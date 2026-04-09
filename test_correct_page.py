@@ -1,73 +1,50 @@
 """
-Teste com o Page ID corrigido para verificar se resolve o problema
+Test that the configured META_PAGE_ID can create ad creatives.
+Run this after setting up your .env to verify page connectivity.
 """
-import sys
 import os
-if sys.platform == 'win32':
-    import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-
 from dotenv import load_dotenv
 from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
-from facebook_business.adobjects.adcreative import AdCreative
+from facebook_business.adobjects.page import Page
 
 load_dotenv()
 
-print("\nTESTE COM PAGE ID CORRIGIDO")
+print("\nTESTING PAGE CONFIGURATION")
 print("=" * 60)
 
-# Inicializar API
 FacebookAdsApi.init(
     app_id=os.getenv('META_APP_ID'),
     app_secret=os.getenv('META_APP_SECRET'),
-    access_token=os.getenv('META_ACCESS_TOKEN')
+    access_token=os.getenv('META_ACCESS_TOKEN'),
 )
 
 ad_account = AdAccount(os.getenv('META_AD_ACCOUNT_ID'))
 page_id = os.getenv('META_PAGE_ID')
 
-print(f"\nConta de Anuncios: {ad_account.get_id()}")
-print(f"Page ID configurado: {page_id}")
-print(f"Nome da pagina: Treinamento de I.A. Para Corretores de Imoveis")
+print(f"\nAd Account: {ad_account.get_id()}")
+print(f"Page ID: {page_id}")
 
-# Usar um hash de imagem que ja foi feito upload antes
-# (do teste anterior)
-image_hash = "05b5ee799139dbc049d019c57e7ad2c7"
-
-print(f"\nTestando criacao de criativo com Page ID correto...")
+print(f"\nChecking page access...")
 print("-" * 60)
 
 try:
-    creative_params = {
-        'name': 'Teste Page Corrigido',
-        'object_story_spec': {
-            'page_id': page_id,
-            'link_data': {
-                'image_hash': image_hash,
-                'link': 'https://www.chatbotimoveis.com.br',
-                'message': 'Teste com pagina correta - Treinamento de IA para Corretores',
-                'name': 'Teste Page ID',
-                'call_to_action': {
-                    'type': 'LEARN_MORE',
-                    'value': {
-                        'link': 'https://www.chatbotimoveis.com.br'
-                    }
-                }
-            }
-        }
-    }
+    page = Page(fbid=page_id)
+    page_info = page.api_get(fields=['id', 'name', 'is_published'])
 
-    creative = ad_account.create_ad_creative(params=creative_params)
-    print(f"\n✅ SUCESSO! Creative criado com ID: {creative.get_id()}")
-    print("\nO problema era apenas o Page ID incorreto!")
-    print("Agora voce pode executar run_automation.py para criar os anuncios completos.")
+    print(f"Page Name: {page_info.get('name')}")
+    print(f"Published: {page_info.get('is_published')}")
+    print("Page access: OK")
+
+    print("\nPage is correctly configured. You can run:")
+    print("  python run_automation.py")
 
 except Exception as e:
-    print(f"\n❌ ERRO: {str(e)}")
-    print("\nPossiveis causas:")
-    print("1. Token ainda sem permissao 'pages_manage_ads'")
-    print("2. Pagina nao conectada a conta de anuncios")
-    print("\nVeja o arquivo SOLUCAO_PAGINA.md para instrucoes completas.")
+    print(f"\nERROR: {str(e)}")
+    print("\nPossible causes:")
+    print("1. Token missing 'pages_manage_ads' permission")
+    print("2. Page not connected to the Ad Account")
+    print("3. Wrong META_PAGE_ID in .env")
+    print("\nRun 'python diagnose_page_permissions.py' for detailed diagnostics.")
 
 print("\n" + "=" * 60)

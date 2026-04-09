@@ -1,167 +1,130 @@
 """
-Módulo de geração de imagens usando OpenAI DALL-E 3
+Image generation module using Vertex AI Imagen
 """
 import os
-import requests
-from openai import OpenAI
 from typing import Optional, Literal
-import base64
+from google import genai
+from google.genai.types import GenerateImagesConfig
 
 
 class ImageGenerator:
-    """Classe para gerar imagens usando a API OpenAI DALL-E 3"""
+    """Generate images using Vertex AI Imagen API"""
 
-    def __init__(self, api_key: Optional[str] = None):
-        """
-        Inicializa o gerador de imagens
+    ASPECT_RATIOS = ("1:1", "3:4", "4:3", "9:16", "16:9")
+    MODELS = {
+        "fast": "imagen-3.0-fast-generate-001",
+        "standard": "imagen-3.0-generate-002",
+        "ultra": "imagen-4.0-ultra-generate-001",
+    }
 
-        Args:
-            api_key: Chave da API OpenAI (se None, usa variável de ambiente)
-        """
-        self.api_key = api_key or os.getenv('OPENAI_API_KEY')
-        if not self.api_key:
-            raise ValueError("OPENAI_API_KEY não encontrada. Configure no .env ou passe como parâmetro")
+    def __init__(
+        self,
+        project_id: Optional[str] = None,
+        location: Optional[str] = None,
+        model_tier: Literal["fast", "standard", "ultra"] = "fast",
+    ):
+        self.project_id = project_id or os.getenv("GCP_PROJECT_ID", "bemtech-478413")
+        self.location = location or os.getenv("GCP_LOCATION", "us-central1")
+        self.model = self.MODELS[model_tier]
 
-        self.client = OpenAI(api_key=self.api_key)
+        self.client = genai.Client(
+            vertexai=True,
+            project=self.project_id,
+            location=self.location,
+        )
 
     def generate_image(
         self,
         prompt: str,
-        size: Literal["1024x1024", "1792x1024", "1024x1792"] = "1024x1024",
-        quality: Literal["standard", "hd"] = "standard",
-        style: Literal["vivid", "natural"] = "vivid",
-        save_path: Optional[str] = None
+        aspect_ratio: str = "1:1",
+        save_path: Optional[str] = None,
     ) -> dict:
         """
-        Gera uma imagem usando DALL-E 3
+        Generate an image from a text prompt.
 
         Args:
-            prompt: Descrição da imagem desejada (máx 4000 caracteres)
-            size: Tamanho da imagem
-            quality: Qualidade da imagem ('standard' ou 'hd')
-            style: Estilo ('vivid' para dramático ou 'natural' para realista)
-            save_path: Caminho para salvar a imagem localmente
+            prompt: Text description of the desired image (max 4000 chars)
+            aspect_ratio: One of 1:1, 3:4, 4:3, 9:16, 16:9
+            save_path: Local path to save the image (optional)
 
         Returns:
-            dict com 'url', 'revised_prompt' e opcionalmente 'local_path'
+            dict with 'local_path', 'model', 'aspect_ratio'
         """
         if len(prompt) > 4000:
-            raise ValueError("Prompt muito longo. Máximo 4000 caracteres para DALL-E 3")
+            raise ValueError("Prompt too long. Max 4000 characters for Imagen.")
 
-        print(f"🎨 Gerando imagem com DALL-E 3...")
-        print(f"📝 Prompt: {prompt[:100]}...")
+        if aspect_ratio not in self.ASPECT_RATIOS:
+            raise ValueError(f"Invalid aspect ratio. Must be one of {self.ASPECT_RATIOS}")
 
-        try:
-            response = self.client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                size=size,
-                quality=quality,
-                style=style,
-                n=1  # DALL-E 3 só suporta n=1
-            )
+        print(f"Generating image with {self.model}...")
+        print(f"Prompt: {prompt[:100]}...")
 
-            image_url = response.data[0].url
-            revised_prompt = response.data[0].revised_prompt
+        response = self.client.models.generate_images(
+            model=self.model,
+            prompt=prompt,
+            config=GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio=aspect_ratio,
+                safety_filter_level="block_medium_and_above",
+                person_generation="allow_adult",
+            ),
+        )
 
-            result = {
-                'url': image_url,
-                'revised_prompt': revised_prompt,
-                'size': size,
-                'quality': quality,
-                'style': style
-            }
+        if not response.generated_images:
+            raise RuntimeError("No image generated — may have been blocked by safety filter.")
 
-            # Salvar imagem localmente se solicitado
-            if save_path:
-                local_path = self._download_image(image_url, save_path)
-                result['local_path'] = local_path
-                print(f"✅ Imagem salva em: {local_path}")
+        result = {
+            "model": self.model,
+            "aspect_ratio": aspect_ratio,
+        }
 
-            print(f"✅ Imagem gerada com sucesso!")
-            print(f"🔗 URL: {image_url}")
-            print(f"📝 Prompt revisado pela IA: {revised_prompt}")
+        if save_path:
+            os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
+            response.generated_images[0].image.save(save_path)
+            result["local_path"] = save_path
+            print(f"Image saved: {save_path}")
+        else:
+            result["image_bytes"] = response.generated_images[0].image.image_bytes
 
-            return result
-
-        except Exception as e:
-            print(f"❌ Erro ao gerar imagem: {str(e)}")
-            raise
-
-    def _download_image(self, url: str, save_path: str) -> str:
-        """
-        Baixa a imagem da URL e salva localmente
-
-        Args:
-            url: URL da imagem
-            save_path: Caminho onde salvar
-
-        Returns:
-            Caminho completo do arquivo salvo
-        """
-        try:
-            response = requests.get(url, timeout=30)
-            response.raise_for_status()
-
-            # Criar diretório se não existir
-            os.makedirs(os.path.dirname(save_path), exist_ok=True)
-
-            with open(save_path, 'wb') as f:
-                f.write(response.content)
-
-            return save_path
-
-        except Exception as e:
-            print(f"❌ Erro ao baixar imagem: {str(e)}")
-            raise
+        return result
 
     def generate_multiple_variations(
         self,
         base_prompt: str,
         variations: list[str],
-        **kwargs
+        **kwargs,
     ) -> list[dict]:
         """
-        Gera múltiplas variações de uma imagem
+        Generate multiple image variations from a base prompt.
 
         Args:
-            base_prompt: Prompt base
-            variations: Lista de modificações para criar variações
-            **kwargs: Parâmetros adicionais para generate_image
+            base_prompt: Base prompt text
+            variations: List of suffixes to append to the base prompt
+            **kwargs: Additional args passed to generate_image
 
         Returns:
-            Lista de resultados de cada variação
+            List of result dicts, one per variation
         """
         results = []
-
         for i, variation in enumerate(variations, 1):
             full_prompt = f"{base_prompt}. {variation}"
-            print(f"\n🎨 Gerando variação {i}/{len(variations)}")
-
+            print(f"\nGenerating variation {i}/{len(variations)}")
             result = self.generate_image(prompt=full_prompt, **kwargs)
-            results.append({
-                'variation': variation,
-                **result
-            })
-
+            results.append({"variation": variation, **result})
         return results
 
 
-# Exemplo de uso
 if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv()
 
-    # Inicializar gerador
     generator = ImageGenerator()
 
-    # Exemplo 1: Imagem simples
     result = generator.generate_image(
-        prompt="Modern luxury apartment interior with ocean view, minimalist design, natural lighting",
-        size="1024x1024",
-        quality="hd",
-        style="vivid",
-        save_path="./generated_images/apartment_1.png"
+        prompt="Professional digital marketing agency workspace, modern and sleek, "
+               "AI-powered dashboards on screens, clean design",
+        aspect_ratio="1:1",
+        save_path="./generated_images/test_aiweon.png",
     )
 
-    print(f"\n📊 Resultado: {result}")
+    print(f"\nResult: {result}")

@@ -1,311 +1,207 @@
 """
-Script principal de automação: Geração de imagens + Publicação de anúncios Meta
+Main automation: AI image generation + Meta ad publishing for Aiweon.
 """
 import os
-from dotenv import load_dotenv
-from image_generator import ImageGenerator
-from meta_ads_manager import MetaAdsManager
-from typing import Optional
 import json
 from datetime import datetime
+from typing import Optional
+
+from dotenv import load_dotenv
+
+from image_generator import ImageGenerator
+from meta_ads_manager import MetaAdsManager
+
+
+DEFAULT_TARGETING = {
+    'geo_locations': {'countries': ['IL']},
+    'age_min': 25,
+    'age_max': 55,
+}
 
 
 class AdAutomation:
-    """Classe principal para automação completa de anúncios"""
+    """End-to-end ad automation: generate image with Imagen, publish via Meta Ads."""
 
     def __init__(self):
-        """Inicializa a automação carregando variáveis de ambiente"""
         load_dotenv()
 
-        print("🚀 Inicializando Automação de Anúncios")
+        print("Initializing Ad Automation")
         print("=" * 60)
 
         self.image_generator = ImageGenerator()
         self.meta_manager = MetaAdsManager()
 
-        print("✅ Automação inicializada com sucesso!")
+        print("Automation ready.")
         print("=" * 60 + "\n")
 
     def create_ad_with_ai_image(
         self,
-        # Parâmetros da imagem
+        # Image params
         image_prompt: str,
-        image_size: str = "1024x1024",
-        image_quality: str = "hd",
-        image_style: str = "vivid",
+        image_aspect_ratio: str = "1:1",
 
-        # Parâmetros do anúncio
-        campaign_name: str = None,
-        ad_title: str = None,
-        ad_body: str = None,
-        link_url: str = None,
-        daily_budget: int = 5000,
+        # Ad params
+        campaign_name: Optional[str] = None,
+        ad_title: Optional[str] = None,
+        ad_body: Optional[str] = None,
+        link_url: Optional[str] = None,
+        daily_budget_usd: float = 14,
 
-        # Segmentação
+        # Targeting
         targeting: Optional[dict] = None,
 
-        # Configurações adicionais
+        # Additional
         objective: str = "OUTCOME_TRAFFIC",
         call_to_action: str = "LEARN_MORE",
-        save_locally: bool = True
+        special_ad_categories: Optional[list] = None,
     ) -> dict:
         """
-        Cria um anúncio completo: gera imagem com IA e publica na Meta
+        Create a complete ad: generate image with AI then publish to Meta.
 
         Args:
-            image_prompt: Descrição da imagem para DALL-E
-            image_size: Tamanho da imagem
-            image_quality: Qualidade (standard/hd)
-            image_style: Estilo (vivid/natural)
-            campaign_name: Nome da campanha
-            ad_title: Título do anúncio
-            ad_body: Texto principal
-            link_url: URL de destino
-            daily_budget: Orçamento diário em centavos
-            targeting: Segmentação do público
-            objective: Objetivo da campanha
-            call_to_action: Tipo de CTA
-            save_locally: Salvar imagem localmente
+            image_prompt: Text description for Imagen
+            image_aspect_ratio: Aspect ratio for the image
+            campaign_name: Campaign name (auto-generated if None)
+            ad_title: Ad headline
+            ad_body: Ad body text
+            link_url: Destination URL
+            daily_budget_usd: Daily budget in USD (converted to ILS via live rate)
+            targeting: Audience targeting dict
+            objective: Campaign objective
+            call_to_action: CTA type
+            special_ad_categories: Special categories (e.g. ['HOUSING'])
 
         Returns:
-            Dicionário com informações da imagem e do anúncio criado
+            Dict with image info and Meta ad IDs
         """
         print("\n" + "=" * 60)
-        print("🎯 INICIANDO AUTOMAÇÃO COMPLETA")
+        print("STARTING FULL AUTOMATION")
         print("=" * 60)
 
-        try:
-            # Gerar timestamp para nomes únicos
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-            # 1. GERAR IMAGEM COM IA
-            print("\n📍 ETAPA 1/2: Gerando imagem com IA")
-            print("-" * 60)
+        # 1. Generate image
+        print("\n[1/2] Generating image with AI")
+        print("-" * 60)
 
-            image_path = None
-            if save_locally:
-                os.makedirs("./generated_images", exist_ok=True)
-                image_path = f"./generated_images/ad_image_{timestamp}.png"
+        os.makedirs("./generated_images", exist_ok=True)
+        image_path = f"./generated_images/ad_image_{timestamp}.png"
 
-            image_result = self.image_generator.generate_image(
-                prompt=image_prompt,
-                size=image_size,
-                quality=image_quality,
-                style=image_style,
-                save_path=image_path
-            )
+        image_result = self.image_generator.generate_image(
+            prompt=image_prompt,
+            aspect_ratio=image_aspect_ratio,
+            save_path=image_path,
+        )
 
-            print(f"✅ Imagem gerada com sucesso!")
-            print(f"🔗 URL: {image_result['url']}")
+        print(f"Image saved: {image_path}")
 
-            if not image_path:
-                print("\n⚠️  Aviso: Imagem não foi salva localmente.")
-                print("💡 Dica: Para publicar na Meta, a imagem precisa ser salva localmente.")
-                print("    Defina save_locally=True ou forneça um save_path.")
-                return {
-                    'success': False,
-                    'image': image_result,
-                    'error': 'Imagem não salva localmente'
-                }
+        # 2. Publish to Meta
+        print("\n[2/2] Publishing ad to Meta")
+        print("-" * 60)
 
-            # 2. PUBLICAR ANÚNCIO NA META
-            print("\n📍 ETAPA 2/2: Publicando anúncio na Meta")
-            print("-" * 60)
+        targeting = targeting or DEFAULT_TARGETING
+        campaign_name = campaign_name or f"Aiweon Campaign {timestamp}"
+        ad_title = ad_title or "AI-Powered Marketing by Aiweon"
+        ad_body = ad_body or "Transform your business with AI-driven marketing."
+        link_url = link_url or "https://aiweon.com"
 
-            # Configurar targeting padrão se não fornecido
-            if targeting is None:
-                targeting = {
-                    'geo_locations': {'countries': ['BR']},
-                    'age_min': 25,
-                    'age_max': 55,
-                }
+        meta_result = self.meta_manager.create_complete_ad(
+            campaign_name=campaign_name,
+            ad_name=f"Ad_{timestamp}",
+            image_path=image_path,
+            title=ad_title,
+            body=ad_body,
+            link_url=link_url,
+            daily_budget_usd=daily_budget_usd,
+            targeting=targeting,
+            objective=objective,
+            call_to_action=call_to_action,
+            special_ad_categories=special_ad_categories,
+        )
 
-            # Usar nomes padrão se não fornecidos
-            campaign_name = campaign_name or f"Campaign_{timestamp}"
-            ad_title = ad_title or "Descubra algo incrível"
-            ad_body = ad_body or image_result.get('revised_prompt', image_prompt)[:500]
-            link_url = link_url or "https://www.exemplo.com"
+        # 3. Compile results
+        final_result = {
+            'success': True,
+            'timestamp': timestamp,
+            'image': {
+                'local_path': image_path,
+                'model': image_result['model'],
+                'aspect_ratio': image_result['aspect_ratio'],
+            },
+            'meta_ad': {
+                'campaign_id': meta_result['campaign_id'],
+                'ad_set_id': meta_result['ad_set_id'],
+                'creative_id': meta_result['creative_id'],
+                'ad_id': meta_result['ad_id'],
+                'campaign_name': campaign_name,
+                'title': ad_title,
+                'body': ad_body,
+                'link': link_url,
+                'daily_budget_usd': daily_budget_usd,
+            },
+        }
 
-            meta_result = self.meta_manager.create_complete_ad(
-                campaign_name=campaign_name,
-                ad_name=f"Ad_{timestamp}",
-                image_path=image_path,
-                title=ad_title,
-                body=ad_body,
-                link_url=link_url,
-                daily_budget=daily_budget,
-                targeting=targeting,
-                objective=objective,
-                call_to_action=call_to_action
-            )
+        # Save log
+        os.makedirs("./logs", exist_ok=True)
+        log_path = f"./logs/automation_log_{timestamp}.json"
+        with open(log_path, 'w', encoding='utf-8') as f:
+            json.dump(final_result, f, indent=2, ensure_ascii=False)
 
-            # 3. COMPILAR RESULTADOS
-            final_result = {
-                'success': True,
-                'timestamp': timestamp,
-                'image': {
-                    'url': image_result['url'],
-                    'local_path': image_path,
-                    'revised_prompt': image_result['revised_prompt'],
-                    'size': image_result['size'],
-                    'quality': image_result['quality']
-                },
-                'meta_ad': {
-                    'campaign_id': meta_result['campaign_id'],
-                    'ad_set_id': meta_result['ad_set_id'],
-                    'creative_id': meta_result['creative_id'],
-                    'ad_id': meta_result['ad_id'],
-                    'campaign_name': campaign_name,
-                    'title': ad_title,
-                    'body': ad_body,
-                    'link': link_url,
-                    'daily_budget': daily_budget
-                }
-            }
+        print("\n" + "=" * 60)
+        print("AUTOMATION COMPLETE")
+        print("=" * 60)
+        print(f"Log: {log_path}")
+        print(f"Image: {image_path}")
+        print(f"Campaign ID: {meta_result['campaign_id']}")
+        print(f"Ad ID: {meta_result['ad_id']}")
+        print("=" * 60 + "\n")
 
-            # Salvar log em JSON
-            log_path = f"./logs/automation_log_{timestamp}.json"
-            os.makedirs("./logs", exist_ok=True)
-            with open(log_path, 'w', encoding='utf-8') as f:
-                json.dump(final_result, f, indent=2, ensure_ascii=False)
-
-            print("\n" + "=" * 60)
-            print("🎉 AUTOMAÇÃO CONCLUÍDA COM SUCESSO!")
-            print("=" * 60)
-            print(f"📊 Log salvo em: {log_path}")
-            print(f"🖼️  Imagem: {image_path}")
-            print(f"📱 Campaign ID: {meta_result['campaign_id']}")
-            print(f"📱 Ad ID: {meta_result['ad_id']}")
-            print("=" * 60 + "\n")
-
-            return final_result
-
-        except Exception as e:
-            error_msg = f"Erro na automação: {str(e)}"
-            print(f"\n❌ {error_msg}")
-
-            return {
-                'success': False,
-                'error': error_msg,
-                'timestamp': timestamp
-            }
+        return final_result
 
     def create_multiple_ads(self, ads_config: list[dict]) -> list[dict]:
-        """
-        Cria múltiplos anúncios em lote
-
-        Args:
-            ads_config: Lista de configurações de anúncios
-
-        Returns:
-            Lista de resultados
-        """
-        print(f"\n🚀 Criando {len(ads_config)} anúncios em lote...")
+        """Create multiple ads in batch."""
+        print(f"\nCreating {len(ads_config)} ads in batch...")
 
         results = []
         for i, config in enumerate(ads_config, 1):
             print(f"\n{'='*60}")
-            print(f"📍 Anúncio {i}/{len(ads_config)}")
+            print(f"Ad {i}/{len(ads_config)}")
             print(f"{'='*60}")
 
-            result = self.create_ad_with_ai_image(**config)
+            try:
+                result = self.create_ad_with_ai_image(**config)
+            except Exception as e:
+                result = {'success': False, 'error': str(e)}
             results.append(result)
 
         successful = sum(1 for r in results if r.get('success'))
-        print(f"\n✅ Concluído! {successful}/{len(ads_config)} anúncios criados com sucesso.")
+        print(f"\nDone: {successful}/{len(ads_config)} ads created successfully.")
 
         return results
 
 
-# Exemplos de uso
 if __name__ == "__main__":
-
-    # Inicializar automação
     automation = AdAutomation()
 
-    # EXEMPLO 1: Criar um anúncio simples
-    print("\n🏠 EXEMPLO 1: Anúncio de Imóvel de Luxo")
-    print("=" * 60)
-
+    # Example: Single Aiweon ad
     result = automation.create_ad_with_ai_image(
-        # Parâmetros da imagem
-        image_prompt="""
-        Modern luxury apartment interior with panoramic ocean view,
-        floor-to-ceiling windows, minimalist Scandinavian design,
-        natural sunlight, elegant furniture, white and beige tones,
-        professional real estate photography style
-        """,
-        image_size="1024x1024",
-        image_quality="hd",
-        image_style="vivid",
-
-        # Parâmetros do anúncio
-        campaign_name="Campanha Imóveis de Luxo - Novembro 2025",
-        ad_title="Apartamento de Luxo com Vista para o Mar",
-        ad_body="""
-        Descubra o imóvel dos seus sonhos! 🏖️
-        ✨ Design moderno e elegante
-        🌊 Vista panorâmica para o oceano
-        📍 Localização privilegiada
-        Agende sua visita hoje mesmo!
-        """,
-        link_url="https://www.exemplo.com/imoveis/luxo",
-        daily_budget=10000,  # R$ 100,00 por dia
-
-        # Segmentação
+        image_prompt=(
+            "Professional AI marketing dashboard, futuristic analytics interface, "
+            "clean modern design, data visualizations, blue and white color scheme"
+        ),
+        campaign_name="Aiweon - AI Marketing Platform",
+        ad_title="Supercharge Your Marketing with AI",
+        ad_body=(
+            "Aiweon uses cutting-edge AI to optimize your digital marketing. "
+            "More leads, lower costs, better results."
+        ),
+        link_url="https://aiweon.com",
+        daily_budget_usd=14,  # ~50 ILS/day
         targeting={
-            'geo_locations': {
-                'countries': ['BR'],
-                'regions': [{'key': '3450'}],  # São Paulo
-            },
-            'age_min': 30,
+            'geo_locations': {'countries': ['IL']},
+            'age_min': 25,
             'age_max': 55,
-            'interests': [
-                {'id': 6003139266461, 'name': 'Real estate'},
-                {'id': 6003107902433, 'name': 'Luxury goods'}
-            ]
         },
-
-        objective="OUTCOME_TRAFFIC",
-        call_to_action="LEARN_MORE"
     )
 
-    print(f"\n📊 Resultado: {json.dumps(result, indent=2, ensure_ascii=False)}")
-
-
-    # EXEMPLO 2: Criar múltiplos anúncios
-    print("\n\n🎯 EXEMPLO 2: Criar 3 Anúncios de Diferentes Imóveis")
-    print("=" * 60)
-
-    ads_batch = [
-        {
-            'image_prompt': 'Modern studio apartment, compact and efficient design, natural light',
-            'campaign_name': 'Campanha Studios Modernos',
-            'ad_title': 'Studio Moderno no Centro',
-            'ad_body': 'Perfeito para jovens profissionais. Localização privilegiada!',
-            'link_url': 'https://exemplo.com/studios',
-            'daily_budget': 5000
-        },
-        {
-            'image_prompt': 'Luxury penthouse terrace with city skyline view, sunset lighting',
-            'campaign_name': 'Campanha Coberturas Premium',
-            'ad_title': 'Cobertura Premium com Vista',
-            'ad_body': 'Viva no topo! Exclusividade e sofisticação em cada detalhe.',
-            'link_url': 'https://exemplo.com/coberturas',
-            'daily_budget': 15000,
-            'image_quality': 'hd'
-        },
-        {
-            'image_prompt': 'Cozy family house with garden, modern suburban home, warm lighting',
-            'campaign_name': 'Campanha Casas Familiares',
-            'ad_title': 'Casa Perfeita para Sua Família',
-            'ad_body': 'Ampla, confortável e segura. O lar que você sempre sonhou!',
-            'link_url': 'https://exemplo.com/casas',
-            'daily_budget': 8000
-        }
-    ]
-
-    # Descomente a linha abaixo para criar os anúncios em lote
-    # batch_results = automation.create_multiple_ads(ads_batch)
-
-    print("\n✅ Script finalizado!")
+    print(f"\nResult: {json.dumps(result, indent=2, ensure_ascii=False)}")

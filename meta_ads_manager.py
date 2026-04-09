@@ -1,7 +1,10 @@
 """
-Módulo de gerenciamento de anúncios na Meta (Facebook, Instagram, WhatsApp)
+Meta Ads Manager — create campaigns, ad sets, creatives, and ads via the Marketing API.
 """
 import os
+import subprocess
+import tempfile
+import requests as http_requests
 from typing import Optional, Literal
 from facebook_business.api import FacebookAdsApi
 from facebook_business.adobjects.adaccount import AdAccount
@@ -10,6 +13,7 @@ from facebook_business.adobjects.adset import AdSet
 from facebook_business.adobjects.ad import Ad
 from facebook_business.adobjects.adcreative import AdCreative
 from facebook_business.adobjects.adimage import AdImage
+from facebook_business.adobjects.advideo import AdVideo
 
 
 class MetaAdsManager:
@@ -51,7 +55,29 @@ class MetaAdsManager:
         )
 
         self.ad_account = AdAccount(self.ad_account_id)
+        self._usdils_rate = None
         print(f"✅ Meta Ads API inicializada para conta: {self.ad_account_id}")
+
+    @property
+    def usdils_rate(self) -> float:
+        """Fetch and cache the current USD/ILS exchange rate."""
+        if self._usdils_rate is None:
+            try:
+                resp = http_requests.get(
+                    "https://open.er-api.com/v6/latest/USD",
+                    timeout=5,
+                )
+                self._usdils_rate = resp.json()["rates"]["ILS"]
+            except Exception:
+                self._usdils_rate = 3.6  # fallback
+                print("⚠️ Could not fetch live rate, using fallback 3.60")
+            print(f"💱 USD/ILS rate: {self._usdils_rate:.2f}")
+        return self._usdils_rate
+
+    def usd_to_agorot(self, usd: float) -> int:
+        """Convert a USD amount to agorot (ILS cents) using live exchange rate."""
+        ils = usd * self.usdils_rate
+        return int(ils * 100)
 
     def upload_image(self, image_path: str, image_name: Optional[str] = None) -> str:
         """
@@ -112,8 +138,7 @@ class MetaAdsManager:
                 Campaign.Field.status: status,
             }
 
-            if special_ad_categories:
-                params[Campaign.Field.special_ad_categories] = special_ad_categories
+            params[Campaign.Field.special_ad_categories] = special_ad_categories or []
 
             # Novo requisito da Meta API: budget sharing
             params['is_adset_budget_sharing_enabled'] = False
@@ -131,46 +156,48 @@ class MetaAdsManager:
         self,
         campaign_id: str,
         name: str,
-        daily_budget: int,
+        daily_budget_usd: float,
         targeting: dict,
         optimization_goal: str = "LINK_CLICKS",
         billing_event: str = "IMPRESSIONS",
         bid_amount: Optional[int] = None
     ) -> AdSet:
         """
-        Cria um conjunto de anúncios
+        Create an ad set.
 
         Args:
-            campaign_id: ID da campanha
-            name: Nome do conjunto
-            daily_budget: Orçamento diário em centavos (ex: 5000 = R$50,00)
-            targeting: Dicionário de segmentação (países, idades, etc)
-            optimization_goal: Meta de otimização
-            billing_event: Evento de cobrança
-            bid_amount: Lance em centavos (opcional)
+            campaign_id: Campaign ID
+            name: Ad set name
+            daily_budget_usd: Daily budget in USD (converted to agorot via live USD/ILS rate)
+            targeting: Targeting dict (countries, ages, etc.)
+            optimization_goal: Optimization goal
+            billing_event: Billing event
+            bid_amount: Bid amount in agorot (optional, defaults to 10% of daily budget)
 
         Returns:
-            Objeto AdSet criado
+            AdSet object
         """
-        print(f"🎯 Criando conjunto de anúncios: {name}")
+        daily_budget_agorot = self.usd_to_agorot(daily_budget_usd)
+        print(f"🎯 Creating ad set: {name} (${daily_budget_usd:.2f}/day = {daily_budget_agorot} agorot)")
 
         try:
             params = {
                 AdSet.Field.name: name,
                 AdSet.Field.campaign_id: campaign_id,
-                AdSet.Field.daily_budget: daily_budget,
+                AdSet.Field.daily_budget: daily_budget_agorot,
                 AdSet.Field.billing_event: billing_event,
                 AdSet.Field.optimization_goal: optimization_goal,
-                AdSet.Field.targeting: targeting,
+                AdSet.Field.targeting: {
+                    **targeting,
+                    'targeting_automation': {'advantage_audience': 0},
+                },
                 AdSet.Field.status: 'PAUSED',
             }
 
-            # Definir bid_amount automaticamente se não fornecido
             if bid_amount:
                 params[AdSet.Field.bid_amount] = bid_amount
             else:
-                # Usar 10% do orçamento diário como lance padrão
-                params[AdSet.Field.bid_amount] = int(daily_budget * 0.1)
+                params[AdSet.Field.bid_amount] = int(daily_budget_agorot * 0.1)
 
             ad_set = self.ad_account.create_ad_set(params=params)
 
@@ -279,6 +306,214 @@ class MetaAdsManager:
             print(f"❌ Erro ao criar anúncio: {str(e)}")
             raise
 
+    def upload_video(self, video_path: str, video_name: Optional[str] = None) -> str:
+        """
+        Upload a video to the ad account's video library.
+
+        Args:
+            video_path: Local path to the video file
+            video_name: Display name for the video (optional)
+
+        Returns:
+            Video ID for use in creatives
+        """
+        print(f"📤 Uploading video: {video_path}")
+
+        try:
+            video = AdVideo(parent_id=self.ad_account_id)
+            video[AdVideo.Field.filepath] = video_path
+
+            if video_name:
+                video[AdVideo.Field.name] = video_name
+
+            video.remote_create()
+            video_id = video.get_id()
+
+            print(f"✅ Video uploaded! ID: {video_id}")
+            return video_id
+
+        except Exception as e:
+            print(f"❌ Video upload error: {str(e)}")
+            raise
+
+    def create_video_ad_creative(
+        self,
+        name: str,
+        video_id: str,
+        title: str,
+        body: str,
+        link_url: str,
+        call_to_action_type: str = "LEARN_MORE",
+        page_id: Optional[str] = None,
+        thumbnail_hash: Optional[str] = None,
+    ) -> AdCreative:
+        """
+        Create an ad creative using a video.
+
+        Args:
+            name: Creative name
+            video_id: Video ID (from upload_video)
+            title: Ad headline
+            body: Primary text
+            link_url: Destination URL
+            call_to_action_type: CTA type
+            page_id: Facebook Page ID (optional, falls back to env)
+            thumbnail_hash: Image hash for custom thumbnail (optional)
+
+        Returns:
+            AdCreative object
+        """
+        print(f"🎨 Creating video creative: {name}")
+
+        try:
+            page_id = page_id or os.getenv('META_PAGE_ID')
+
+            video_data = {
+                'video_id': video_id,
+                'message': body,
+                'title': title,
+                'call_to_action': {
+                    'type': call_to_action_type,
+                    'value': {
+                        'link': link_url,
+                    },
+                },
+            }
+
+            if thumbnail_hash:
+                video_data['image_hash'] = thumbnail_hash
+
+            object_story_spec = {
+                'page_id': page_id,
+                'video_data': video_data,
+            }
+
+            params = {
+                AdCreative.Field.name: name,
+                AdCreative.Field.object_story_spec: object_story_spec,
+            }
+
+            creative = self.ad_account.create_ad_creative(params=params)
+
+            print(f"✅ Video creative created! ID: {creative.get_id()}")
+            return creative
+
+        except Exception as e:
+            print(f"❌ Video creative error: {str(e)}")
+            raise
+
+    def create_complete_video_ad(
+        self,
+        campaign_name: str,
+        ad_name: str,
+        video_path: str,
+        title: str,
+        body: str,
+        link_url: str,
+        daily_budget_usd: float,
+        targeting: dict,
+        objective: str = "OUTCOME_AWARENESS",
+        call_to_action: str = "LEARN_MORE",
+        optimization_goal: str = "THRUPLAY",
+        special_ad_categories: Optional[list] = None,
+    ) -> dict:
+        """
+        Create a complete video ad (campaign + ad set + creative + ad).
+
+        Args:
+            campaign_name: Campaign name
+            ad_name: Ad name
+            video_path: Local path to the video file
+            title: Ad headline
+            body: Primary text
+            link_url: Destination URL
+            daily_budget_usd: Daily budget in USD (converted to ILS via live rate)
+            targeting: Audience targeting dict
+            objective: Campaign objective (default OUTCOME_AWARENESS for video)
+            call_to_action: CTA type
+            optimization_goal: Ad set optimization (default THRUPLAY for video)
+            special_ad_categories: Special categories list
+
+        Returns:
+            Dict with IDs of all created objects
+        """
+        print(f"\n🚀 Creating complete video ad: {campaign_name}")
+        print("=" * 60)
+
+        try:
+            # 1. Upload video
+            video_id = self.upload_video(video_path, video_name=ad_name)
+
+            # 2. Create campaign
+            campaign = self.create_campaign(
+                name=campaign_name,
+                objective=objective,
+                status="PAUSED",
+                special_ad_categories=special_ad_categories,
+            )
+
+            # 3. Create ad set
+            ad_set = self.create_ad_set(
+                campaign_id=campaign.get_id(),
+                name=f"{ad_name} - Ad Set",
+                daily_budget_usd=daily_budget_usd,
+                targeting=targeting,
+                optimization_goal=optimization_goal,
+            )
+
+            # 4. Extract thumbnail and upload
+            print("🖼️ Extracting video thumbnail...")
+            thumb_path = os.path.join(tempfile.gettempdir(), "ad_thumbnail.png")
+            subprocess.run(
+                ["ffmpeg", "-i", video_path, "-ss", "00:00:02", "-frames:v", "1",
+                 "-update", "1", thumb_path, "-y"],
+                capture_output=True,
+            )
+            thumbnail_hash = self.upload_image(thumb_path, image_name=f"{ad_name} - Thumbnail")
+
+            # 5. Create video creative
+            creative = self.create_video_ad_creative(
+                name=f"{ad_name} - Creative",
+                video_id=video_id,
+                title=title,
+                body=body,
+                link_url=link_url,
+                call_to_action_type=call_to_action,
+                thumbnail_hash=thumbnail_hash,
+            )
+
+            # 6. Create ad
+            ad = self.create_ad(
+                ad_set_id=ad_set.get_id(),
+                creative_id=creative.get_id(),
+                name=ad_name,
+                status="PAUSED",
+            )
+
+            result = {
+                'campaign_id': campaign.get_id(),
+                'ad_set_id': ad_set.get_id(),
+                'creative_id': creative.get_id(),
+                'ad_id': ad.get_id(),
+                'video_id': video_id,
+                'thumbnail_hash': thumbnail_hash,
+            }
+
+            print("\n" + "=" * 60)
+            print("✅ VIDEO AD CREATED SUCCESSFULLY!")
+            print(f"📊 Campaign ID: {result['campaign_id']}")
+            print(f"📊 Ad Set ID: {result['ad_set_id']}")
+            print(f"📊 Creative ID: {result['creative_id']}")
+            print(f"📊 Ad ID: {result['ad_id']}")
+            print(f"📊 Video ID: {result['video_id']}")
+            print("=" * 60)
+
+            return result
+
+        except Exception as e:
+            print(f"\n❌ Error creating video ad: {str(e)}")
+            raise
+
     def create_complete_ad(
         self,
         campaign_name: str,
@@ -287,26 +522,26 @@ class MetaAdsManager:
         title: str,
         body: str,
         link_url: str,
-        daily_budget: int,
+        daily_budget_usd: float,
         targeting: dict,
         objective: str = "OUTCOME_TRAFFIC",
         call_to_action: str = "LEARN_MORE",
         special_ad_categories: Optional[list] = None
     ) -> dict:
         """
-        Cria um anúncio completo (campanha + conjunto + criativo + anúncio)
+        Create a complete ad (campaign + ad set + creative + ad).
 
         Args:
-            campaign_name: Nome da campanha
-            ad_name: Nome do anúncio
-            image_path: Caminho da imagem
-            title: Título do anúncio
-            body: Texto principal
-            link_url: URL de destino
-            daily_budget: Orçamento diário em centavos
-            targeting: Segmentação
-            objective: Objetivo da campanha
-            call_to_action: Tipo de CTA
+            campaign_name: Campaign name
+            ad_name: Ad name
+            image_path: Image path
+            title: Ad headline
+            body: Primary text
+            link_url: Destination URL
+            daily_budget_usd: Daily budget in USD (converted to ILS via live rate)
+            targeting: Targeting dict
+            objective: Campaign objective
+            call_to_action: CTA type
 
         Returns:
             Dicionário com IDs de todos os objetos criados
@@ -330,7 +565,7 @@ class MetaAdsManager:
             ad_set = self.create_ad_set(
                 campaign_id=campaign.get_id(),
                 name=f"{ad_name} - Ad Set",
-                daily_budget=daily_budget,
+                daily_budget_usd=daily_budget_usd,
                 targeting=targeting
             )
 
@@ -375,30 +610,27 @@ class MetaAdsManager:
             raise
 
 
-# Exemplo de uso
 if __name__ == "__main__":
     from dotenv import load_dotenv
     load_dotenv()
 
-    # Inicializar gerenciador
     manager = MetaAdsManager()
 
-    # Exemplo: Criar anúncio completo
     targeting = {
-        'geo_locations': {'countries': ['BR']},
+        'geo_locations': {'countries': ['IL']},
         'age_min': 25,
         'age_max': 55,
     }
 
     result = manager.create_complete_ad(
-        campaign_name="Test Campaign - Real Estate",
-        ad_name="Luxury Apartment Ad",
-        image_path="./generated_images/apartment_1.png",
-        title="Apartamento de Luxo com Vista para o Mar",
-        body="Descubra o imóvel dos seus sonhos. Design moderno e localização privilegiada.",
-        link_url="https://www.exemplo.com/imoveis",
-        daily_budget=5000,  # R$ 50,00
-        targeting=targeting
+        campaign_name="Aiweon - Test Campaign",
+        ad_name="Aiweon AI Marketing Ad",
+        image_path="./generated_images/test_aiweon.png",
+        title="AI-Powered Digital Marketing",
+        body="Transform your marketing with AI. Aiweon delivers results.",
+        link_url="https://aiweon.com",
+        daily_budget_usd=14,  # ~50 ILS/day
+        targeting=targeting,
     )
 
-    print(f"\n📊 Resultado final: {result}")
+    print(f"\nResult: {result}")

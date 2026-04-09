@@ -1,191 +1,109 @@
 """
-Exemplo Prático: Automação para Anúncios de Imóveis
+Example: Batch ad creation for Aiweon — agency + SaaS campaigns.
 """
+import json
 from automation_main import AdAutomation
 from dotenv import load_dotenv
 
-# Carregar variáveis de ambiente
 load_dotenv()
 
-# Inicializar automação
 automation = AdAutomation()
 
-print("\n" + "="*60)
-print("🏠 EXEMPLO: AUTOMAÇÃO DE ANÚNCIOS DE IMÓVEIS")
-print("="*60)
+print("\n" + "=" * 60)
+print("AIWEON AD EXAMPLES")
+print("=" * 60)
 
-# Exemplo 1: Apartamento de Luxo
-print("\n📍 Criando anúncio: Apartamento de Luxo")
-print("-"*60)
+# Example 1: Agency brand awareness
+print("\nCreating ad: Agency Brand Awareness")
+print("-" * 60)
 
-apartamento_luxo = automation.create_ad_with_ai_image(
-    # Configuração da imagem
-    image_prompt="""
-    Luxurious modern apartment interior with floor-to-ceiling windows,
-    panoramic ocean view, minimalist Scandinavian design,
-    elegant white and beige furniture, natural sunlight,
-    professional real estate photography, wide angle
-    """,
-    image_size="1024x1024",
-    image_quality="hd",
-    image_style="vivid",
-
-    # Configuração do anúncio
-    campaign_name="Campanha Apartamentos Luxo - Costa",
-    ad_title="Apartamento de Luxo Frente Mar",
-    ad_body="""
-🏖️ Viva com Vista para o Mar!
-
-✨ Design moderno e sofisticado
-🌊 Vista panorâmica do oceano
-🏠 Acabamento de alto padrão
-📍 Localização privilegiada
-🔒 Segurança 24h
-
-Agende sua visita e se apaixone!
-    """,
-    link_url="https://www.seusite.com/apartamentos/luxo",
-    daily_budget=10000,  # R$ 100/dia
-
-    # Segmentação
+agency_ad = automation.create_ad_with_ai_image(
+    image_prompt=(
+        "Modern AI marketing agency office, team collaborating around screens "
+        "showing data analytics, professional and innovative atmosphere, "
+        "natural lighting, high-end tech workspace"
+    ),
+    campaign_name="Aiweon - Brand Awareness IL",
+    ad_title="Meet Aiweon: AI Marketing, Redefined",
+    ad_body=(
+        "Israel's AI-first digital marketing agency. "
+        "We use machine learning to find your audience, craft your message, "
+        "and maximize your ROI."
+    ),
+    link_url="https://aiweon.com",
+    daily_budget=7000,  # 70 ILS/day
     targeting={
-        'geo_locations': {
-            'countries': ['BR'],
-            'regions': [{'key': '3450'}]  # São Paulo
-        },
-        'age_min': 35,
-        'age_max': 60,
+        'geo_locations': {'countries': ['IL']},
+        'age_min': 28,
+        'age_max': 55,
         'interests': [
-            {'id': 6003139266461, 'name': 'Real estate'},
-            {'id': 6003107902433, 'name': 'Luxury goods'}
-        ]
+            {'id': 6003384953570, 'name': 'Digital marketing'},
+            {'id': 6003171473721, 'name': 'Entrepreneurship'},
+        ],
     },
-
     objective="OUTCOME_TRAFFIC",
-    call_to_action="LEARN_MORE"
+    call_to_action="LEARN_MORE",
 )
 
-if apartamento_luxo['success']:
-    print(f"✅ Sucesso! Ad ID: {apartamento_luxo['meta_ad']['ad_id']}")
+if agency_ad['success']:
+    print(f"Ad created! ID: {agency_ad['meta_ad']['ad_id']}")
 else:
-    print(f"❌ Erro: {apartamento_luxo.get('error')}")
+    print(f"Error: {agency_ad.get('error')}")
 
 
-# Exemplo 2: Casa Familiar
-print("\n📍 Criando anúncio: Casa Familiar")
-print("-"*60)
+# Example 2: SaaS lead generation
+print("\nCreating ad: SaaS Lead Generation")
+print("-" * 60)
 
-casa_familiar = automation.create_ad_with_ai_image(
-    image_prompt="""
-    Beautiful suburban family house with garden,
-    modern architecture, warm lighting at sunset,
-    green lawn, family-friendly atmosphere,
-    professional real estate photo
-    """,
-    image_quality="standard",
-
-    campaign_name="Campanha Casas Familiares",
-    ad_title="Casa Perfeita para Sua Família",
-    ad_body="""
-🏡 O Lar dos Seus Sonhos!
-
-👨‍👩‍👧‍👦 Espaço ideal para família
-🌳 Jardim amplo e arborizado
-🚗 Garagem para 3 carros
-🎯 Próximo a escolas e parques
-💚 Área de lazer completa
-
-Venha conhecer!
-    """,
-    link_url="https://www.seusite.com/casas/familiar",
-    daily_budget=7000,
-
+saas_ad = automation.create_ad_with_ai_image(
+    image_prompt=(
+        "Clean SaaS product screenshot showing marketing automation dashboard, "
+        "campaign performance graphs, A/B testing results, "
+        "modern UI with gradients, professional product mockup"
+    ),
+    campaign_name="Aiweon SaaS - Lead Gen IL",
+    ad_title="Automate Your Marketing in Minutes",
+    ad_body=(
+        "From campaign creation to optimization — all powered by AI. "
+        "Start your free trial and see results from day one."
+    ),
+    link_url="https://aiweon.com",
+    daily_budget=10000,  # 100 ILS/day
     targeting={
-        'geo_locations': {'countries': ['BR']},
-        'age_min': 30,
+        'geo_locations': {'countries': ['IL']},
+        'age_min': 25,
         'age_max': 50,
         'interests': [
-            {'id': 6003139266461, 'name': 'Real estate'}
+            {'id': 6003384953570, 'name': 'Digital marketing'},
+            {'id': 6003020834693, 'name': 'Marketing automation'},
         ],
-        'life_events': [
-            {'id': 6002714398172, 'name': 'Recently moved'}
-        ]
-    }
+    },
+    objective="OUTCOME_LEADS",
+    call_to_action="SIGN_UP",
 )
 
-if casa_familiar['success']:
-    print(f"✅ Sucesso! Ad ID: {casa_familiar['meta_ad']['ad_id']}")
+if saas_ad['success']:
+    print(f"Ad created! ID: {saas_ad['meta_ad']['ad_id']}")
 else:
-    print(f"❌ Erro: {casa_familiar.get('error')}")
+    print(f"Error: {saas_ad.get('error')}")
 
 
-# Exemplo 3: Studio para Jovens Profissionais
-print("\n📍 Criando anúncio: Studio Moderno")
-print("-"*60)
+# Summary
+print("\n" + "=" * 60)
+print("BATCH SUMMARY")
+print("=" * 60)
 
-studio = automation.create_ad_with_ai_image(
-    image_prompt="""
-    Modern compact studio apartment,
-    efficient space design, industrial chic style,
-    natural light, young professional lifestyle,
-    minimalist furniture, city view
-    """,
-    image_quality="standard",
+results = [agency_ad, saas_ad]
+successful = sum(1 for r in results if r.get('success'))
+print(f"Created: {successful}/{len(results)} ads")
+print(f"Logs: ./logs/")
+print(f"Images: ./generated_images/")
 
-    campaign_name="Campanha Studios Centro",
-    ad_title="Studio Moderno no Coração da Cidade",
-    ad_body="""
-🌆 Vida Urbana com Estilo!
-
-⚡ Localização central
-🚇 Ao lado do metrô
-💼 Ideal para home office
-🎯 Design inteligente
-💰 Preço acessível
-
-Seu primeiro imóvel te espera!
-    """,
-    link_url="https://www.seusite.com/studios",
-    daily_budget=5000,
-
-    targeting={
-        'geo_locations': {'countries': ['BR']},
-        'age_min': 22,
-        'age_max': 35,
-        'interests': [
-            {'id': 6003139266461, 'name': 'Real estate'}
-        ]
-    }
-)
-
-if studio['success']:
-    print(f"✅ Sucesso! Ad ID: {studio['meta_ad']['ad_id']}")
+if successful == len(results):
+    print("\nAll ads created. Review and activate in Meta Ads Manager.")
+    print("https://business.facebook.com/adsmanager")
 else:
-    print(f"❌ Erro: {studio.get('error')}")
+    failed = len(results) - successful
+    print(f"\n{failed} ad(s) failed. Check logs for details.")
 
-
-# Resumo final
-print("\n" + "="*60)
-print("📊 RESUMO DA AUTOMAÇÃO")
-print("="*60)
-
-total_ads = 3
-successful_ads = sum([
-    1 if apartamento_luxo.get('success') else 0,
-    1 if casa_familiar.get('success') else 0,
-    1 if studio.get('success') else 0
-])
-
-print(f"✅ Anúncios criados com sucesso: {successful_ads}/{total_ads}")
-print(f"📁 Logs salvos em: ./logs/")
-print(f"🖼️ Imagens salvas em: ./generated_images/")
-
-if successful_ads == total_ads:
-    print("\n🎉 Parabéns! Todos os anúncios foram criados com sucesso!")
-    print("💡 Acesse o Meta Ads Manager para ativar suas campanhas.")
-    print("🔗 https://business.facebook.com/adsmanager")
-else:
-    print(f"\n⚠️ {total_ads - successful_ads} anúncio(s) falharam.")
-    print("💡 Verifique os logs para mais detalhes.")
-
-print("="*60 + "\n")
+print("=" * 60 + "\n")

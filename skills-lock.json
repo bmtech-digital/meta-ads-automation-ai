@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "ads-optimizer": {
+      "source": "dengineproblem/agents-monorepo",
+      "sourceType": "github",
+      "computedHash": "8d99039382a9f1f44f9981c2d3cc576032ef04aa5f89fcac7d2ff2a5826de121"
+    }
+  }
+}
