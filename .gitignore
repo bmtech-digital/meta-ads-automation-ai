@@ -9,6 +9,10 @@ generated_images/
 *.jpg
 *.jpeg
 
+# Gallery uploads (local dev filesystem storage; prod uses Supabase Storage)
+web/uploads/*
+!web/uploads/.gitkeep
+
 # Logs
 logs/
 *.log
@@ -60,4 +64,9 @@ desktop.ini
 .pytest_cache/
 .coverage
 htmlcov/
-node_modules
+
+# Node / Next.js
+node_modules/
+web/.pnpm-store/
+web/tsconfig.tsbuildinfo
+.next/
