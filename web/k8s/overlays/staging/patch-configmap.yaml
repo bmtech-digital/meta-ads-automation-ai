@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: campaigner-web-config
+data:
+  WEB_DB_MODE: "local-postgres"
+  WEB_AUTH_MODE: "dev-cookie"
+  WEB_DEV_ALLOWED_EMAILS: "admin@aiweon.co.il"

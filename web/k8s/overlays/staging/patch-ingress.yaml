@@ -1,0 +1,15 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: campaigner-web
+spec:
+  rules:
+    - host: campaigner-staging.bemtech.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: campaigner-web
+                port: { name: http }
