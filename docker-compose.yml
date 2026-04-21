@@ -1,0 +1,100 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: campaigner-postgres
+    environment:
+      POSTGRES_DB: campaigner_dev
+      POSTGRES_USER: campaigner
+      POSTGRES_PASSWORD: campaigner_dev_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campaigner -d campaigner_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mongo:
+    image: mongo:7
+    container_name: campaigner-mongo
+    environment:
+      MONGO_INITDB_DATABASE: campaigner_dev
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: campaigner-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  campaigner:
+    build: .
+    image: campaigner:local
+    container_name: campaigner
+    env_file: .env
+    volumes:
+      - .:/app
+      - ${APPDATA:-${HOME}/.config}/gcloud:/root/.config/gcloud:ro
+    environment:
+      PYTHONPATH: /app
+      GOOGLE_APPLICATION_CREDENTIALS: /root/.config/gcloud/application_default_credentials.json
+      MONGO_URL: mongodb://mongo:27017
+      MONGO_DB: campaigner_dev
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+    command: bash
+
+  web:
+    image: node:22-alpine
+    container_name: campaigner-web
+    working_dir: /app
+    env_file: .env
+    environment:
+      WEB_DB_MODE: local-postgres
+      WEB_AUTH_MODE: dev-cookie
+      NEXT_TELEMETRY_DISABLED: "1"
+      PORT: "3000"
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./web:/app
+      - web_node_modules:/app/node_modules
+      - web_next:/app/.next
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "corepack enable && corepack prepare pnpm@9.12.0 --activate && pnpm install && pnpm dev"
+    profiles: ["web"]
+
+volumes:
+  pgdata:
+  mongodata:
+  redisdata:
+  web_node_modules:
+  web_next:

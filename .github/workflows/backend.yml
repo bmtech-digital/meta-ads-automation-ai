@@ -1,0 +1,76 @@
+name: backend
+
+on:
+  pull_request:
+    paths:
+      - 'campaigner/**'
+      - 'migrations/**'
+      - 'scripts/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/backend.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'campaigner/**'
+      - 'migrations/**'
+      - 'scripts/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/backend.yml'
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: test (compose stack)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare empty .env (compose requires the file; runtime values come from compose environment block)
+        run: touch .env
+
+      - name: Bootstrap mongo + redis + init collections
+        run: bash scripts/bootstrap_local_db.sh
+
+      - name: Validate local env
+        run: docker compose run --rm campaigner python scripts/validate_local_env.py
+
+      - name: Teardown
+        if: always()
+        run: docker compose down -v
+
+  build-push:
+    name: build + push (Artifact Registry)
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.AR_PUSH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      IMAGE_BASE: ${{ vars.AR_LOCATION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ vars.AR_REPOSITORY }}/campaigner
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIF_PROVIDER }}
+          service_account: ${{ secrets.WIF_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ vars.AR_LOCATION }}-docker.pkg.dev --quiet
+
+      - name: Build + push
+        run: |
+          docker build -t "$IMAGE_BASE:${{ github.sha }}" -t "$IMAGE_BASE:latest" .
+          docker push "$IMAGE_BASE:${{ github.sha }}"
+          docker push "$IMAGE_BASE:latest"
