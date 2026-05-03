@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: campaigner-runner-config
+data:
+  GCP_PROJECT_ID: "bemtech-478413"
+  GCP_LOCATION: "us-central1"
+  TZ: "Asia/Jerusalem"
