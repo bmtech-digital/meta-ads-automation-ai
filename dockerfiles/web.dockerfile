@@ -1,6 +1,7 @@
-# Multi-stage build for Next.js 15 (standalone output).
-# Target: GKE generic-agent-cluster / campaigner namespace.
-# Registry: us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-web
+# syntax=docker/dockerfile:1.6
+#
+# Campaigner web (Next.js 15 standalone). Build context: ./web
+# Image: us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-web
 
 ARG NODE_VERSION=22-alpine
 
@@ -24,10 +25,10 @@ RUN pnpm build
 # ---------- runner ----------
 FROM node:${NODE_VERSION} AS runner
 WORKDIR /app
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 

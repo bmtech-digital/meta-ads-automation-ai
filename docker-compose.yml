@@ -45,7 +45,9 @@ services:
       retries: 10
 
   campaigner:
-    build: .
+    build:
+      context: .
+      dockerfile: dockerfiles/agent.dockerfile
     image: campaigner:local
     container_name: campaigner
     env_file: .env

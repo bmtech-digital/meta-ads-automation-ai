@@ -1,0 +1,328 @@
+# Deploy Campaigner to GKE generic-agent-cluster (campaigner namespace).
+# Modeled on bemtech/generic_agent's deploy.yml.
+#
+# Triggers:
+#   - push to main
+#   - manual workflow_dispatch (choose all/agent/web/webhook)
+#
+# Required GitHub Secrets:
+#   GCP_SA_KEY                     # Service account JSON, used for both cluster
+#                                  # auth and the in-cluster gcp-vertexai-credentials Secret
+#   ANTHROPIC_API_KEY
+#   META_APP_ID, META_APP_SECRET, META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, META_PAGE_ID
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+#   DATABASE_URL
+#   BUSINESS_ID
+
+name: Deploy to GKE
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'What to deploy'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - agent
+          - web
+          - webhook
+
+env:
+  PROJECT_ID: bemtech-478413
+  DOCKER_REGISTRY: us-central1-docker.pkg.dev
+  REPO: us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo
+  ZONE: us-central1-a
+  REGION: us-central1
+  CLUSTER_NAME: generic-agent-cluster
+  NAMESPACE: campaigner
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      agent: ${{ steps.changes.outputs.agent }}
+      web: ${{ steps.changes.outputs.web }}
+      webhook: ${{ steps.changes.outputs.webhook }}
+      kubefiles: ${{ steps.changes.outputs.kubefiles }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            agent:
+              - 'campaigner/**'
+              - 'runners/**'
+              - 'migrations/**'
+              - 'scripts/**'
+              - 'meta_ads_manager.py'
+              - 'image_generator.py'
+              - 'requirements.txt'
+              - 'dockerfiles/agent.dockerfile'
+            web:
+              - 'web/**'
+              - 'dockerfiles/web.dockerfile'
+            webhook:
+              - 'webhook/**'
+              - 'dockerfiles/webhook.dockerfile'
+            kubefiles:
+              - 'kubefiles/**'
+
+  build-agent:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      needs.changes.outputs.agent == 'true' ||
+      github.event.inputs.deploy_target == 'all' ||
+      github.event.inputs.deploy_target == 'agent' ||
+      github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+      - run: gcloud auth configure-docker "$DOCKER_REGISTRY" --quiet
+      - name: Build and push agent image
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          docker build \
+            -t "${REPO}/campaigner-agent:${SHA}" \
+            -t "${REPO}/campaigner-agent:latest" \
+            -f dockerfiles/agent.dockerfile .
+          docker push "${REPO}/campaigner-agent:${SHA}"
+          docker push "${REPO}/campaigner-agent:latest"
+
+  build-web:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      needs.changes.outputs.web == 'true' ||
+      github.event.inputs.deploy_target == 'all' ||
+      github.event.inputs.deploy_target == 'web' ||
+      github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+      - run: gcloud auth configure-docker "$DOCKER_REGISTRY" --quiet
+      - name: Build and push web image
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          docker build \
+            -t "${REPO}/campaigner-web:${SHA}" \
+            -t "${REPO}/campaigner-web:latest" \
+            -f dockerfiles/web.dockerfile web
+          docker push "${REPO}/campaigner-web:${SHA}"
+          docker push "${REPO}/campaigner-web:latest"
+
+  build-webhook:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      needs.changes.outputs.webhook == 'true' ||
+      github.event.inputs.deploy_target == 'all' ||
+      github.event.inputs.deploy_target == 'webhook' ||
+      github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+      - run: gcloud auth configure-docker "$DOCKER_REGISTRY" --quiet
+      - name: Build and push webhook image
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          docker build \
+            -t "${REPO}/campaigner-webhook:${SHA}" \
+            -t "${REPO}/campaigner-webhook:latest" \
+            -f dockerfiles/webhook.dockerfile webhook
+          docker push "${REPO}/campaigner-webhook:${SHA}"
+          docker push "${REPO}/campaigner-webhook:latest"
+
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    needs: changes
+    if: |
+      needs.changes.outputs.kubefiles == 'true' ||
+      github.event.inputs.deploy_target == 'all' ||
+      github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+      - run: gcloud components install gke-gcloud-auth-plugin --quiet
+      - run: gcloud container clusters get-credentials "$CLUSTER_NAME" --zone "$ZONE" --project "$PROJECT_ID"
+
+      - name: Apply namespace
+        run: kubectl apply -f kubefiles/namespace.yaml
+
+      - name: Apply application secrets (envsubst)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
+          META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
+          META_PAGE_ID: ${{ secrets.META_PAGE_ID }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          BUSINESS_ID: ${{ secrets.BUSINESS_ID }}
+        run: envsubst < kubefiles/secrets_template.yaml | kubectl apply -f -
+
+      - name: Upload GCP SA key as gcp-vertexai-credentials secret
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+        run: |
+          echo "$GCP_SA_KEY" > /tmp/sa.json
+          kubectl create secret generic gcp-vertexai-credentials \
+            --from-file=credentials.json=/tmp/sa.json \
+            -n "$NAMESPACE" \
+            --dry-run=client -o yaml | kubectl apply -f -
+          rm -f /tmp/sa.json
+
+  deploy-agent:
+    runs-on: ubuntu-latest
+    needs: [build-agent, deploy-infrastructure]
+    if: |
+      always() &&
+      needs.build-agent.result == 'success' &&
+      (needs.deploy-infrastructure.result == 'success' || needs.deploy-infrastructure.result == 'skipped')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+      - run: gcloud components install gke-gcloud-auth-plugin --quiet
+      - run: gcloud container clusters get-credentials "$CLUSTER_NAME" --zone "$ZONE" --project "$PROJECT_ID"
+      - name: Apply CronJobs (next scheduled run picks up :latest)
+        run: |
+          kubectl apply -f kubefiles/agent_cronjob_daily_observe.yaml
+          kubectl apply -f kubefiles/agent_cronjob_execute_approvals.yaml
+          kubectl apply -f kubefiles/agent_cronjob_weekly_creative.yaml
+
+  deploy-web:
+    runs-on: ubuntu-latest
+    needs: [build-web, deploy-infrastructure]
+    if: |
+      always() &&
+      needs.build-web.result == 'success' &&
+      (needs.deploy-infrastructure.result == 'success' || needs.deploy-infrastructure.result == 'skipped')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+      - run: gcloud components install gke-gcloud-auth-plugin --quiet
+      - run: gcloud container clusters get-credentials "$CLUSTER_NAME" --zone "$ZONE" --project "$PROJECT_ID"
+      - run: kubectl apply -f kubefiles/web_deployment.yaml
+      - run: kubectl apply -f kubefiles/web_ingress.yaml
+      - name: Restart and wait for rollout
+        run: |
+          kubectl rollout restart deployment/web -n "$NAMESPACE"
+          kubectl rollout status deployment/web -n "$NAMESPACE" --timeout=300s
+
+  deploy-webhook:
+    runs-on: ubuntu-latest
+    needs: [build-webhook, deploy-infrastructure]
+    if: |
+      always() &&
+      needs.build-webhook.result == 'success' &&
+      (needs.deploy-infrastructure.result == 'success' || needs.deploy-infrastructure.result == 'skipped')
+    steps:
+      - uses: actions/checkout@v4
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+      - run: gcloud components install gke-gcloud-auth-plugin --quiet
+      - run: gcloud container clusters get-credentials "$CLUSTER_NAME" --zone "$ZONE" --project "$PROJECT_ID"
+      - run: kubectl apply -f kubefiles/webhook_deployment.yaml
+      - name: Restart and wait for rollout
+        run: |
+          kubectl rollout restart deployment/webhook -n "$NAMESPACE"
+          kubectl rollout status deployment/webhook -n "$NAMESPACE" --timeout=300s
+
+  verify:
+    runs-on: ubuntu-latest
+    needs: [deploy-agent, deploy-web, deploy-webhook]
+    if: always()
+    steps:
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+      - run: gcloud components install gke-gcloud-auth-plugin --quiet
+      - run: gcloud container clusters get-credentials "$CLUSTER_NAME" --zone "$ZONE" --project "$PROJECT_ID"
+      - name: Cluster status
+        run: |
+          echo "=== Deployments ==="
+          kubectl get deployments -n "$NAMESPACE"
+          echo ""
+          echo "=== CronJobs ==="
+          kubectl get cronjobs -n "$NAMESPACE"
+          echo ""
+          echo "=== Pods ==="
+          kubectl get pods -n "$NAMESPACE"
+          echo ""
+          echo "=== Services ==="
+          kubectl get services -n "$NAMESPACE"
+          echo ""
+          echo "=== Ingress ==="
+          kubectl get ingress -n "$NAMESPACE"
+          kubectl get managedcertificate -n "$NAMESPACE" || true
+      - name: Summary
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+          AGENT: ${{ needs.deploy-agent.result }}
+          WEB: ${{ needs.deploy-web.result }}
+          WEBHOOK: ${{ needs.deploy-webhook.result }}
+        run: |
+          {
+            echo "## Deploy Summary"
+            echo ""
+            echo "**Branch:** ${REF_NAME}"
+            echo "**Commit:** ${SHA}"
+            echo "**Namespace:** ${NAMESPACE}"
+            echo ""
+            echo "### Status"
+            echo "- agent CronJobs: ${AGENT}"
+            echo "- web Deployment: ${WEB}"
+            echo "- webhook Deployment: ${WEBHOOK}"
+          } >> "$GITHUB_STEP_SUMMARY"
