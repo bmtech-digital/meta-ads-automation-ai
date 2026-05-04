@@ -1,0 +1,46 @@
+# Flow B — execute approvals. Every 15 minutes.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: agent-execute-approvals
+  namespace: campaigner
+spec:
+  schedule: "*/15 * * * *"
+  timeZone: "Asia/Jerusalem"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: agent
+            image: us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-agent:latest
+            imagePullPolicy: Always
+            command: ["bash", "runners/execute_approvals.sh"]
+            envFrom:
+            - secretRef:
+                name: campaigner-secrets
+            env:
+            - name: GCP_PROJECT_ID
+              value: "bemtech-478413"
+            - name: GCP_LOCATION
+              value: "us-central1"
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: "/var/secrets/gcp/credentials.json"
+            volumeMounts:
+            - name: gcp-credentials
+              mountPath: /var/secrets/gcp
+              readOnly: true
+            resources:
+              requests: { cpu: 100m, memory: 384Mi }
+              limits: { cpu: 500m, memory: 1Gi }
+          volumes:
+          - name: gcp-credentials
+            secret:
+              secretName: gcp-vertexai-credentials

@@ -70,7 +70,7 @@ function ThemeItem({
   const isActive = active === value;
   return (
     <DropdownMenuItem
-      onSelect={(e) => {
+      onSelect={(e: Event) => {
         e.preventDefault();
         onSelect(value);
       }}
