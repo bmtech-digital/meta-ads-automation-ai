@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
-import { uploadAsset } from "@/lib/storage";
+import { uploadAssetStream, deleteAsset, UploadTooLargeError } from "@/lib/storage";
 import type { CreativeAssetKind } from "@/lib/db/types";
 
 export const runtime = "nodejs";
@@ -98,42 +98,50 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "missing_body" }, { status: 400 });
   }
 
-  let bytes: ArrayBuffer;
+  const sizeLimit = kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
+
+  let public_url: string;
+  let actualSize: number;
   try {
-    bytes = await req.arrayBuffer();
+    const result = await uploadAssetStream(business.id, filename, req.body, sizeLimit);
+    public_url = result.public_url;
+    actualSize = result.size_bytes;
   } catch (e) {
-    console.error("gallery upload: body read failed", e);
+    if (e instanceof UploadTooLargeError) {
+      return NextResponse.json(
+        { error: "file_too_large", max_bytes: e.maxBytes },
+        { status: 413 },
+      );
+    }
+    console.error("gallery upload: stream write failed", e);
     return NextResponse.json({ error: "body_read_failed" }, { status: 400 });
   }
 
-  const actualSize = bytes.byteLength;
-  const sizeLimit = kind === "image" ? MAX_IMAGE_BYTES : MAX_VIDEO_BYTES;
-  if (actualSize > sizeLimit) {
-    return NextResponse.json(
-      { error: "file_too_large", max_bytes: sizeLimit, got: actualSize },
-      { status: 413 },
-    );
-  }
   if (actualSize === 0) {
+    await deleteAsset(public_url).catch(() => {});
     return NextResponse.json({ error: "empty_body" }, { status: 400 });
   }
 
-  const { public_url } = await uploadAsset(business.id, filename, mimeType, bytes);
-
-  const row = await db.createGalleryAsset({
-    business_id: business.id,
-    kind,
-    storage_url: public_url,
-    aspect_ratio: aspectRatio,
-    dimensions,
-    generated_by: "manual_upload",
-    marketing_angle: marketingAngle,
-    service_tag: serviceTag,
-    mime_type: mimeType,
-    size_bytes: actualSize,
-    original_filename: filename,
-    duration_seconds: kind === "video" ? durationSeconds : null,
-  });
+  let row;
+  try {
+    row = await db.createGalleryAsset({
+      business_id: business.id,
+      kind,
+      storage_url: public_url,
+      aspect_ratio: aspectRatio,
+      dimensions,
+      generated_by: "manual_upload",
+      marketing_angle: marketingAngle,
+      service_tag: serviceTag,
+      mime_type: mimeType,
+      size_bytes: actualSize,
+      original_filename: filename,
+      duration_seconds: kind === "video" ? durationSeconds : null,
+    });
+  } catch (e) {
+    await deleteAsset(public_url).catch(() => {});
+    throw e;
+  }
 
   return NextResponse.json({ asset: row }, { status: 201 });
 }

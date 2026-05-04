@@ -93,6 +93,52 @@ export async function listAdsForAccount(adAccountId: string): Promise<MetaAdSumm
   return out.data ?? [];
 }
 
+export interface MetaAdWithCreative {
+  ad_id: string;
+  ad_name: string;
+  ad_effective_status: string;
+  creative_id: string | null;
+  adset_id: string | null;
+  campaign_id: string | null;
+  campaign_name: string | null;
+  campaign_effective_status: string | null;
+}
+
+interface RawAdWithCreative {
+  id: string;
+  name: string;
+  effective_status: string;
+  creative?: { id?: string };
+  adset?: { id?: string };
+  campaign?: { id?: string; name?: string; effective_status?: string };
+}
+
+/**
+ * Pull every ad in the account with its creative_id and parent campaign in a
+ * single Graph call — used to surface "which campaign is this asset live in?"
+ * on the gallery page. We expand `creative{id}`, `adset{id}` and
+ * `campaign{id,name,effective_status}` so we don't fan out one request per ad.
+ */
+export async function listAdsWithCreativeAndCampaign(
+  adAccountId: string,
+): Promise<MetaAdWithCreative[]> {
+  const out = await graph<{ data: RawAdWithCreative[] }>(`${adAccountId}/ads`, {
+    fields:
+      "id,name,effective_status,creative{id},adset{id},campaign{id,name,effective_status}",
+    limit: "500",
+  });
+  return (out.data ?? []).map((a) => ({
+    ad_id: a.id,
+    ad_name: a.name,
+    ad_effective_status: a.effective_status,
+    creative_id: a.creative?.id ?? null,
+    adset_id: a.adset?.id ?? null,
+    campaign_id: a.campaign?.id ?? null,
+    campaign_name: a.campaign?.name ?? null,
+    campaign_effective_status: a.campaign?.effective_status ?? null,
+  }));
+}
+
 export interface MetaAdSetSummary {
   id: string;
   campaign_id: string;
@@ -193,4 +239,107 @@ export function findAction(insights: MetaInsights | null, actionType: string): s
   if (!insights?.actions) return null;
   const found = insights.actions.find((a) => a.action_type === actionType);
   return found?.value ?? null;
+}
+
+// ---------- Organic posts (Facebook Page + Instagram business account) ----------
+
+export interface FacebookPagePost {
+  id: string;
+  message: string | null;
+  created_time: string;
+  permalink_url: string | null;
+  full_picture: string | null;
+}
+
+interface RawFacebookPost {
+  id: string;
+  message?: string;
+  created_time: string;
+  permalink_url?: string;
+  full_picture?: string;
+}
+
+/**
+ * Page posts via /{page_id}/published_posts. Returns the most recent posts
+ * the Page itself published (excludes user posts on the wall). Token must
+ * have `pages_read_engagement`.
+ */
+export async function listPagePosts(pageId: string, limit = 50): Promise<FacebookPagePost[]> {
+  const out = await graph<{ data: RawFacebookPost[] }>(`${pageId}/published_posts`, {
+    fields: "id,message,created_time,permalink_url,full_picture",
+    limit: String(limit),
+  });
+  return (out.data ?? []).map((p) => ({
+    id: p.id,
+    message: p.message ?? null,
+    created_time: p.created_time,
+    permalink_url: p.permalink_url ?? null,
+    full_picture: p.full_picture ?? null,
+  }));
+}
+
+/**
+ * The IG business account id linked to a Facebook Page, or null if none is
+ * connected. Needed because Instagram media is fetched against the IG user
+ * id, not the Page id.
+ */
+export async function getInstagramAccountIdForPage(pageId: string): Promise<string | null> {
+  const out = await graph<{ instagram_business_account?: { id: string } }>(pageId, {
+    fields: "instagram_business_account",
+  });
+  return out.instagram_business_account?.id ?? null;
+}
+
+export type InstagramMediaType = "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM";
+
+export interface InstagramMedia {
+  id: string;
+  caption: string | null;
+  media_type: InstagramMediaType;
+  media_url: string | null;     // null for CAROUSEL_ALBUM (use first child)
+  thumbnail_url: string | null; // populated for VIDEO
+  permalink: string | null;
+  timestamp: string;
+}
+
+interface RawIgMedia {
+  id: string;
+  caption?: string;
+  media_type: InstagramMediaType;
+  media_url?: string;
+  thumbnail_url?: string;
+  permalink?: string;
+  timestamp: string;
+  children?: { data: Array<{ media_type: InstagramMediaType; media_url?: string; thumbnail_url?: string }> };
+}
+
+/**
+ * IG business-account media. For CAROUSEL_ALBUM we surface the first child's
+ * media_url so the tile has something to render. Token must have
+ * `instagram_basic` and `pages_show_list`.
+ */
+export async function listInstagramMedia(igUserId: string, limit = 50): Promise<InstagramMedia[]> {
+  const out = await graph<{ data: RawIgMedia[] }>(`${igUserId}/media`, {
+    fields:
+      "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,children{media_type,media_url,thumbnail_url}",
+    limit: String(limit),
+  });
+  return (out.data ?? []).map((m) => {
+    let mediaUrl = m.media_url ?? null;
+    let thumbUrl = m.thumbnail_url ?? null;
+    if (m.media_type === "CAROUSEL_ALBUM" && m.children?.data?.[0]) {
+      const first = m.children.data[0];
+      mediaUrl = mediaUrl ?? first.media_url ?? null;
+      thumbUrl = thumbUrl ?? first.thumbnail_url ?? null;
+    }
+    return {
+      id: m.id,
+      caption: m.caption ?? null,
+      media_type: m.media_type,
+      media_url: mediaUrl,
+      thumbnail_url: thumbUrl,
+      permalink: m.permalink ?? null,
+      timestamp: m.timestamp,
+    };
+  });
 }

@@ -1,7 +1,10 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { mkdir, writeFile, unlink, stat, readFile } from "node:fs/promises";
-import { createReadStream } from "node:fs";
+import { mkdir, unlink, stat, readFile } from "node:fs/promises";
+import { createReadStream, createWriteStream } from "node:fs";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import type { ReadableStream as NodeWebReadableStream } from "node:stream/web";
 import path from "node:path";
 
 /**
@@ -22,6 +25,13 @@ const UPLOAD_ROOT = process.env.UPLOAD_ROOT || "/app/uploads";
 export interface UploadResult {
   path: string;        // disk path, relative to UPLOAD_ROOT
   public_url: string;  // URL the browser fetches
+  size_bytes: number;  // bytes actually written
+}
+
+export class UploadTooLargeError extends Error {
+  constructor(public readonly maxBytes: number) {
+    super("upload_too_large");
+  }
 }
 
 function safeFilename(name: string): string {
@@ -36,11 +46,16 @@ function keyToDiskPath(key: string): string {
   return path.join(UPLOAD_ROOT, normalized);
 }
 
-export async function uploadAsset(
+/**
+ * Stream a request body straight to disk while counting bytes. We can't buffer
+ * the whole upload in memory — a 4GB video would OOM the Node process. If the
+ * stream exceeds maxBytes, we abort and unlink the partial file.
+ */
+export async function uploadAssetStream(
   businessId: string,
   filename: string,
-  _contentType: string,
-  body: ArrayBuffer | Uint8Array,
+  body: ReadableStream<Uint8Array>,
+  maxBytes: number,
 ): Promise<UploadResult> {
   const safe = safeFilename(filename);
   const rand = createHash("sha1")
@@ -50,9 +65,36 @@ export async function uploadAsset(
   const key = `${businessId}/${rand}_${safe}`;
   const disk = keyToDiskPath(key);
   await mkdir(path.dirname(disk), { recursive: true });
-  const buffer = body instanceof ArrayBuffer ? Buffer.from(body) : Buffer.from(body);
-  await writeFile(disk, buffer);
-  return { path: key, public_url: `/api/gallery/file/${key}` };
+
+  let written = 0;
+  let aborted = false;
+  const counter = new TransformStream<Uint8Array, Uint8Array>({
+    transform(chunk, controller) {
+      written += chunk.byteLength;
+      if (written > maxBytes) {
+        aborted = true;
+        controller.error(new UploadTooLargeError(maxBytes));
+        return;
+      }
+      controller.enqueue(chunk);
+    },
+  });
+
+  const sink = createWriteStream(disk);
+  try {
+    const counted = body.pipeThrough(counter) as unknown as NodeWebReadableStream<Uint8Array>;
+    await pipeline(Readable.fromWeb(counted), sink);
+  } catch (err) {
+    try {
+      await unlink(disk);
+    } catch {
+      // best-effort cleanup; ignore ENOENT etc.
+    }
+    if (aborted) throw new UploadTooLargeError(maxBytes);
+    throw err;
+  }
+
+  return { path: key, public_url: `/api/gallery/file/${key}`, size_bytes: written };
 }
 
 export async function deleteAsset(storageUrl: string): Promise<void> {

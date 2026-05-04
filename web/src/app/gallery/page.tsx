@@ -3,9 +3,29 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { Shell, PageHeader } from "@/components/shell";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
-import { GalleryClient } from "./gallery-client";
+import {
+  listAdsWithCreativeAndCampaign,
+  listPagePosts,
+  getInstagramAccountIdForPage,
+  listInstagramMedia,
+  type MetaAdWithCreative,
+  type FacebookPagePost,
+  type InstagramMedia,
+} from "@/lib/meta";
+import { GalleryClient, type CreativeUsage } from "./gallery-client";
 
 export const dynamic = "force-dynamic";
+
+function buildCreativeUsage(ads: MetaAdWithCreative[]): CreativeUsage {
+  const byCreative = new Map<string, MetaAdWithCreative[]>();
+  for (const ad of ads) {
+    if (!ad.creative_id) continue;
+    const arr = byCreative.get(ad.creative_id) ?? [];
+    arr.push(ad);
+    byCreative.set(ad.creative_id, arr);
+  }
+  return Object.fromEntries(byCreative.entries());
+}
 
 export default async function GalleryPage() {
   const session = await getAuth().getSession();
@@ -32,6 +52,43 @@ export default async function GalleryPage() {
 
   const assets = await db.listGalleryAssets(business.id);
 
+  let creativeUsage: CreativeUsage = {};
+  let metaError: string | null = null;
+  if (business.meta_ad_account_id) {
+    try {
+      const ads = await listAdsWithCreativeAndCampaign(business.meta_ad_account_id);
+      creativeUsage = buildCreativeUsage(ads);
+    } catch (e) {
+      metaError = e instanceof Error ? e.message : "meta_lookup_failed";
+    }
+  }
+
+  // Organic feeds — each fetched independently so a broken FB scope doesn't
+  // hide the IG feed (and vice versa). All errors surface to the client.
+  let fbPosts: FacebookPagePost[] = [];
+  let fbError: string | null = null;
+  let igPosts: InstagramMedia[] = [];
+  let igError: string | null = null;
+
+  if (business.meta_page_id) {
+    try {
+      fbPosts = await listPagePosts(business.meta_page_id);
+    } catch (e) {
+      fbError = e instanceof Error ? e.message : "facebook_fetch_failed";
+    }
+
+    try {
+      const igUserId = await getInstagramAccountIdForPage(business.meta_page_id);
+      if (igUserId) {
+        igPosts = await listInstagramMedia(igUserId);
+      } else {
+        igError = "no_instagram_business_account_linked_to_page";
+      }
+    } catch (e) {
+      igError = e instanceof Error ? e.message : "instagram_fetch_failed";
+    }
+  }
+
   return (
     <Shell active="/gallery" width="wide">
       <PageHeader
@@ -39,7 +96,15 @@ export default async function GalleryPage() {
         title="גלריית נכסים"
         subtitle="תמונות וסרטונים שמהם הסוכן מושך קריאייטיב כשמוצע new_creative או new_campaign. תמונות: JPEG/PNG/WebP עד 30MB. וידאו: MP4/MOV עד 4GB, 1–241 שניות, aspect 1:1/4:5/9:16/16:9."
       />
-      <GalleryClient assets={assets} />
+      <GalleryClient
+        assets={assets}
+        creativeUsage={creativeUsage}
+        metaError={metaError}
+        fbPosts={fbPosts}
+        fbError={fbError}
+        igPosts={igPosts}
+        igError={igError}
+      />
     </Shell>
   );
 }
