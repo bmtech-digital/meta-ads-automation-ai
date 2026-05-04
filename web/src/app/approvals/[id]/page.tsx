@@ -2,10 +2,16 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Nav } from "@/components/nav";
+import { Shell, PageHeader } from "@/components/shell";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import {
@@ -16,7 +22,11 @@ import {
   requiresHumanReview,
   taskTypeLabel,
 } from "@/lib/approvals-fmt";
-import { humanExecutionRows, humanImpactRows, humanPayloadRows } from "@/lib/approvals-display";
+import {
+  humanExecutionRows,
+  humanImpactRows,
+  humanPayloadRows,
+} from "@/lib/approvals-display";
 import { DecisionRow } from "@/components/decision-row";
 
 export const dynamic = "force-dynamic";
@@ -39,7 +49,9 @@ async function rejectAction(formData: FormData) {
   const reason = String(formData.get("reason") ?? "").trim();
   if (!id) redirect("/approvals");
   if (reason.length < 1 || reason.length > 200) {
-    redirect(`/approvals/${id}?error=${encodeURIComponent("סיבת דחייה חייבת להיות 1-200 תווים")}`);
+    redirect(
+      `/approvals/${id}?error=${encodeURIComponent("סיבת דחייה חייבת להיות 1-200 תווים")}`,
+    );
   }
   await getDataClient().rejectApproval(id, reason);
   redirect("/approvals?action=rejected");
@@ -53,7 +65,9 @@ async function unapproveAction(formData: FormData) {
   if (!id) redirect("/approvals");
   const result = await getDataClient().unapproveApproval(id);
   if (!result.reverted) {
-    redirect(`/approvals/${id}?error=${encodeURIComponent("לא ניתן לבטל — האישור כבר בוצע או כבר לא במצב 'אושר'")}`);
+    redirect(
+      `/approvals/${id}?error=${encodeURIComponent("לא ניתן לבטל — האישור כבר בוצע או כבר לא במצב 'אושר'")}`,
+    );
   }
   redirect(`/approvals/${id}?undone=1`);
 }
@@ -81,10 +95,13 @@ export default async function ApprovalDetailPage({
   const impactRows = humanImpactRows(approval.expected_impact);
   const payloadRows = humanPayloadRows(approval.payload);
   const executionRows = humanExecutionRows(approval.execution_result);
-  const targetLabel = approval.target_kind ? TARGET_KIND_LABEL_HE[approval.target_kind] : "";
+  const targetLabel = approval.target_kind
+    ? TARGET_KIND_LABEL_HE[approval.target_kind]
+    : "";
   const isExecuted = approval.status === "executed";
   const isFailed = approval.status === "failed";
-  const showExecutionSection = (isExecuted || isFailed) && executionRows.length > 0;
+  const showExecutionSection =
+    (isExecuted || isFailed) && executionRows.length > 0;
 
   const relatedCampaignId: string | null =
     approval.target_kind === "campaign" && approval.target_id
@@ -95,33 +112,41 @@ export default async function ApprovalDetailPage({
   const canUndo = approval.status === "approved" && !approval.executed_at;
 
   return (
-    <main className="min-h-screen p-6">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <Nav active="/approvals" />
-
-        <header className="flex items-center justify-between">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold">{taskTypeLabel(approval.task_type)}</h1>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>נוצר {relativeHe(approval.created_at)}</span>
-              <span>·</span>
-              <span>סטטוס:</span>
-              <StatusBadge status={approval.status} />
-            </div>
+    <Shell active="/approvals">
+      <PageHeader
+        eyebrow="הצעה"
+        title={taskTypeLabel(approval.task_type)}
+        subtitle={`נוצר ${relativeHe(approval.created_at)}`}
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">סטטוס:</span>
+            <StatusBadge status={approval.status} />
+            <Link href="/approvals">
+              <Button variant="outline" size="sm">
+                חזרה לרשימה
+              </Button>
+            </Link>
           </div>
-          <Link href="/approvals">
-            <Button variant="outline">חזרה לרשימה</Button>
-          </Link>
-        </header>
+        }
+      />
 
+      <div className="flex flex-col gap-6">
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        {undone ? <Badge className="bg-blue-500 text-white">האישור בוטל, חזר ל"ממתין"</Badge> : null}
+        {undone ? (
+          <Badge className="bg-blue-500 text-white">
+            האישור בוטל, חזר ל"ממתין"
+          </Badge>
+        ) : null}
 
         {hrReason ? (
           <Card className="border-2 border-amber-500 bg-amber-50">
             <CardHeader>
-              <CardTitle className="text-amber-900">⚠️ דורש בדיקה אנושית</CardTitle>
-              <CardDescription className="text-amber-800">{hrReason}</CardDescription>
+              <CardTitle className="text-amber-900">
+                ⚠️ דורש בדיקה אנושית
+              </CardTitle>
+              <CardDescription className="text-amber-800">
+                {hrReason}
+              </CardDescription>
             </CardHeader>
           </Card>
         ) : null}
@@ -154,17 +179,25 @@ export default async function ApprovalDetailPage({
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
             <section>
-              <h3 className="mb-2 text-sm font-semibold text-muted-foreground">למה?</h3>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{approval.rationale}</p>
+              <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+                למה?
+              </h3>
+              <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                {approval.rationale}
+              </p>
             </section>
 
             {impactRows.length > 0 ? (
               <section>
-                <h3 className="mb-2 text-sm font-semibold text-muted-foreground">השפעה צפויה</h3>
+                <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+                  השפעה צפויה
+                </h3>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                   {impactRows.map((r) => (
                     <div key={r.label} className="rounded-md border p-3">
-                      <div className="text-xs text-muted-foreground">{r.label}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {r.label}
+                      </div>
                       <div
                         className={
                           "mt-1 text-lg font-semibold " +
@@ -185,10 +218,15 @@ export default async function ApprovalDetailPage({
 
             {payloadRows.length > 0 ? (
               <section>
-                <h3 className="mb-2 text-sm font-semibold text-muted-foreground">פרטי הפעולה</h3>
+                <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+                  פרטי הפעולה
+                </h3>
                 <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm md:grid-cols-2">
                   {payloadRows.map((r) => (
-                    <div key={r.key} className="flex items-baseline justify-between gap-3 border-b py-1.5">
+                    <div
+                      key={r.key}
+                      className="flex items-baseline justify-between gap-3 border-b py-1.5"
+                    >
                       <dt className="text-muted-foreground">{r.label}</dt>
                       <dd className="font-medium text-right">{r.value}</dd>
                     </div>
@@ -198,8 +236,13 @@ export default async function ApprovalDetailPage({
             ) : null}
 
             <details className="rounded-md border bg-muted/30 p-3 text-sm">
-              <summary className="cursor-pointer text-xs text-muted-foreground">JSON מלא (למפתחים)</summary>
-              <pre dir="ltr" className="mt-2 overflow-auto text-left font-mono text-xs">
+              <summary className="cursor-pointer text-xs text-muted-foreground">
+                JSON מלא (למפתחים)
+              </summary>
+              <pre
+                dir="ltr"
+                className="mt-2 overflow-auto text-left font-mono text-xs"
+              >
                 {JSON.stringify(approval.payload, null, 2)}
               </pre>
             </details>
@@ -216,7 +259,9 @@ export default async function ApprovalDetailPage({
                 <div className="text-xs text-blue-700">אושר</div>
                 <p className="mt-1">
                   ע"י {approval.approved_by}
-                  {approval.approved_at ? ` · ${relativeHe(approval.approved_at)}` : null}
+                  {approval.approved_at
+                    ? ` · ${relativeHe(approval.approved_at)}`
+                    : null}
                 </p>
               </div>
             ) : null}
@@ -260,11 +305,15 @@ export default async function ApprovalDetailPage({
         {showExecutionSection ? (
           <Card
             className={
-              isFailed ? "border-red-300 bg-red-50/30" : "border-green-300 bg-green-50/30"
+              isFailed
+                ? "border-red-300 bg-red-50/30"
+                : "border-green-300 bg-green-50/30"
             }
           >
             <CardHeader>
-              <CardTitle className={isFailed ? "text-red-900" : "text-green-900"}>
+              <CardTitle
+                className={isFailed ? "text-red-900" : "text-green-900"}
+              >
                 {isFailed ? "שגיאת ביצוע" : "תוצאת ביצוע"}
               </CardTitle>
               <CardDescription>
@@ -282,7 +331,10 @@ export default async function ApprovalDetailPage({
                     </h4>
                     <dl className="flex flex-col gap-1 text-sm">
                       {impactRows.map((r) => (
-                        <div key={r.label} className="flex items-baseline justify-between gap-3">
+                        <div
+                          key={r.label}
+                          className="flex items-baseline justify-between gap-3"
+                        >
                           <dt className="text-muted-foreground">{r.label}</dt>
                           <dd
                             className={
@@ -306,7 +358,10 @@ export default async function ApprovalDetailPage({
                     </h4>
                     <dl className="flex flex-col gap-1 text-sm">
                       {executionRows.map((r) => (
-                        <div key={r.key} className="flex items-baseline justify-between gap-3">
+                        <div
+                          key={r.key}
+                          className="flex items-baseline justify-between gap-3"
+                        >
                           <dt className="text-muted-foreground">{r.label}</dt>
                           <dd
                             className={
@@ -326,7 +381,10 @@ export default async function ApprovalDetailPage({
               ) : (
                 <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm md:grid-cols-2">
                   {executionRows.map((r) => (
-                    <div key={r.key} className="flex items-baseline justify-between gap-3 border-b py-1.5">
+                    <div
+                      key={r.key}
+                      className="flex items-baseline justify-between gap-3 border-b py-1.5"
+                    >
                       <dt className="text-muted-foreground">{r.label}</dt>
                       <dd
                         className={
@@ -343,14 +401,17 @@ export default async function ApprovalDetailPage({
                 </dl>
               )}
               <p className="text-xs text-muted-foreground">
-                מטריקות בפועל (CPA/ROAS/CTR אחרי הביצוע) עדיין לא נאספות אוטומטית — יתווסף cron
-                ייעודי כשייצברו מספיק הצעות שבוצעו.
+                מטריקות בפועל (CPA/ROAS/CTR אחרי הביצוע) עדיין לא נאספות
+                אוטומטית — יתווסף cron ייעודי כשייצברו מספיק הצעות שבוצעו.
               </p>
               <details className="rounded-md border bg-muted/30 p-3 text-sm">
                 <summary className="cursor-pointer text-xs text-muted-foreground">
                   JSON גולמי (למפתחים)
                 </summary>
-                <pre dir="ltr" className="mt-2 overflow-auto text-left font-mono text-xs">
+                <pre
+                  dir="ltr"
+                  className="mt-2 overflow-auto text-left font-mono text-xs"
+                >
                   {JSON.stringify(approval.execution_result, null, 2)}
                 </pre>
               </details>
@@ -363,8 +424,9 @@ export default async function ApprovalDetailPage({
             <CardHeader>
               <CardTitle className="text-blue-900">ביטול אישור</CardTitle>
               <CardDescription>
-                האישור עוד לא בוצע ב-Meta. אפשר להחזיר את ההצעה ל"ממתין" אם טעית. לאחר שה-cron הבא של
-                execute_approvals יריץ אותה, לא יהיה אפשר לבטל.
+                האישור עוד לא בוצע ב-Meta. אפשר להחזיר את ההצעה ל"ממתין" אם
+                טעית. לאחר שה-cron הבא של execute_approvals יריץ אותה, לא יהיה
+                אפשר לבטל.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -382,14 +444,15 @@ export default async function ApprovalDetailPage({
           <CardHeader>
             <CardTitle>שרשרת החלטות הסוכן</CardTitle>
             <CardDescription>
-              {decisions.length} רשומות ב-`agent_decisions` שקשורות להצעה זו, כרונולוגי.
+              {decisions.length} רשומות ב-`agent_decisions` שקשורות להצעה זו,
+              כרונולוגי.
             </CardDescription>
           </CardHeader>
           <CardContent>
             {decisions.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                אין רשומות ב-agent_decisions להצעה זו. (הסוכן לא כתב `related_approval_id` או
-                ההצעה נוצרה ידנית.)
+                אין רשומות ב-agent_decisions להצעה זו. (הסוכן לא כתב
+                `related_approval_id` או ההצעה נוצרה ידנית.)
               </p>
             ) : (
               <ol className="flex flex-col gap-3">
@@ -401,7 +464,7 @@ export default async function ApprovalDetailPage({
           </CardContent>
         </Card>
       </div>
-    </main>
+    </Shell>
   );
 }
 

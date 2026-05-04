@@ -1,6 +1,12 @@
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Nav } from "@/components/nav";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Shell, PageHeader } from "@/components/shell";
 import { BudgetHealthCard } from "@/components/budget-health-card";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
@@ -25,17 +31,15 @@ export default async function ApprovalsPage({
 
   if (!business) {
     return (
-      <main className="min-h-screen p-6">
-        <div className="mx-auto max-w-4xl">
-          <Nav active="/approvals" />
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>אין עסק ב-DB</CardTitle>
-              <CardDescription>הרץ migrations ו-seed קודם.</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      </main>
+      <Shell active="/approvals">
+        <PageHeader eyebrow="הצעות" title="הצעות ממתינות" />
+        <Card>
+          <CardHeader>
+            <CardTitle>אין עסק ב-DB</CardTitle>
+            <CardDescription>הרץ migrations ו-seed קודם.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Shell>
     );
   }
 
@@ -43,19 +47,14 @@ export default async function ApprovalsPage({
   const budgetHealth = await db.getLatestBudgetHealthDecision(business.id);
 
   return (
-    <main className="min-h-screen p-6">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <Nav active="/approvals" />
+    <Shell active="/approvals">
+      <PageHeader
+        eyebrow="הצעות"
+        title="הצעות ממתינות"
+        subtitle={`ממוין לפי דחיפות ואז לפי זמן יצירה. ${pending.length} ממתינות בסה״כ.`}
+      />
 
-        <header className="flex items-center justify-between">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold">הצעות ממתינות</h1>
-            <p className="text-sm text-muted-foreground">
-              ממוין לפי דחיפות ואז לפי זמן יצירה. {pending.length} ממתינות בסה״כ.
-            </p>
-          </div>
-        </header>
-
+      <div className="flex flex-col gap-6">
         <BudgetHealthCard business={business} decision={budgetHealth} />
 
         {pending.length === 0 ? (
@@ -67,15 +66,22 @@ export default async function ApprovalsPage({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <pre dir="ltr" className="text-left font-mono text-xs text-muted-foreground">
-                docker compose run --rm campaigner bash runners/daily_observe_propose.sh
+              <pre
+                dir="ltr"
+                className="text-left font-mono text-xs text-muted-foreground"
+              >
+                docker compose run --rm campaigner bash
+                runners/daily_observe_propose.sh
               </pre>
             </CardContent>
           </Card>
         ) : (
-          <ApprovalsFilteredList approvals={pending} initialCampaignFilter={campaignFilter ?? null} />
+          <ApprovalsFilteredList
+            approvals={pending}
+            initialCampaignFilter={campaignFilter ?? null}
+          />
         )}
       </div>
-    </main>
+    </Shell>
   );
 }

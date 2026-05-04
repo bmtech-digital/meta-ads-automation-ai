@@ -1,14 +1,28 @@
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Shell, PageHeader } from "@/components/shell";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
-import type { BusinessKnowledgeUpsert, Product, Vertical } from "@/lib/db/types";
-import { VERTICALS, VERTICAL_LABELS_HE, deriveKpiFromVertical } from "@/lib/kpi";
+import type {
+  BusinessKnowledgeUpsert,
+  Product,
+  Vertical,
+} from "@/lib/db/types";
+import {
+  VERTICALS,
+  VERTICAL_LABELS_HE,
+  deriveKpiFromVertical,
+} from "@/lib/kpi";
 import {
   businessKnowledgeFormSchema,
   parseProductsRaw,
@@ -47,7 +61,9 @@ async function saveKnowledgeAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    const msg = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    const msg = parsed.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
     redirect(`/business-knowledge?error=${encodeURIComponent(msg)}`);
   }
 
@@ -85,7 +101,10 @@ async function saveKnowledgeAction(formData: FormData) {
     delivery_time_days: d.delivery_time_days,
     strong_seasons: d.strong_seasons,
     weak_seasons: d.weak_seasons,
-    questionnaire_answers: Object.keys(questionnaire_answers).length > 0 ? questionnaire_answers : null,
+    questionnaire_answers:
+      Object.keys(questionnaire_answers).length > 0
+        ? questionnaire_answers
+        : null,
     brand_voice: Object.keys(brand_voice).length > 0 ? brand_voice : null,
     competitors: d.competitors,
   };
@@ -114,12 +133,14 @@ export default async function BusinessKnowledgePage({
 
   if (!business) {
     return (
-      <Shell active="/business-knowledge" width="narrow">
+      <Shell active="/business-knowledge">
         <PageHeader eyebrow="ידע עסקי" title="ידע עסקי" />
         <Card>
           <CardHeader>
             <CardTitle>אין עסק ב-DB</CardTitle>
-            <CardDescription>הרץ migrations ו-seed לפני עריכת ידע עסקי.</CardDescription>
+            <CardDescription>
+              הרץ migrations ו-seed לפני עריכת ידע עסקי.
+            </CardDescription>
           </CardHeader>
         </Card>
       </Shell>
@@ -129,11 +150,19 @@ export default async function BusinessKnowledgePage({
   const k = await db.getBusinessKnowledge(business.id);
 
   const productsText = k?.products
-    ? k.products.map((p) => (p.description ? `${p.name} — ${p.description}` : p.name)).join("\n")
+    ? k.products
+        .map((p) => (p.description ? `${p.name} — ${p.description}` : p.name))
+        .join("\n")
     : "";
 
-  const q = (k?.questionnaire_answers ?? {}) as Record<string, string | undefined>;
-  const bv = (k?.brand_voice ?? {}) as { tone?: string; forbidden_words?: string[] };
+  const q = (k?.questionnaire_answers ?? {}) as Record<
+    string,
+    string | undefined
+  >;
+  const bv = (k?.brand_voice ?? {}) as {
+    tone?: string;
+    forbidden_words?: string[];
+  };
 
   return (
     <Shell active="/business-knowledge">
@@ -166,7 +195,8 @@ export default async function BusinessKnowledgePage({
           <CardHeader>
             <CardTitle>טופס מובנה</CardTitle>
             <CardDescription>
-              שדות עובדתיים. vertical קובע את ה־KPI הראשי שבו הסוכן מודד ביצועים.
+              שדות עובדתיים. vertical קובע את ה־KPI הראשי שבו הסוכן מודד
+              ביצועים.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -187,7 +217,8 @@ export default async function BusinessKnowledgePage({
                   ))}
                 </select>
                 <p className="text-xs text-muted-foreground">
-                  KPI נגזר: eCommerce→ROAS · לידים→CPL · Awareness→CPM · אפליקציה→CPI
+                  KPI נגזר: eCommerce→ROAS · לידים→CPL · Awareness→CPM ·
+                  אפליקציה→CPI
                 </p>
               </div>
               <div className="flex flex-col gap-2">
@@ -255,7 +286,9 @@ export default async function BusinessKnowledgePage({
                 name="products_raw"
                 defaultValue={productsText}
                 rows={4}
-                placeholder={"שורה לכל מוצר. פורמט: שם — תיאור קצר\nדוגמה: קורס AI למנהלים — 8 מפגשים, 3000₪"}
+                placeholder={
+                  "שורה לכל מוצר. פורמט: שם — תיאור קצר\nדוגמה: קורס AI למנהלים — 8 מפגשים, 3000₪"
+                }
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
             </div>
@@ -301,10 +334,26 @@ export default async function BusinessKnowledgePage({
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <Questionnaire id="ideal_customer" label="לקוח אידיאלי" value={q.ideal_customer} />
-            <Questionnaire id="main_pain" label="הכאב המרכזי שהמוצר פותר" value={q.main_pain} />
-            <Questionnaire id="common_objections" label="התנגדויות נפוצות" value={q.common_objections} />
-            <Questionnaire id="usp" label="יתרון תחרותי ייחודי (USP)" value={q.usp} />
+            <Questionnaire
+              id="ideal_customer"
+              label="לקוח אידיאלי"
+              value={q.ideal_customer}
+            />
+            <Questionnaire
+              id="main_pain"
+              label="הכאב המרכזי שהמוצר פותר"
+              value={q.main_pain}
+            />
+            <Questionnaire
+              id="common_objections"
+              label="התנגדויות נפוצות"
+              value={q.common_objections}
+            />
+            <Questionnaire
+              id="usp"
+              label="יתרון תחרותי ייחודי (USP)"
+              value={q.usp}
+            />
             <Questionnaire
               id="what_worked_before"
               label="מה עבד בעבר בפרסום"

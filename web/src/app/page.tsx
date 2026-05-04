@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, LogOut, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 import { Shell, PageHeader, SectionHeader } from "@/components/shell";
 import { PulseDot } from "@/components/brand/icons";
 import { RunNowButton } from "@/components/run-now-button";
@@ -18,7 +18,12 @@ import {
   taskTypeLabel,
   truncate,
 } from "@/lib/approvals-fmt";
-import type { Approval, Business, Heartbeat, HeartbeatFlow } from "@/lib/db/types";
+import type {
+  Approval,
+  Business,
+  Heartbeat,
+  HeartbeatFlow,
+} from "@/lib/db/types";
 import {
   isTokenActionable,
   tokenExpiryState,
@@ -29,9 +34,17 @@ import {
 const INBOX_PREVIEW_LIMIT = 5;
 
 const FLOWS: Array<{ flow: HeartbeatFlow; label: string; schedule: string }> = [
-  { flow: "daily_observe_propose", label: "סריקה יומית", schedule: "כל יום 09:00" },
+  {
+    flow: "daily_observe_propose",
+    label: "סריקה יומית",
+    schedule: "כל יום 09:00",
+  },
   { flow: "execute_approvals", label: "ביצוע אישורים", schedule: "כל 15 דק׳" },
-  { flow: "weekly_creative_firehose", label: "ייצור קריאייטיבים", schedule: "שני 10:00" },
+  {
+    flow: "weekly_creative_firehose",
+    label: "ייצור קריאייטיבים",
+    schedule: "שני 10:00",
+  },
 ];
 
 type PhaseMeta = {
@@ -41,21 +54,20 @@ type PhaseMeta = {
 };
 
 function phaseMeta(hb: Heartbeat | undefined): PhaseMeta {
-  if (!hb) return { label: "עוד לא רץ", tone: "idle", cls: "text-muted-foreground" };
+  if (!hb)
+    return { label: "עוד לא רץ", tone: "idle", cls: "text-muted-foreground" };
   if (hb.phase === "end")
     return { label: "הצלחה", tone: "success", cls: "text-success" };
   if (hb.phase === "error")
     return { label: "נכשל", tone: "error", cls: "text-destructive" };
-  return { label: "רץ עכשיו", tone: "active", cls: "text-brand-500 dark:text-brand-400" };
+  return {
+    label: "רץ עכשיו",
+    tone: "active",
+    cls: "text-brand-500 dark:text-brand-400",
+  };
 }
 
 export const dynamic = "force-dynamic";
-
-async function signOutAction() {
-  "use server";
-  await getAuth().signOut();
-  redirect("/login");
-}
 
 export default async function HomePage() {
   const auth = getAuth();
@@ -70,33 +82,36 @@ export default async function HomePage() {
   const heartbeats = business ? await db.getLatestHeartbeats(business.id) : [];
   const byFlow = new Map(heartbeats.map((h) => [h.flow, h]));
   const allowLocalRunners = process.env.NODE_ENV !== "production";
-  const pendingApprovals = business ? await db.listPendingApprovals(business.id) : [];
+  const pendingApprovals = business
+    ? await db.listPendingApprovals(business.id)
+    : [];
   const inboxPreview = pendingApprovals.slice(0, INBOX_PREVIEW_LIMIT);
-  const inboxRemainder = Math.max(0, pendingApprovals.length - inboxPreview.length);
-  const budgetHealth = business ? await db.getLatestBudgetHealthDecision(business.id) : null;
-
-  const right = (
-    <form action={signOutAction} className="flex items-center gap-2">
-      <span className="hidden md:inline text-xs text-muted-foreground">{session.email}</span>
-      <Button type="submit" variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
-        <LogOut size={14} />
-        התנתק
-      </Button>
-    </form>
+  const inboxRemainder = Math.max(
+    0,
+    pendingApprovals.length - inboxPreview.length,
   );
+  const budgetHealth = business
+    ? await db.getLatestBudgetHealthDecision(business.id)
+    : null;
 
   return (
-    <Shell active="/" right={right}>
+    <Shell active="/">
       <PageHeader
         eyebrow="דשבורד"
         title={business ? business.name : "Campaigner"}
         subtitle="הסוכן סורק, מציע, ומבצע רק אחרי שאתה מאשר. כל מה שצריך לקרות היום — מופיע כאן."
         actions={
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="border-border bg-muted/40 font-mono text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground">
+            <Badge
+              variant="outline"
+              className="border-border bg-muted/40 font-mono text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground"
+            >
               DB · {db.mode}
             </Badge>
-            <Badge variant="outline" className="border-border bg-muted/40 font-mono text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground">
+            <Badge
+              variant="outline"
+              className="border-border bg-muted/40 font-mono text-[10.5px] font-medium uppercase tracking-wider text-muted-foreground"
+            >
               AUTH · {auth.mode}
             </Badge>
           </div>
@@ -131,8 +146,14 @@ export default async function HomePage() {
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <KpiTile
                 label="תקציב פרסום חודשי"
-                value={business.monthly_budget_ils ? `₪${Number(business.monthly_budget_ils).toLocaleString("he-IL")}` : "—"}
-                hint={business.monthly_budget_ils ? "מוגדר ב-Business" : "לא הוגדר"}
+                value={
+                  business.monthly_budget_ils
+                    ? `₪${Number(business.monthly_budget_ils).toLocaleString("he-IL")}`
+                    : "—"
+                }
+                hint={
+                  business.monthly_budget_ils ? "מוגדר ב-Business" : "לא הוגדר"
+                }
                 accent={!!business.monthly_budget_ils}
               />
               <KpiTile
@@ -172,16 +193,25 @@ export default async function HomePage() {
                     key={flow}
                     className="flex items-center gap-4 px-4 py-3.5 transition-colors hover:bg-muted/30"
                   >
-                    <PulseDot tone={meta.tone} className={meta.tone === "active" ? "animate-pulse-soft" : ""} />
+                    <PulseDot
+                      tone={meta.tone}
+                      className={
+                        meta.tone === "active" ? "animate-pulse-soft" : ""
+                      }
+                    />
                     <div className="flex min-w-0 flex-1 flex-col">
                       <span className="font-medium">{label}</span>
-                      <span className="text-xs text-muted-foreground">{schedule}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {schedule}
+                      </span>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-tabular text-xs text-muted-foreground">
                         {hb ? relativeHe(hb.ran_at) : "—"}
                       </span>
-                      <span className={`text-xs font-semibold ${meta.cls}`}>{meta.label}</span>
+                      <span className={`text-xs font-semibold ${meta.cls}`}>
+                        {meta.label}
+                      </span>
                       {allowLocalRunners ? <RunNowButton flow={flow} /> : null}
                     </div>
                   </li>
@@ -279,15 +309,22 @@ function KpiTile({
   return (
     <div className="group relative overflow-hidden rounded-lg border border-border bg-card p-4 transition-colors hover:border-border/80">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-muted-foreground">{label}</span>
+        <span className="text-xs font-medium text-muted-foreground">
+          {label}
+        </span>
         {accent ? (
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-500 dark:bg-brand-400" aria-hidden />
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-brand-500 dark:bg-brand-400"
+            aria-hidden
+          />
         ) : null}
       </div>
       <div className="mt-2 font-tabular text-[26px] font-semibold leading-none tracking-[-0.02em]">
         {value}
       </div>
-      {hint ? <div className="mt-1.5 text-[11.5px] text-muted-foreground">{hint}</div> : null}
+      {hint ? (
+        <div className="mt-1.5 text-[11.5px] text-muted-foreground">{hint}</div>
+      ) : null}
     </div>
   );
 }
@@ -365,7 +402,9 @@ function ApprovalsInbox({
       <ul className="overflow-hidden rounded-lg border border-border bg-card/40">
         {preview.map((a, i) => {
           const hrReason = requiresHumanReview(a);
-          const targetLabel = a.target_kind ? TARGET_KIND_LABEL_HE[a.target_kind] : "";
+          const targetLabel = a.target_kind
+            ? TARGET_KIND_LABEL_HE[a.target_kind]
+            : "";
           return (
             <li key={a.id} className={i > 0 ? "border-t border-border" : ""}>
               <Link
@@ -378,11 +417,15 @@ function ApprovalsInbox({
                   >
                     {URGENCY_LABEL_HE[a.urgency]}
                   </span>
-                  <span className="text-[14px] font-semibold">{taskTypeLabel(a.task_type)}</span>
+                  <span className="text-[14px] font-semibold">
+                    {taskTypeLabel(a.task_type)}
+                  </span>
                   {targetLabel && a.target_id ? (
                     <span className="text-[12px] text-muted-foreground">
                       {targetLabel}:{" "}
-                      <span className="mono-ltr text-[11.5px]">{a.target_id}</span>
+                      <span className="mono-ltr text-[11.5px]">
+                        {a.target_id}
+                      </span>
                     </span>
                   ) : null}
                   {hrReason ? (

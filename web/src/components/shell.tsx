@@ -1,8 +1,10 @@
 import { Nav } from "@/components/nav";
+import { UserMenu } from "@/components/user-menu";
 import { cn } from "@/lib/utils";
 
 type ShellProps = {
   active?: string;
+  /** Optional page-specific actions; rendered alongside the always-present user menu. */
   right?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
@@ -10,13 +12,35 @@ type ShellProps = {
   width?: "default" | "narrow" | "wide";
 };
 
-export function Shell({ active, right, children, className, width = "default" }: ShellProps) {
+export function Shell({
+  active,
+  right,
+  children,
+  className,
+  width = "default",
+}: ShellProps) {
   const widthCls =
-    width === "narrow" ? "max-w-3xl" : width === "wide" ? "max-w-7xl" : "max-w-6xl";
+    width === "narrow"
+      ? "max-w-3xl"
+      : width === "wide"
+        ? "max-w-7xl"
+        : "max-w-6xl";
+  const headerRight = (
+    <>
+      {right}
+      <UserMenu />
+    </>
+  );
   return (
     <>
-      <Nav active={active} right={right} />
-      <main className={cn("mx-auto w-full px-4 sm:px-6 py-8 sm:py-10 animate-fade-in", widthCls, className)}>
+      <Nav active={active} right={headerRight} />
+      <main
+        className={cn(
+          "mx-auto w-full px-4 sm:px-6 py-8 sm:py-10 animate-fade-in",
+          widthCls,
+          className,
+        )}
+      >
         {children}
       </main>
     </>
@@ -30,7 +54,12 @@ type PageHeaderProps = {
   actions?: React.ReactNode;
 };
 
-export function PageHeader({ title, subtitle, eyebrow, actions }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  subtitle,
+  eyebrow,
+  actions,
+}: PageHeaderProps) {
   return (
     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex flex-col gap-1.5">
@@ -41,10 +70,14 @@ export function PageHeader({ title, subtitle, eyebrow, actions }: PageHeaderProp
         ) : null}
         <h1 className="text-h1 text-balance">{title}</h1>
         {subtitle ? (
-          <p className="max-w-prose text-[14.5px] leading-relaxed text-muted-foreground">{subtitle}</p>
+          <p className="max-w-prose text-[14.5px] leading-relaxed text-muted-foreground">
+            {subtitle}
+          </p>
         ) : null}
       </div>
-      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+      {actions ? (
+        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+      ) : null}
     </div>
   );
 }
@@ -55,13 +88,19 @@ type SectionHeaderProps = {
   action?: React.ReactNode;
 };
 
-export function SectionHeader({ title, description, action }: SectionHeaderProps) {
+export function SectionHeader({
+  title,
+  description,
+  action,
+}: SectionHeaderProps) {
   return (
     <div className="mb-4 flex items-end justify-between gap-4">
       <div className="flex flex-col gap-1">
         <h2 className="text-h2 leading-tight">{title}</h2>
         {description ? (
-          <p className="text-[13.5px] leading-relaxed text-muted-foreground">{description}</p>
+          <p className="text-[13.5px] leading-relaxed text-muted-foreground">
+            {description}
+          </p>
         ) : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}

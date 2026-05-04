@@ -1,11 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Shell, PageHeader } from "@/components/shell";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import type { ApprovalStatus } from "@/lib/db/types";
-import { TARGET_KIND_LABEL_HE, relativeHe, taskTypeLabel } from "@/lib/approvals-fmt";
+import {
+  TARGET_KIND_LABEL_HE,
+  relativeHe,
+  taskTypeLabel,
+} from "@/lib/approvals-fmt";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +23,12 @@ const STATUS_STYLES: Record<ApprovalStatus, string> = {
   pending: "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100",
   approved: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200",
   rejected: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200",
-  executed: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200",
+  executed:
+    "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200",
   failed: "bg-red-200 text-red-900 dark:bg-red-900/60 dark:text-red-100",
   expired: "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200",
-  dry_run: "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200",
+  dry_run:
+    "bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200",
 };
 
 const STATUS_LABEL_HE: Record<ApprovalStatus, string> = {
@@ -43,7 +55,7 @@ export default async function HistoryPage() {
 
   if (!business) {
     return (
-      <Shell active="/history" width="narrow">
+      <Shell active="/history">
         <PageHeader eyebrow="היסטוריה" title="היסטוריית החלטות" />
         <Card>
           <CardHeader>
@@ -70,7 +82,8 @@ export default async function HistoryPage() {
           <CardHeader>
             <CardTitle>אין היסטוריה עדיין</CardTitle>
             <CardDescription>
-              ברגע שהסוכן יריץ {DAYS} יום של observe-propose, הרשומות יופיעו כאן.
+              ברגע שהסוכן יריץ {DAYS} יום של observe-propose, הרשומות יופיעו
+              כאן.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -90,12 +103,19 @@ export default async function HistoryPage() {
                 </thead>
                 <tbody>
                   {rows.map((a) => (
-                    <tr key={a.id} className="border-t transition-colors hover:bg-muted/30">
+                    <tr
+                      key={a.id}
+                      className="border-t transition-colors hover:bg-muted/30"
+                    >
                       <td className="px-4 py-3 whitespace-nowrap text-muted-foreground tabular-nums">
                         {new Date(a.created_at).toLocaleDateString("he-IL")}
-                        <div className="text-xs">{relativeHe(a.created_at)}</div>
+                        <div className="text-xs">
+                          {relativeHe(a.created_at)}
+                        </div>
                       </td>
-                      <td className="px-4 py-3 font-medium">{taskTypeLabel(a.task_type)}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {taskTypeLabel(a.task_type)}
+                      </td>
                       <td className="px-4 py-3">
                         {a.target_kind ? (
                           <>

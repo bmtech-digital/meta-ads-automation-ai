@@ -2,10 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Nav } from "@/components/nav";
+import { Shell, PageHeader } from "@/components/shell";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import type { SeasonalHint, SeasonalHints } from "@/lib/db/types";
@@ -39,7 +45,9 @@ async function saveSettingsAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    const msg = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    const msg = parsed.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
     redirect(`/settings?error=${encodeURIComponent(msg)}`);
   }
 
@@ -64,7 +72,9 @@ async function addSeasonalWindowAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    const msg = parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ");
+    const msg = parsed.error.issues
+      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .join("; ");
     redirect(`/settings?error=${encodeURIComponent(msg)}#seasonal`);
   }
 
@@ -95,7 +105,8 @@ async function removeSeasonalWindowAction(formData: FormData) {
   if (!current) redirect("/settings?error=business_not_found");
 
   const existing: SeasonalHint[] = current!.seasonal_hints?.windows ?? [];
-  if (index >= existing.length) redirect("/settings?error=index_out_of_range#seasonal");
+  if (index >= existing.length)
+    redirect("/settings?error=index_out_of_range#seasonal");
 
   // Safety: never remove 'learned' rows via this action (v2 War Chest entries).
   if (existing[index]?.confidence === "learned") {
@@ -126,37 +137,36 @@ export default async function SettingsPage({
 
   if (!business) {
     return (
-      <main className="min-h-screen p-6">
-        <div className="mx-auto max-w-3xl">
-          <Card>
-            <CardHeader>
-              <CardTitle>אין עסק ב-DB</CardTitle>
-              <CardDescription>
-                הרץ את ה-migrations ו-seed_local.py לפני עריכת הגדרות.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      </main>
+      <Shell active="/settings">
+        <PageHeader eyebrow="הגדרות" title="הגדרות עסק" />
+        <Card>
+          <CardHeader>
+            <CardTitle>אין עסק ב-DB</CardTitle>
+            <CardDescription>
+              הרץ את ה-migrations ו-seed_local.py לפני עריכת הגדרות.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </Shell>
     );
   }
 
   return (
-    <main className="min-h-screen p-6">
-      <div className="mx-auto flex max-w-3xl flex-col gap-6">
-        <Nav active="/settings" />
-        <header className="flex items-center justify-between">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold">הגדרות עסק</h1>
-            <p className="text-sm text-muted-foreground">
-              הקלט המינימלי שהסוכן קורא לפני כל ריצה.
-            </p>
-          </div>
+    <Shell active="/settings">
+      <PageHeader
+        eyebrow="הגדרות"
+        title="הגדרות עסק"
+        subtitle="הקלט המינימלי שהסוכן קורא לפני כל ריצה."
+        actions={
           <Link href="/">
-            <Button variant="outline">חזרה לדשבורד</Button>
+            <Button variant="outline" size="sm">
+              חזרה לדשבורד
+            </Button>
           </Link>
-        </header>
+        }
+      />
 
+      <div className="flex flex-col gap-6">
         <div className="flex flex-wrap gap-2">
           <Badge variant="secondary">DB: {db.mode}</Badge>
           {saved ? <Badge>נשמר</Badge> : null}
@@ -229,7 +239,10 @@ export default async function SettingsPage({
                         </a>{" "}
                         → בחר את ה-App + Page המתאימים → צור User Token חדש.
                       </li>
-                      <li>החלף את <code dir="ltr">META_ACCESS_TOKEN</code> ב-Secret Manager של הסביבה.</li>
+                      <li>
+                        החלף את <code dir="ltr">META_ACCESS_TOKEN</code>{" "}
+                        ב-Secret Manager של הסביבה.
+                      </li>
                       <li>
                         הרץ{" "}
                         <code dir="ltr" className="font-mono">
@@ -258,7 +271,12 @@ export default async function SettingsPage({
 
               <div className="flex flex-col gap-2">
                 <Label htmlFor="name">שם עסק</Label>
-                <Input id="name" name="name" defaultValue={business.name} required />
+                <Input
+                  id="name"
+                  name="name"
+                  defaultValue={business.name}
+                  required
+                />
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -288,7 +306,9 @@ export default async function SettingsPage({
               </div>
 
               <div className="flex flex-col gap-2">
-                <Label htmlFor="monthly_budget_ils">תקציב פרסום חודשי (₪)</Label>
+                <Label htmlFor="monthly_budget_ils">
+                  תקציב פרסום חודשי (₪)
+                </Label>
                 <Input
                   id="monthly_budget_ils"
                   name="monthly_budget_ils"
@@ -299,11 +319,14 @@ export default async function SettingsPage({
                   placeholder="לדוגמה 1500"
                 />
                 <p className="text-xs text-muted-foreground">
-                  התקציב היומי נגזר אוטומטית מהסכום החודשי (חודשי ÷ 30). הסוכן משתמש בזה כתקרת הוצאה חודשית.
+                  התקציב היומי נגזר אוטומטית מהסכום החודשי (חודשי ÷ 30). הסוכן
+                  משתמש בזה כתקרת הוצאה חודשית.
                 </p>
               </div>
 
-              {error ? <p className="text-sm text-destructive">{error}</p> : null}
+              {error ? (
+                <p className="text-sm text-destructive">{error}</p>
+              ) : null}
 
               <div className="flex gap-2">
                 <Button type="submit">שמור</Button>
@@ -316,16 +339,23 @@ export default async function SettingsPage({
           <CardHeader>
             <CardTitle>עונתיות (חלונות ידניים)</CardTitle>
             <CardDescription>
-              חלונות שמכפילים את התקציב החודשי בתקופות מוגדרות (פסח, BFCM, חזרה ללימודים, וכו&apos;). הסוכן משתמש בזה ב-pace monitor וב-§T10 demand-driven raise. מקבץ חופף = מכפלה של המכפילים. ל-v2 (War Chest) תתווסף למידה אוטומטית עם <code dir="ltr">confidence=&quot;learned&quot;</code>.
+              חלונות שמכפילים את התקציב החודשי בתקופות מוגדרות (פסח, BFCM, חזרה
+              ללימודים, וכו&apos;). הסוכן משתמש בזה ב-pace monitor וב-§T10
+              demand-driven raise. מקבץ חופף = מכפלה של המכפילים. ל-v2 (War
+              Chest) תתווסף למידה אוטומטית עם{" "}
+              <code dir="ltr">confidence=&quot;learned&quot;</code>.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             {(() => {
               const hintsForm: SeasonalHintsForm = {
-                windows: (business.seasonal_hints?.windows ?? []) as SeasonalHintsForm["windows"],
+                windows: (business.seasonal_hints?.windows ??
+                  []) as SeasonalHintsForm["windows"],
               };
               const overlaps = overlappingPairs(hintsForm);
-              const extreme = overlaps.find((o) => o.product > 2.0 || o.product < 0.5);
+              const extreme = overlaps.find(
+                (o) => o.product > 2.0 || o.product < 0.5,
+              );
               if (!overlaps.length) return null;
               return (
                 <div
@@ -345,7 +375,8 @@ export default async function SettingsPage({
                   </ul>
                   {extreme ? (
                     <p className="mt-2">
-                      מכפלה מחוץ לטווח [0.5, 2.0] — ודא שזה באמת מה שאתה מתכוון אליו.
+                      מכפלה מחוץ לטווח [0.5, 2.0] — ודא שזה באמת מה שאתה מתכוון
+                      אליו.
                     </p>
                   ) : (
                     <p className="mt-2">לא חוסם; רק מודיע על ההשלכה.</p>
@@ -354,7 +385,7 @@ export default async function SettingsPage({
               );
             })()}
 
-            {((business.seasonal_hints?.windows ?? []).length === 0) ? (
+            {(business.seasonal_hints?.windows ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground">
                 עדיין לא הגדרת חלונות עונתיים. הסוכן ישתמש בתקציב החודשי המלא.
               </p>
@@ -373,7 +404,10 @@ export default async function SettingsPage({
                   </thead>
                   <tbody>
                     {(business.seasonal_hints?.windows ?? []).map((w, i) => (
-                      <tr key={`${w.name}-${w.start}-${i}`} className="border-t">
+                      <tr
+                        key={`${w.name}-${w.start}-${i}`}
+                        className="border-t"
+                      >
                         <td className="py-2">{w.name}</td>
                         <td className="py-2" dir="ltr">
                           {w.start}
@@ -386,10 +420,16 @@ export default async function SettingsPage({
                         </td>
                         <td className="py-2">
                           <Badge
-                            variant={w.confidence === "learned" ? "secondary" : "outline"}
+                            variant={
+                              w.confidence === "learned"
+                                ? "secondary"
+                                : "outline"
+                            }
                             className="text-[10px]"
                           >
-                            {w.confidence === "learned" ? "נלמד אוטומטית" : "ידני"}
+                            {w.confidence === "learned"
+                              ? "נלמד אוטומטית"
+                              : "ידני"}
                           </Badge>
                         </td>
                         <td className="py-2 text-left">
@@ -402,9 +442,18 @@ export default async function SettingsPage({
                             </span>
                           ) : (
                             <form action={removeSeasonalWindowAction}>
-                              <input type="hidden" name="id" value={business.id} />
+                              <input
+                                type="hidden"
+                                name="id"
+                                value={business.id}
+                              />
                               <input type="hidden" name="index" value={i} />
-                              <Button type="submit" variant="ghost" size="sm" className="text-destructive">
+                              <Button
+                                type="submit"
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive"
+                              >
                                 מחק
                               </Button>
                             </form>
@@ -417,7 +466,10 @@ export default async function SettingsPage({
               </div>
             )}
 
-            <form action={addSeasonalWindowAction} className="flex flex-col gap-3 rounded-md border border-dashed p-3">
+            <form
+              action={addSeasonalWindowAction}
+              className="flex flex-col gap-3 rounded-md border border-dashed p-3"
+            >
               <input type="hidden" name="id" value={business.id} />
               <p className="text-sm font-medium">הוסף חלון חדש</p>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -448,11 +500,23 @@ export default async function SettingsPage({
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label htmlFor="window_start">מתאריך</Label>
-                  <Input id="window_start" name="window_start" type="date" required dir="ltr" />
+                  <Input
+                    id="window_start"
+                    name="window_start"
+                    type="date"
+                    required
+                    dir="ltr"
+                  />
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label htmlFor="window_end">עד תאריך</Label>
-                  <Input id="window_end" name="window_end" type="date" required dir="ltr" />
+                  <Input
+                    id="window_end"
+                    name="window_end"
+                    type="date"
+                    required
+                    dir="ltr"
+                  />
                 </div>
               </div>
               <div>
@@ -464,6 +528,6 @@ export default async function SettingsPage({
           </CardContent>
         </Card>
       </div>
-    </main>
+    </Shell>
   );
 }
