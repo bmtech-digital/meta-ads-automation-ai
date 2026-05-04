@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { mkdir, writeFile, unlink, stat, readFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
 import path from "node:path";
 
 /**
@@ -76,4 +77,42 @@ export async function readAsset(key: string): Promise<{ body: Buffer; size: numb
     if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
     throw err;
   }
+}
+
+export async function statAsset(key: string): Promise<{ size: number } | null> {
+  const disk = keyToDiskPath(key);
+  try {
+    const st = await stat(disk);
+    return st.isFile() ? { size: st.size } : null;
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err;
+  }
+}
+
+/**
+ * Stream a byte range from the asset. Used by the file route to support
+ * HTTP Range requests — browsers refuse to play <video> without 206 +
+ * Accept-Ranges, and a 4GB video would blow up memory if we buffered it.
+ */
+export function readAssetStream(
+  key: string,
+  start: number,
+  end: number,
+): ReadableStream<Uint8Array> {
+  const disk = keyToDiskPath(key);
+  const fileStream = createReadStream(disk, { start, end });
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      fileStream.on("data", (chunk) => {
+        const buf = chunk instanceof Buffer ? chunk : Buffer.from(chunk);
+        controller.enqueue(new Uint8Array(buf));
+      });
+      fileStream.on("end", () => controller.close());
+      fileStream.on("error", (err) => controller.error(err));
+    },
+    cancel() {
+      fileStream.destroy();
+    },
+  });
 }
