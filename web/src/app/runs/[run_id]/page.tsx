@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Nav } from "@/components/nav";
+import { Shell, PageHeader } from "@/components/shell";
 import { DecisionRow, DECISION_LABEL_HE, DECISION_STYLES } from "@/components/decision-row";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
@@ -81,32 +81,28 @@ export default async function RunDetailPage({
     0,
   );
 
+  const right = (
+    <Link href="/approvals">
+      <Button variant="outline" size="sm">
+        הצעות
+      </Button>
+    </Link>
+  );
+
   return (
-    <main className="min-h-screen p-6">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <Nav active="/runs" />
+    <Shell active="/runs" right={right}>
+      <PageHeader
+        eyebrow="ריצה"
+        title={graphNames.join(", ") || "ריצה"}
+        subtitle={`${runId} · התחילה ${relativeHe(first.created_at)}`}
+      />
 
-        <header className="flex flex-wrap items-start justify-between gap-3">
-          <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-bold">ריצה</h1>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <span dir="ltr" className="font-mono text-xs">{runId}</span>
-              <span>·</span>
-              <span>{graphNames.join(", ")}</span>
-              <span>·</span>
-              <span>התחילה {relativeHe(first.created_at)}</span>
-            </div>
-          </div>
-          <Link href="/approvals">
-            <Button variant="outline">הצעות</Button>
-          </Link>
-        </header>
-
+      <div className="flex flex-col gap-6">
         {hasErrors ? (
-          <Card className="border-red-300 bg-red-50/40">
+          <Card className="border-red-300/60 bg-red-50/40 dark:border-red-900/50 dark:bg-red-900/10">
             <CardHeader>
-              <CardTitle className="text-red-900">הריצה כללה שגיאות</CardTitle>
-              <CardDescription className="text-red-800">
+              <CardTitle className="text-red-900 dark:text-red-200">הריצה כללה שגיאות</CardTitle>
+              <CardDescription className="text-red-800 dark:text-red-300">
                 {typeCounts.get("error")} רשומות error. בדוק את השורות המסומנות באדום למטה.
               </CardDescription>
             </CardHeader>
@@ -156,7 +152,7 @@ export default async function RunDetailPage({
             </div>
 
             {guardrailHits > 0 ? (
-              <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="rounded-md border border-amber-300/60 bg-amber-50/60 p-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-900/15 dark:text-amber-200">
                 🛡 {guardrailHits} guardrail violations בריצה הזו
               </div>
             ) : null}
@@ -168,7 +164,7 @@ export default async function RunDetailPage({
             <CardHeader>
               <CardTitle>הצעות שנוצרו מהריצה</CardTitle>
               <CardDescription>
-                {relatedApprovals.length} הצעות יחודיות עם קישורי `related_approval_id`.
+                {relatedApprovals.length} הצעות יחודיות עם קישורי related_approval_id.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -177,7 +173,7 @@ export default async function RunDetailPage({
                   <li key={r.id}>
                     <Link
                       href={`/approvals/${r.id}`}
-                      className="flex flex-wrap items-center gap-2 rounded-md border p-2 text-sm hover:bg-muted/50"
+                      className="flex flex-wrap items-center gap-2 rounded-md border bg-card/40 p-2 text-sm transition-colors hover:bg-muted/40"
                     >
                       <span dir="ltr" className="font-mono text-xs text-muted-foreground">
                         {r.id.slice(0, 8)}
@@ -212,9 +208,11 @@ export default async function RunDetailPage({
                   <Link
                     key={c}
                     href={`/campaigns#campaign-${c}`}
-                    className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs hover:bg-muted/50"
+                    className="inline-flex items-center gap-1 rounded-full border bg-card/40 px-3 py-1 text-xs transition-colors hover:bg-muted/40"
                   >
-                    <span dir="ltr" className="font-mono">{c}</span>
+                    <span dir="ltr" className="font-mono">
+                      {c}
+                    </span>
                     <span>↗</span>
                   </Link>
                 ))}
@@ -231,18 +229,13 @@ export default async function RunDetailPage({
           <CardContent>
             <ol className="flex flex-col gap-3">
               {decisions.map((d) => (
-                <DecisionRow
-                  key={d.id}
-                  d={d}
-                  showRunLink={false}
-                  showApprovalLink={true}
-                />
+                <DecisionRow key={d.id} d={d} showRunLink={false} showApprovalLink={true} />
               ))}
             </ol>
           </CardContent>
         </Card>
       </div>
-    </main>
+    </Shell>
   );
 }
 
@@ -278,9 +271,9 @@ function inferTaskType(d: AgentDecision): string | null {
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md border p-3">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-lg font-semibold">{value}</div>
+    <div className="rounded-md border bg-card/40 p-3">
+      <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className="mt-1 text-lg font-semibold tabular-nums">{value}</div>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   MetaApiError,
   type DatePreset,
   type DateRange,
+  type MetaAdSetSummary,
   type MetaAdSummary,
   type MetaInsights,
   findAction,
@@ -17,6 +18,7 @@ import {
   formatMoney,
   formatPct,
   getAdAccountInfo,
+  listAdSetsForAccount,
   listAdsForAccount,
   listCampaignsWithInsights,
   parseDateRange,
@@ -137,13 +139,15 @@ export default async function CampaignsPage({
   let accountInfo: Awaited<ReturnType<typeof getAdAccountInfo>> | null = null;
   let campaigns: Awaited<ReturnType<typeof listCampaignsWithInsights>> = [];
   let allAds: MetaAdSummary[] = [];
+  let allAdSets: MetaAdSetSummary[] = [];
   let errorMsg: string | null = null;
 
   try {
-    [accountInfo, campaigns, allAds] = await Promise.all([
+    [accountInfo, campaigns, allAds, allAdSets] = await Promise.all([
       getAdAccountInfo(business.meta_ad_account_id),
       listCampaignsWithInsights(business.meta_ad_account_id, range),
       listAdsForAccount(business.meta_ad_account_id),
+      listAdSetsForAccount(business.meta_ad_account_id),
     ]);
   } catch (e) {
     errorMsg =
@@ -174,11 +178,26 @@ export default async function CampaignsPage({
   const activeCount = campaigns.filter((c) => c.effective_status === "ACTIVE").length;
   const totalSpend = campaigns.reduce((sum, c) => sum + Number(c.insights?.spend ?? 0), 0);
 
+  const pendingApprovals = await db.listPendingApprovals(business.id);
+  const pendingByCampaign = new Map<string, number>();
+  for (const a of pendingApprovals) {
+    if (a.target_kind === "campaign" && a.target_id) {
+      pendingByCampaign.set(a.target_id, (pendingByCampaign.get(a.target_id) ?? 0) + 1);
+    }
+  }
+
   const adsByCampaign = new Map<string, MetaAdSummary[]>();
   for (const ad of allAds) {
     const arr = adsByCampaign.get(ad.campaign_id) ?? [];
     arr.push(ad);
     adsByCampaign.set(ad.campaign_id, arr);
+  }
+
+  const adSetsByCampaign = new Map<string, MetaAdSetSummary[]>();
+  for (const as of allAdSets) {
+    const arr = adSetsByCampaign.get(as.campaign_id) ?? [];
+    arr.push(as);
+    adSetsByCampaign.set(as.campaign_id, arr);
   }
 
   return (
@@ -216,8 +235,14 @@ export default async function CampaignsPage({
             const objectiveLabel = OBJECTIVE_LABEL_HE[c.objective] ?? c.objective;
             const ads = adsByCampaign.get(c.id) ?? [];
             const activeAds = ads.filter((a) => a.effective_status === "ACTIVE").length;
+            const campaignAdSets = adSetsByCampaign.get(c.id) ?? [];
+            const adSetDailyTotal = campaignAdSets
+              .filter((as) => as.effective_status !== "DELETED" && as.effective_status !== "ARCHIVED")
+              .reduce((sum, as) => sum + Number(as.daily_budget ?? 0), 0);
+            const effectiveDailyCents = Number(c.daily_budget ?? 0) || adSetDailyTotal;
+            const pendingCount = pendingByCampaign.get(c.id) ?? 0;
             return (
-              <Card key={c.id}>
+              <Card key={c.id} id={`campaign-${c.id}`} className="scroll-mt-6">
                 <CardHeader>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex flex-col gap-1">
@@ -234,15 +259,24 @@ export default async function CampaignsPage({
                           {c.effective_status}
                         </span>
                         <span className="text-xs text-muted-foreground">{objectiveLabel}</span>
+                        {pendingCount > 0 ? (
+                          <Link
+                            href={`/approvals?campaign=${c.id}`}
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 hover:bg-amber-200"
+                          >
+                            🔔 {pendingCount} הצעות ממתינות
+                          </Link>
+                        ) : null}
                         <span className="text-xs text-muted-foreground">
                           מודעות: <strong className="text-foreground">{ads.length}</strong>
                           {activeAds !== ads.length ? ` (${activeAds} פעילות)` : null}
                         </span>
-                        {c.daily_budget ? (
-                          <span className="text-xs text-muted-foreground">
-                            תקציב יומי: {formatCents(c.daily_budget, currency)}
-                          </span>
-                        ) : null}
+                        <span className="text-xs text-muted-foreground">
+                          תקציב יומי:{" "}
+                          {effectiveDailyCents > 0
+                            ? formatCents(String(effectiveDailyCents), currency)
+                            : "ללא הגבלה"}
+                        </span>
                         {c.lifetime_budget ? (
                           <span className="text-xs text-muted-foreground">
                             תקציב חיים: {formatCents(c.lifetime_budget, currency)}

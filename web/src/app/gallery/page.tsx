@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Nav } from "@/components/nav";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Shell, PageHeader } from "@/components/shell";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import { GalleryClient } from "./gallery-client";
@@ -18,36 +18,28 @@ export default async function GalleryPage() {
 
   if (!business) {
     return (
-      <main className="min-h-screen p-6">
-        <div className="mx-auto max-w-4xl">
-          <Nav active="/gallery" />
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>אין עסק ב-DB</CardTitle>
-              <CardDescription>הרץ migrations ו-seed קודם.</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      </main>
+      <Shell active="/gallery">
+        <PageHeader eyebrow="גלריה" title="גלריית נכסים" />
+        <Card>
+          <CardHeader>
+            <CardTitle>אין עסק ב-DB</CardTitle>
+            <CardDescription>הרץ migrations ו-seed קודם.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Shell>
     );
   }
 
   const assets = await db.listGalleryAssets(business.id);
 
   return (
-    <main className="min-h-screen p-6">
-      <Nav active="/gallery" />
-      <div className="mx-auto mt-6 flex max-w-6xl flex-col gap-4">
-        <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">גלריית נכסים</h1>
-          <p className="text-sm text-muted-foreground">
-            תמונות וסרטונים שמהם הסוכן מושך קריאייטיב כשמוצע <code>new_creative</code> או{" "}
-            <code>new_campaign</code>. תמונות: JPEG/PNG/WebP עד 30MB. וידאו: MP4/MOV עד 4GB,
-            1-241 שניות, aspect 1:1/4:5/9:16/16:9.
-          </p>
-        </header>
-        <GalleryClient assets={assets} />
-      </div>
-    </main>
+    <Shell active="/gallery" width="wide">
+      <PageHeader
+        eyebrow="גלריה"
+        title="גלריית נכסים"
+        subtitle="תמונות וסרטונים שמהם הסוכן מושך קריאייטיב כשמוצע new_creative או new_campaign. תמונות: JPEG/PNG/WebP עד 30MB. וידאו: MP4/MOV עד 4GB, 1–241 שניות, aspect 1:1/4:5/9:16/16:9."
+      />
+      <GalleryClient assets={assets} />
+    </Shell>
   );
 }

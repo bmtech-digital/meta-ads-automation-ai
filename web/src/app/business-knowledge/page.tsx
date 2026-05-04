@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Nav } from "@/components/nav";
+import { Shell, PageHeader } from "@/components/shell";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import type { BusinessKnowledgeUpsert, Product, Vertical } from "@/lib/db/types";
@@ -115,16 +114,15 @@ export default async function BusinessKnowledgePage({
 
   if (!business) {
     return (
-      <main className="min-h-screen p-6">
-        <div className="mx-auto max-w-3xl">
-          <Card>
-            <CardHeader>
-              <CardTitle>אין עסק ב-DB</CardTitle>
-              <CardDescription>הרץ migrations ו-seed לפני עריכת ידע עסקי.</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-      </main>
+      <Shell active="/business-knowledge" width="narrow">
+        <PageHeader eyebrow="ידע עסקי" title="ידע עסקי" />
+        <Card>
+          <CardHeader>
+            <CardTitle>אין עסק ב-DB</CardTitle>
+            <CardDescription>הרץ migrations ו-seed לפני עריכת ידע עסקי.</CardDescription>
+          </CardHeader>
+        </Card>
+      </Shell>
     );
   }
 
@@ -138,222 +136,223 @@ export default async function BusinessKnowledgePage({
   const bv = (k?.brand_voice ?? {}) as { tone?: string; forbidden_words?: string[] };
 
   return (
-    <main className="min-h-screen p-6">
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <Nav active="/business-knowledge" />
-
-        <header className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold">ידע עסקי</h1>
-          <p className="text-sm text-muted-foreground">
-            הסוכן קורא את השדות האלה לפני כל ריצה. ה-KPI הראשי נגזר אוטומטית מ-vertical.
-          </p>
-        </header>
-
-        {saved ? <Badge>נשמר</Badge> : null}
-        {error ? <p className="text-sm text-destructive">{error}</p> : null}
-
-        <form action={saveKnowledgeAction} className="flex flex-col gap-6">
-          <input type="hidden" name="business_id" value={business.id} />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>טופס מובנה</CardTitle>
-              <CardDescription>
-                שדות עובדתיים. vertical קובע את ה-KPI הראשי שבו הסוכן מודד ביצועים.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="vertical">Vertical</Label>
-                  <select
-                    id="vertical"
-                    name="vertical"
-                    defaultValue={k?.vertical ?? ""}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="">— בחר —</option>
-                    {VERTICALS.map((v) => (
-                      <option key={v} value={v}>
-                        {VERTICAL_LABELS_HE[v]}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-muted-foreground">
-                    KPI נגזר: eCommerce→ROAS · לידים→CPL · Awareness→CPM · אפליקציה→CPI
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="website_url">כתובת אתר</Label>
-                  <Input
-                    id="website_url"
-                    name="website_url"
-                    defaultValue={k?.website_url ?? ""}
-                    placeholder="https://example.com"
-                    dir="ltr"
-                    className="text-left"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="service_regions">אזורי שירות</Label>
-                <Input
-                  id="service_regions"
-                  name="service_regions"
-                  defaultValue={(k?.service_regions ?? []).join(", ")}
-                  placeholder="תל אביב, חיפה, מרכז (מופרד בפסיקים)"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="customer_age_min">גיל לקוח (מ-)</Label>
-                  <Input
-                    id="customer_age_min"
-                    name="customer_age_min"
-                    type="number"
-                    min="13"
-                    max="80"
-                    defaultValue={k?.customer_age_min ?? ""}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="customer_age_max">גיל לקוח (עד)</Label>
-                  <Input
-                    id="customer_age_max"
-                    name="customer_age_max"
-                    type="number"
-                    min="13"
-                    max="80"
-                    defaultValue={k?.customer_age_max ?? ""}
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="delivery_time_days">זמן אספקה (ימים)</Label>
-                  <Input
-                    id="delivery_time_days"
-                    name="delivery_time_days"
-                    type="number"
-                    min="0"
-                    defaultValue={k?.delivery_time_days ?? ""}
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="products_raw">מוצרים / שירותים</Label>
-                <textarea
-                  id="products_raw"
-                  name="products_raw"
-                  defaultValue={productsText}
-                  rows={4}
-                  placeholder={"שורה לכל מוצר. פורמט: שם — תיאור קצר\nדוגמה: קורס AI למנהלים — 8 מפגשים, 3000₪"}
-                  className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="strong_seasons">עונות חזקות</Label>
-                  <Input
-                    id="strong_seasons"
-                    name="strong_seasons"
-                    defaultValue={(k?.strong_seasons ?? []).join(", ")}
-                    placeholder="פסח, חנוכה, ספטמבר"
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="weak_seasons">עונות חלשות</Label>
-                  <Input
-                    id="weak_seasons"
-                    name="weak_seasons"
-                    defaultValue={(k?.weak_seasons ?? []).join(", ")}
-                    placeholder="אוגוסט, סוכות"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="competitors">מתחרים</Label>
-                <Input
-                  id="competitors"
-                  name="competitors"
-                  defaultValue={(k?.competitors ?? []).join(", ")}
-                  placeholder="שמות מתחרים, מופרדים בפסיקים"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>שאלון מונחה</CardTitle>
-              <CardDescription>
-                שדות שיפוטיים. דלג על מה שעדיין לא ברור — אפשר למלא בהדרגה.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <Questionnaire id="ideal_customer" label="לקוח אידיאלי" value={q.ideal_customer} />
-              <Questionnaire id="main_pain" label="הכאב המרכזי שהמוצר פותר" value={q.main_pain} />
-              <Questionnaire id="common_objections" label="התנגדויות נפוצות" value={q.common_objections} />
-              <Questionnaire id="usp" label="יתרון תחרותי ייחודי (USP)" value={q.usp} />
-              <Questionnaire
-                id="what_worked_before"
-                label="מה עבד בעבר בפרסום"
-                value={q.what_worked_before}
-              />
-              <Questionnaire
-                id="what_failed_before"
-                label="מה נכשל בעבר בפרסום"
-                value={q.what_failed_before}
-              />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>קול מותג</CardTitle>
-              <CardDescription>משפיע על טקסטי קריאייטיב.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="brand_tone">טון</Label>
-                <Input
-                  id="brand_tone"
-                  name="brand_tone"
-                  defaultValue={bv.tone ?? ""}
-                  placeholder="דוגמה: מקצועי, חם, בגובה העיניים"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="brand_forbidden_words">מילים אסורות</Label>
-                <Input
-                  id="brand_forbidden_words"
-                  name="brand_forbidden_words"
-                  defaultValue={(bv.forbidden_words ?? []).join(", ")}
-                  placeholder="מופרד בפסיקים"
-                />
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="flex items-center gap-3">
-            <Button type="submit">שמור</Button>
-            <Link href="/">
-              <Button type="button" variant="outline">
-                חזרה לדשבורד
-              </Button>
-            </Link>
+    <Shell active="/business-knowledge">
+      <PageHeader
+        eyebrow="ידע עסקי"
+        title="ידע עסקי"
+        subtitle="הסוכן קורא את השדות האלה לפני כל ריצה. ה־KPI הראשי נגזר אוטומטית מ־vertical."
+        actions={
+          <div className="flex items-center gap-2">
+            {saved ? <Badge>נשמר ✓</Badge> : null}
             {k?.last_refreshed_at ? (
               <span className="text-xs text-muted-foreground">
-                עודכן לאחרונה: {new Date(k.last_refreshed_at).toLocaleString("he-IL")}
+                עודכן {new Date(k.last_refreshed_at).toLocaleString("he-IL")}
               </span>
             ) : null}
           </div>
-        </form>
-      </div>
-    </main>
+        }
+      />
+
+      {error ? (
+        <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+
+      <form action={saveKnowledgeAction} className="flex flex-col gap-6">
+        <input type="hidden" name="business_id" value={business.id} />
+
+        <Card>
+          <CardHeader>
+            <CardTitle>טופס מובנה</CardTitle>
+            <CardDescription>
+              שדות עובדתיים. vertical קובע את ה־KPI הראשי שבו הסוכן מודד ביצועים.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="vertical">Vertical</Label>
+                <select
+                  id="vertical"
+                  name="vertical"
+                  defaultValue={k?.vertical ?? ""}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">— בחר —</option>
+                  {VERTICALS.map((v) => (
+                    <option key={v} value={v}>
+                      {VERTICAL_LABELS_HE[v]}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs text-muted-foreground">
+                  KPI נגזר: eCommerce→ROAS · לידים→CPL · Awareness→CPM · אפליקציה→CPI
+                </p>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="website_url">כתובת אתר</Label>
+                <Input
+                  id="website_url"
+                  name="website_url"
+                  defaultValue={k?.website_url ?? ""}
+                  placeholder="https://example.com"
+                  dir="ltr"
+                  className="text-left"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="service_regions">אזורי שירות</Label>
+              <Input
+                id="service_regions"
+                name="service_regions"
+                defaultValue={(k?.service_regions ?? []).join(", ")}
+                placeholder="תל אביב, חיפה, מרכז (מופרד בפסיקים)"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="customer_age_min">גיל לקוח (מ-)</Label>
+                <Input
+                  id="customer_age_min"
+                  name="customer_age_min"
+                  type="number"
+                  min="13"
+                  max="80"
+                  defaultValue={k?.customer_age_min ?? ""}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="customer_age_max">גיל לקוח (עד)</Label>
+                <Input
+                  id="customer_age_max"
+                  name="customer_age_max"
+                  type="number"
+                  min="13"
+                  max="80"
+                  defaultValue={k?.customer_age_max ?? ""}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="delivery_time_days">זמן אספקה (ימים)</Label>
+                <Input
+                  id="delivery_time_days"
+                  name="delivery_time_days"
+                  type="number"
+                  min="0"
+                  defaultValue={k?.delivery_time_days ?? ""}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="products_raw">מוצרים / שירותים</Label>
+              <textarea
+                id="products_raw"
+                name="products_raw"
+                defaultValue={productsText}
+                rows={4}
+                placeholder={"שורה לכל מוצר. פורמט: שם — תיאור קצר\nדוגמה: קורס AI למנהלים — 8 מפגשים, 3000₪"}
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="strong_seasons">עונות חזקות</Label>
+                <Input
+                  id="strong_seasons"
+                  name="strong_seasons"
+                  defaultValue={(k?.strong_seasons ?? []).join(", ")}
+                  placeholder="פסח, חנוכה, ספטמבר"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="weak_seasons">עונות חלשות</Label>
+                <Input
+                  id="weak_seasons"
+                  name="weak_seasons"
+                  defaultValue={(k?.weak_seasons ?? []).join(", ")}
+                  placeholder="אוגוסט, סוכות"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="competitors">מתחרים</Label>
+              <Input
+                id="competitors"
+                name="competitors"
+                defaultValue={(k?.competitors ?? []).join(", ")}
+                placeholder="שמות מתחרים, מופרדים בפסיקים"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>שאלון מונחה</CardTitle>
+            <CardDescription>
+              שדות שיפוטיים. דלג על מה שעדיין לא ברור — אפשר למלא בהדרגה.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <Questionnaire id="ideal_customer" label="לקוח אידיאלי" value={q.ideal_customer} />
+            <Questionnaire id="main_pain" label="הכאב המרכזי שהמוצר פותר" value={q.main_pain} />
+            <Questionnaire id="common_objections" label="התנגדויות נפוצות" value={q.common_objections} />
+            <Questionnaire id="usp" label="יתרון תחרותי ייחודי (USP)" value={q.usp} />
+            <Questionnaire
+              id="what_worked_before"
+              label="מה עבד בעבר בפרסום"
+              value={q.what_worked_before}
+            />
+            <Questionnaire
+              id="what_failed_before"
+              label="מה נכשל בעבר בפרסום"
+              value={q.what_failed_before}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>קול מותג</CardTitle>
+            <CardDescription>משפיע על טקסטי קריאייטיב.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="brand_tone">טון</Label>
+              <Input
+                id="brand_tone"
+                name="brand_tone"
+                defaultValue={bv.tone ?? ""}
+                placeholder="דוגמה: מקצועי, חם, בגובה העיניים"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="brand_forbidden_words">מילים אסורות</Label>
+              <Input
+                id="brand_forbidden_words"
+                name="brand_forbidden_words"
+                defaultValue={(bv.forbidden_words ?? []).join(", ")}
+                placeholder="מופרד בפסיקים"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="sticky bottom-4 flex items-center gap-3 rounded-lg border bg-background/80 p-3 shadow-sm backdrop-blur">
+          <Button type="submit">שמור</Button>
+          <span className="text-xs text-muted-foreground">
+            השינויים יוחלו על הריצה הבאה של הסוכן.
+          </span>
+        </div>
+      </form>
+    </Shell>
   );
 }
 

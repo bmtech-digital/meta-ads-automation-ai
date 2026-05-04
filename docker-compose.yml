@@ -7,7 +7,8 @@ services:
       POSTGRES_USER: campaigner
       POSTGRES_PASSWORD: campaigner_dev_pass
     ports:
-      - "5432:5432"
+      # Host port 5433 → container 5432. 5432 is used by aiweon-service's postgres.
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -26,10 +27,13 @@ services:
     volumes:
       - mongodata:/data/db
     healthcheck:
+      # mongosh JS bundle takes 3–5s to boot; 5s timeout was too tight and
+      # marked the container unhealthy even though mongo itself was fine.
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 30s
 
   redis:
     image: redis:7-alpine
@@ -80,6 +84,10 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       PORT: "3000"
       HOSTNAME: 0.0.0.0
+      # Windows bind mounts don't propagate inotify events into the container,
+      # so Next.js HMR misses file changes. Polling fixes that.
+      WATCHPACK_POLLING: "true"
+      CHOKIDAR_USEPOLLING: "true"
     ports:
       - "3000:3000"
     volumes:

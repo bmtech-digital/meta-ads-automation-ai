@@ -1,25 +1,19 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Nav } from "@/components/nav";
+import { BudgetHealthCard } from "@/components/budget-health-card";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
-import {
-  URGENCY_LABEL_HE,
-  URGENCY_STYLES,
-  TARGET_KIND_LABEL_HE,
-  formatExpectedImpact,
-  relativeHe,
-  requiresHumanReview,
-  taskTypeLabel,
-  truncate,
-} from "@/lib/approvals-fmt";
+import { ApprovalsFilteredList } from "./approvals-filtered-list";
 
 export const dynamic = "force-dynamic";
 
-export default async function ApprovalsPage() {
+export default async function ApprovalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ campaign?: string }>;
+}) {
+  const { campaign: campaignFilter } = await searchParams;
   const auth = getAuth();
   const session = await auth.getSession();
   if (!session) redirect("/login?next=/approvals");
@@ -46,6 +40,7 @@ export default async function ApprovalsPage() {
   }
 
   const pending = await db.listPendingApprovals(business.id);
+  const budgetHealth = await db.getLatestBudgetHealthDecision(business.id);
 
   return (
     <main className="min-h-screen p-6">
@@ -56,10 +51,12 @@ export default async function ApprovalsPage() {
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-bold">הצעות ממתינות</h1>
             <p className="text-sm text-muted-foreground">
-              ממוין לפי דחיפות ואז לפי זמן יצירה. {pending.length} ממתינות.
+              ממוין לפי דחיפות ואז לפי זמן יצירה. {pending.length} ממתינות בסה״כ.
             </p>
           </div>
         </header>
+
+        <BudgetHealthCard business={business} decision={budgetHealth} />
 
         {pending.length === 0 ? (
           <Card>
@@ -76,59 +73,7 @@ export default async function ApprovalsPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="flex flex-col gap-4">
-            {pending.map((a) => {
-              const hrReason = requiresHumanReview(a);
-              const impact = formatExpectedImpact(a.expected_impact);
-              const targetLabel = a.target_kind ? TARGET_KIND_LABEL_HE[a.target_kind] : "";
-              return (
-                <Card
-                  key={a.id}
-                  className={hrReason ? "border-amber-500 border-2" : ""}
-                >
-                  <CardHeader>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div className="flex flex-col gap-2">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${URGENCY_STYLES[a.urgency]}`}
-                          >
-                            {URGENCY_LABEL_HE[a.urgency]}
-                          </span>
-                          <span className="font-semibold">{taskTypeLabel(a.task_type)}</span>
-                          {targetLabel && a.target_id ? (
-                            <span className="text-sm text-muted-foreground">
-                              {targetLabel}: <span dir="ltr" className="font-mono text-xs">{a.target_id}</span>
-                            </span>
-                          ) : null}
-                        </div>
-                        {hrReason ? (
-                          <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
-                            ⚠️ דורש בדיקה: {hrReason}
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <span className="text-xs text-muted-foreground">{relativeHe(a.created_at)}</span>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="flex flex-col gap-3">
-                    <p className="text-sm">{truncate(a.rationale)}</p>
-                    {impact ? (
-                      <div className="rounded-md bg-muted px-3 py-2 text-sm">
-                        <span className="text-muted-foreground">השפעה צפויה: </span>
-                        <span className="font-semibold">{impact}</span>
-                      </div>
-                    ) : null}
-                    <div className="flex gap-2">
-                      <Link href={`/approvals/${a.id}`}>
-                        <Button>פתח וסקור</Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <ApprovalsFilteredList approvals={pending} initialCampaignFilter={campaignFilter ?? null} />
         )}
       </div>
     </main>
