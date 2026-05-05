@@ -70,3 +70,4 @@ node_modules/
 web/.pnpm-store/
 web/tsconfig.tsbuildinfo
 .next/
+docker-compose.override.yml

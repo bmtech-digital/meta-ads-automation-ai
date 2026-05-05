@@ -4,7 +4,9 @@ metadata:
   name: webhook
   namespace: campaigner
 spec:
-  replicas: 1
+  # Trello pipe webhook — not part of MVP scope. Scale up to 1 once
+  # WEBHOOK_VERIFY_TOKEN and TRELLO_* env vars are populated in campaigner-secrets.
+  replicas: 0
   selector:
     matchLabels:
       app: webhook
