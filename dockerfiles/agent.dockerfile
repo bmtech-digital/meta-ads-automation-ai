@@ -40,4 +40,35 @@ COPY meta_ads_manager.py image_generator.py ./
 
 RUN chmod +x runners/*.sh
 
+# Bake a Claude Code permissions allowlist into the image so headless `claude -p`
+# in runners/*.sh can call campaigner.tools.* without per-turn approval prompts
+# (which silently fail in non-interactive cron context — Claude returns
+# success:true to indicate the turn finished, even when every Bash call denied).
+RUN mkdir -p /app/.claude && cat > /app/.claude/settings.json <<'JSON'
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m campaigner.tools.list_approved *)",
+      "Bash(python -m campaigner.tools.fetch_insights *)",
+      "Bash(python -m campaigner.tools.load_baselines *)",
+      "Bash(python -m campaigner.tools.load_business_knowledge *)",
+      "Bash(python -m campaigner.tools.check_data_sufficiency *)",
+      "Bash(python -m campaigner.tools.check_guardrails *)",
+      "Bash(python -m campaigner.tools.recheck_guardrails *)",
+      "Bash(python -m campaigner.tools.list_active_creatives *)",
+      "Bash(python -m campaigner.tools.list_gallery_assets *)",
+      "Bash(python -m campaigner.tools.compute_monthly_pace *)",
+      "Bash(python -m campaigner.tools.suggest_where_to_save *)",
+      "Bash(python -m campaigner.tools.generate_creative *)",
+      "Bash(python -m campaigner.tools.log_decision *)",
+      "Bash(python -m campaigner.tools.propose_task *)",
+      "Bash(python -m campaigner.tools.execute_task *)",
+      "Bash(python -m campaigner.tools.mark_failed *)",
+      "Bash(python -m campaigner.tools.heartbeat *)"
+    ],
+    "deny": []
+  }
+}
+JSON
+
 CMD ["bash"]
