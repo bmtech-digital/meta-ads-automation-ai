@@ -184,6 +184,9 @@ jobs:
       - name: Apply namespace
         run: kubectl apply -f kubefiles/namespace.yaml
 
+      - name: Apply Postgres (StatefulSet + Service + credentials)
+        run: kubectl apply -f kubefiles/postgres.yaml
+
       - name: Apply application secrets (envsubst)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
