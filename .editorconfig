@@ -1,0 +1,40 @@
+# EditorConfig is awesome: https://editorconfig.org
+# Top-level config — every editor + IDE in the project respects these.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Python — 4 spaces (PEP 8)
+[*.{py,pyi}]
+indent_size = 4
+
+# Makefiles MUST use tabs
+[Makefile]
+indent_style = tab
+
+# Bash / shell
+[*.{sh,bash}]
+indent_size = 2
+
+# Markdown — preserve trailing whitespace (used for line breaks)
+[*.md]
+trim_trailing_whitespace = false
+
+# YAML — strict 2-space (Kubernetes manifests, GitHub Actions)
+[*.{yml,yaml}]
+indent_size = 2
+
+# JSON — 2 spaces
+[*.{json,jsonc}]
+indent_size = 2
+
+# TypeScript / JavaScript / TSX / JSX — 2 spaces (Next.js convention)
+[*.{ts,tsx,js,jsx,mjs,cjs}]
+indent_size = 2

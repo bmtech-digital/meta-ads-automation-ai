@@ -66,7 +66,10 @@ jobs:
               - 'meta_ads_manager.py'
               - 'image_generator.py'
               - 'requirements.txt'
+              - 'pyproject.toml'
               - 'dockerfiles/agent.dockerfile'
+              # NOTE: legacy/ is reference-only and intentionally excluded —
+              # changes there do not need an agent rebuild.
             web:
               - 'web/**'
               - 'dockerfiles/web.dockerfile'

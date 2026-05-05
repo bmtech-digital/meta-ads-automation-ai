@@ -1,0 +1,68 @@
+# Python tooling config — used by ruff, pytest, and any tool that reads pyproject.toml.
+# This file is the source of truth for Python lint/format/test settings.
+
+[tool.ruff]
+# Match the Dockerfile + requirements.txt
+target-version = "py311"
+line-length = 100
+extend-exclude = [
+    "legacy",
+    "migrations/_sql_pending_decision",
+    "node_modules",
+    ".venv",
+    "venv",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # pyflakes
+    "W",      # pycodestyle warnings
+    "I",      # isort (import ordering)
+    "B",      # flake8-bugbear (likely bugs)
+    "UP",     # pyupgrade (modernize syntax)
+    "SIM",    # flake8-simplify
+    "C4",     # flake8-comprehensions
+    "PTH",    # flake8-use-pathlib
+]
+ignore = [
+    "E501",   # line too long — formatter handles, occasional long string is fine
+    "B008",   # function calls in argument defaults (FastAPI / argparse pattern)
+    "SIM108", # ternary not always clearer than if/else
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests can use assert and longer expressions
+"tests/**" = ["B011", "E501"]
+# Tools have argparse Namespaces and dynamic JSON; allow looser rules
+"campaigner/tools/**" = ["B008"]
+# CLI uses argparse heavily
+"campaigner/cli/**" = ["B008"]
+# Inherited / legacy scripts at the repo root — kept as reference, not refactored.
+# See CLAUDE.md "Existing legacy files". Don't add new files matching these patterns.
+"meta_ads_manager.py" = ["PTH"]
+"image_generator.py" = ["PTH"]
+"automation_main.py" = ["PTH", "B"]
+"run_automation.py" = ["PTH", "B"]
+"create_*.py" = ["PTH", "B"]
+"example_real_estate.py" = ["PTH", "B"]
+"test_correct_page.py" = ["PTH", "B"]
+"test_credentials_simple.py" = ["PTH", "B"]
+"diagnose_page_permissions.py" = ["PTH", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+# Show slowest 10 tests, fail on first error in CI mode (override locally)
+addopts = "-ra --strict-markers"
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:facebook_business.*",
+    "ignore::DeprecationWarning:google.*",
+]

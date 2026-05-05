@@ -36,3 +36,11 @@ desktop.ini
 Dockerfile
 docker-compose*.yml
 .dockerignore
+
+# Legacy reference scripts — not needed inside the runtime image
+legacy
+
+# Tooling caches and dev artifacts
+.ruff_cache
+.mypy_cache
+.secrets.baseline

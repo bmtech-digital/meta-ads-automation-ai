@@ -70,3 +70,13 @@ node_modules/
 web/.pnpm-store/
 web/tsconfig.tsbuildinfo
 .next/
+
+# Tooling caches
+.ruff_cache/
+.mypy_cache/
+
+# Local docker-compose overrides — example committed as docker-compose.override.yml.example
+docker-compose.override.yml
+
+# detect-secrets baseline — generated locally on first run, regenerated as needed
+.secrets.baseline

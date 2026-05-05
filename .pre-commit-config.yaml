@@ -1,0 +1,74 @@
+# Pre-commit hooks. Install once with:
+#   pip install pre-commit && pre-commit install
+# Or via Docker:
+#   docker compose run --rm campaigner pre-commit install
+#
+# Run on all files (manual):
+#   pre-commit run --all-files
+
+repos:
+  # Standard hygiene
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+        exclude: ^kubefiles/secrets_template\.yaml$  # has ${VAR} placeholders
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: check-executables-have-shebangs
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # Python — ruff (replaces black + isort + flake8)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # Frontend — prettier for JSON/YAML/MD/TS where applicable
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v4.0.0-alpha.8
+    hooks:
+      - id: prettier
+        types_or: [javascript, jsx, ts, tsx, json, yaml, markdown, css]
+        exclude: |
+          (?x)^(
+            web/node_modules/.*|
+            web/\.next/.*|
+            web/pnpm-lock\.yaml|
+            web/uploads/.*|
+            docs/legacy/.*|
+            \.github/.*  # has its own validators
+          )$
+
+  # Secret scan — quick check for committed credentials.
+  # The baseline (.secrets.baseline) is generated locally with:
+  #   docker compose run --rm campaigner detect-secrets scan > .secrets.baseline
+  # Anything in .env.example / lock files / generated artifacts is excluded
+  # below — those are templates or vendored data, not real secrets.
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: |
+          (?x)^(
+            .*\.lock|
+            .*-lock\.json|
+            web/pnpm-lock\.yaml|
+            \.env\.example|
+            web/\.env\.example|
+            docs/legacy/.*|
+            tests/golden/.*\.json|
+            \.secrets\.baseline
+          )$

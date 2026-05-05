@@ -1,0 +1,62 @@
+# docker-compose.override.yml — local overrides (NOT committed).
+#
+# Copy to docker-compose.override.yml (gitignored) and edit. Compose merges
+# this on top of docker-compose.yml automatically — no flag needed.
+#
+# Common use cases below; uncomment only what you need.
+
+services:
+  # ─────────────────────────────────────────────────────────────────────
+  # Run a different ad account locally without editing .env
+  # ─────────────────────────────────────────────────────────────────────
+  # campaigner:
+  #   environment:
+  #     META_AD_ACCOUNT_ID: act_202495959   # personal/test account
+  #     BUSINESS_ID: 00000000-0000-0000-0000-000000000099  # local fixture
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Mount your local Claude Code config so `claude -p` reuses your auth
+  # ─────────────────────────────────────────────────────────────────────
+  # campaigner:
+  #   volumes:
+  #     - ${APPDATA:-${HOME}}/.claude:/root/.claude:ro
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Verbose Postgres logging (every statement logged) — useful when
+  # debugging migrations or n+1 queries
+  # ─────────────────────────────────────────────────────────────────────
+  # postgres:
+  #   command:
+  #     - postgres
+  #     - -c
+  #     - log_statement=all
+  #     - -c
+  #     - log_duration=on
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Expose the dev DB on the standard 5432 port (default is 5433 to avoid
+  # colliding with another local Postgres). Only do this if no other
+  # Postgres listens on 5432.
+  # ─────────────────────────────────────────────────────────────────────
+  # postgres:
+  #   ports:
+  #     - "5432:5432"
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Run the web UI in production mode locally (test the standalone build
+  # the way k8s runs it)
+  # ─────────────────────────────────────────────────────────────────────
+  # web:
+  #   command: sh -c "corepack enable && corepack prepare pnpm@9.12.0 --activate && pnpm install && pnpm build && pnpm start"
+  #   environment:
+  #     NODE_ENV: production
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Drop into a running campaigner container with a real shell instead of
+  # the default `bash` task — useful when iterating on tools
+  # ─────────────────────────────────────────────────────────────────────
+  # campaigner:
+  #   stdin_open: true
+  #   tty: true
+  #   command: bash -c "while true; do sleep 3600; done"
+  #   # Then: docker compose exec campaigner bash
