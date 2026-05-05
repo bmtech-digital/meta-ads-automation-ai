@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ExternalLink, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CreativeAsset } from "@/lib/db/types";
 import type { AdInsightsRow, MetaAdWithCreative } from "@/lib/meta";
@@ -38,10 +38,6 @@ function SectionHeader({ title, subtitle, count, right }: SectionHeaderProps) {
       {right ? <div>{right}</div> : null}
     </div>
   );
-}
-
-function shortCampaignId(id: string): string {
-  return id.length <= 9 ? id : `…${id.slice(-9)}`;
 }
 
 interface LiveSectionProps {
@@ -90,11 +86,17 @@ export function LiveSection({
         {groups.length === 0 ? (
           <EmptyState text="אין מודעה חיה במטא כרגע." />
         ) : (
-          <div className="flex flex-col gap-6">
-            {groups.map((g) => (
-              <MetaCampaignGroup key={g.id} group={g} />
-            ))}
-          </div>
+          // Flatten all groups into a single grid — each tile carries its
+          // own campaign label so the grid stays readable without per-group
+          // headers. Tiles from the same campaign cluster together because
+          // groups are iterated in order.
+          <TileGrid>
+            {groups.flatMap((g) =>
+              g.creatives.map((c) => (
+                <LiveMetaCreativeTile key={c.creative_id} creative={c} />
+              )),
+            )}
+          </TileGrid>
         )}
       </div>
 
@@ -137,23 +139,55 @@ function SubsectionHeader({
 }
 
 function OrganicLiveTile({ post }: { post: OrganicPost }) {
+  const [playing, setPlaying] = useState(false);
   const thumb = post.thumbnail
     ? `/api/gallery/organic-thumbnail?src=${post.source}&url=${encodeURIComponent(post.thumbnail)}`
     : null;
+  // Proxy IG/FB video through the same endpoint to strip the referer header —
+  // direct CDN loads from <video src> sometimes 403 without it.
+  const videoSrc = post.video_url
+    ? `/api/gallery/organic-thumbnail?src=${post.source}&url=${encodeURIComponent(post.video_url)}`
+    : null;
+  const canPlay = post.isVideo && !!videoSrc;
 
   return (
     <div className="flex flex-col gap-2">
       <div className="group relative overflow-hidden rounded-xl bg-muted shadow-sm ring-1 ring-emerald-300/60 transition-shadow hover:shadow-md">
         <div className="relative aspect-square w-full">
-          {thumb ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumb}
-              alt={post.caption?.slice(0, 80) ?? `${post.source} post`}
-              className="h-full w-full object-cover"
-              referrerPolicy="no-referrer"
-              loading="lazy"
+          {playing && canPlay ? (
+            <video
+              src={videoSrc ?? undefined}
+              poster={thumb ?? undefined}
+              controls
+              autoPlay
+              playsInline
+              className="h-full w-full bg-slate-900 object-cover"
             />
+          ) : thumb ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={thumb}
+                alt={post.caption?.slice(0, 80) ?? `${post.source} post`}
+                className="h-full w-full object-cover"
+                referrerPolicy="no-referrer"
+                loading="lazy"
+              />
+              {canPlay ? (
+                <button
+                  type="button"
+                  onClick={() => setPlaying(true)}
+                  aria-label="הפעל וידאו"
+                  className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors hover:bg-black/20"
+                >
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition-transform group-hover:scale-110">
+                    <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current ms-1" aria-hidden>
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                </button>
+              ) : null}
+            </>
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-slate-900 text-xs text-slate-300">
               {post.isVideo ? "▶ וידאו אורגני" : "אין תצוגה מקדימה"}
@@ -169,7 +203,7 @@ function OrganicLiveTile({ post }: { post: OrganicPost }) {
           <span className="absolute start-2 top-2 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
             חי
           </span>
-          {post.isVideo ? (
+          {post.isVideo && !playing ? (
             <span className="absolute bottom-2 start-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
               ▶ וידאו
             </span>
@@ -212,41 +246,6 @@ function formatPostDate(iso: string): string {
   } catch {
     return iso;
   }
-}
-
-function MetaCampaignGroup({ group }: { group: LiveMetaCampaignGroup }) {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-3 border-b border-border/60 pb-2">
-        <h3 className="text-sm font-semibold">{group.name}</h3>
-        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-          #{shortCampaignId(group.id)}
-        </span>
-        {group.effective_status && group.effective_status !== "ACTIVE" ? (
-          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] text-amber-900">
-            {group.effective_status}
-          </span>
-        ) : null}
-        <span className="text-xs text-muted-foreground">
-          {group.creatives.length} קריאייטיב{group.creatives.length === 1 ? "" : "ים"}
-        </span>
-        <a
-          href={`https://www.facebook.com/adsmanager/manage/campaigns?selected_campaign_ids=${group.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="ms-auto inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
-        >
-          פתח ב-Ads Manager
-          <ExternalLink className="h-3 w-3" />
-        </a>
-      </div>
-      <TileGrid>
-        {group.creatives.map((c) => (
-          <LiveMetaCreativeTile key={c.creative_id} creative={c} />
-        ))}
-      </TileGrid>
-    </div>
-  );
 }
 
 const GRADE_STYLE: Record<PerformanceGrade, { bg: string; text: string; ring: string; label: string }> = {
@@ -301,7 +300,7 @@ function MetricChips({ perf }: { perf: NonNullable<LiveMetaCreative["performance
 const NO_DATA_PERFORMANCE = {
   score: 0,
   grade: "learning" as const,
-  reasons: ["אין נתוני ביצועים בחלון 30 הימים האחרונים"],
+  reasons: ["אין נתוני ביצועים מ-Meta — המודעה כנראה עוד לא רצה או שהטוקן חסר ads_read"],
   metrics: {
     impressions: null,
     ctr: null,
@@ -313,6 +312,8 @@ const NO_DATA_PERFORMANCE = {
 };
 
 function LiveMetaCreativeTile({ creative }: { creative: LiveMetaCreative }) {
+  const [playing, setPlaying] = useState(false);
+
   // Meta CDN URLs (fbcdn.net) sometimes block direct browser loads — proxy
   // through our existing organic-thumbnail handler which strips referrer.
   const rawThumb = creative.thumbnail_url ?? creative.image_url;
@@ -320,37 +321,83 @@ function LiveMetaCreativeTile({ creative }: { creative: LiveMetaCreative }) {
     ? `/api/gallery/organic-thumbnail?src=meta&url=${encodeURIComponent(rawThumb)}`
     : null;
   const isVideo = !!creative.video_id;
+  const canPlay = isVideo && !!creative.video_source_url;
   const fromGallery = !!creative.galleryAsset;
   const perf = creative.performance ?? NO_DATA_PERFORMANCE;
   const ringColor = GRADE_STYLE[perf.grade].ring;
 
   return (
     <div className="flex flex-col gap-2">
+      {/* Per-tile header — campaign label so it's clear at any scroll depth
+          which campaign this ad belongs to. */}
+      <div className="flex items-center gap-2 px-1 text-[10px]">
+        <span
+          className="truncate font-semibold text-muted-foreground"
+          title={`${creative.campaign_name} · #${creative.campaign_id}`}
+        >
+          {creative.campaign_name}
+        </span>
+        <span className="shrink-0 font-mono text-muted-foreground/70">
+          #{creative.campaign_id.slice(-6)}
+        </span>
+        {creative.campaign_status && creative.campaign_status !== "ACTIVE" ? (
+          <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] text-amber-900">
+            {creative.campaign_status}
+          </span>
+        ) : null}
+      </div>
+
       <div
         className={`group relative overflow-hidden rounded-xl bg-muted shadow-sm ring-2 ${ringColor} transition-shadow hover:shadow-md`}
       >
         <div className="relative aspect-square w-full">
-          {thumb ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumb}
-              alt={creative.name ?? `creative ${creative.creative_id}`}
-              className="h-full w-full object-cover"
-              referrerPolicy="no-referrer"
-              loading="lazy"
+          {playing && canPlay ? (
+            <video
+              src={creative.video_source_url ?? undefined}
+              poster={thumb ?? undefined}
+              controls
+              autoPlay
+              playsInline
+              className="h-full w-full bg-slate-900 object-cover"
             />
+          ) : thumb ? (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={thumb}
+                alt={creative.name ?? `creative ${creative.creative_id}`}
+                className="h-full w-full object-cover"
+                referrerPolicy="no-referrer"
+                loading="lazy"
+              />
+              {canPlay ? (
+                <button
+                  type="button"
+                  onClick={() => setPlaying(true)}
+                  aria-label="הפעל וידאו"
+                  className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors hover:bg-black/20"
+                >
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition-transform group-hover:scale-110">
+                    <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current ms-1" aria-hidden>
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                </button>
+              ) : null}
+            </>
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-slate-900 text-xs text-slate-300">
               {isVideo ? "▶ וידאו" : "אין תצוגה מקדימה"}
             </div>
           )}
+
           <div className="absolute start-2 top-2">
             <PerformanceBadge grade={perf.grade} score={perf.score} />
           </div>
           <span className="absolute end-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
             Meta
           </span>
-          {isVideo ? (
+          {isVideo && !playing ? (
             <span className="absolute bottom-2 start-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
               ▶ וידאו
             </span>

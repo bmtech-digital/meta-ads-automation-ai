@@ -8,6 +8,7 @@ export interface OrganicPost {
   id: string;
   caption: string | null;
   thumbnail: string | null;
+  video_url: string | null;
   permalink: string | null;
   timestamp: string;
   isVideo: boolean;
@@ -296,10 +297,10 @@ export function scoreLivePerformance(
     "contact",
   ]);
 
-  const video3sec = actionValue(
-    insights.video_3_sec_watched_actions,
-    "video_view",
-  );
+  // Hook rate = 3-sec views / impressions. In Graph v21 the 3-sec count
+  // lives in the standard `actions` array as `video_view` (Meta's default
+  // video event taxonomy).
+  const video3sec = actionValue(insights.actions, "video_view");
   const hookRate =
     isVideo && video3sec != null && impressions > 0
       ? (video3sec / impressions) * 100

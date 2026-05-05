@@ -46,14 +46,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "host_not_allowed", host: parsed.hostname }, { status: 400 });
   }
 
+  // Forward Range header so video <video> elements can seek without
+  // re-downloading the full file. Without this, scrubbing in the player
+  // re-fetches from byte 0 every time.
+  const upstreamHeaders: Record<string, string> = {
+    "user-agent": "Campaigner/1.0 (+thumbnail-proxy)",
+  };
+  const incomingRange = req.headers.get("range");
+  if (incomingRange) upstreamHeaders.range = incomingRange;
+
   let upstream: Response;
   try {
     upstream = await fetch(parsed.toString(), {
       cache: "no-store",
       redirect: "follow",
-      headers: {
-        "user-agent": "Campaigner/1.0 (+thumbnail-proxy)",
-      },
+      headers: upstreamHeaders,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "fetch_failed";
@@ -67,18 +74,35 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const contentType = upstream.headers.get("content-type") ?? "image/jpeg";
-  if (!contentType.startsWith("image/")) {
-    return NextResponse.json({ error: "non_image_response", content_type: contentType }, { status: 502 });
+  const contentType = upstream.headers.get("content-type") ?? "application/octet-stream";
+  // Allow images (thumbnails) and videos (organic IG/FB video playback).
+  if (
+    !contentType.startsWith("image/") &&
+    !contentType.startsWith("video/") &&
+    !contentType.startsWith("application/octet-stream")
+  ) {
+    return NextResponse.json(
+      { error: "unsupported_content_type", content_type: contentType },
+      { status: 502 },
+    );
   }
 
+  // Forward Range requests for video streaming (browser <video> element
+  // requests partial content for seek). We pass through whatever the upstream
+  // returns plus accept-ranges so the browser knows ranges are supported.
+  const headers: Record<string, string> = {
+    "content-type": contentType,
+    "cache-control": "private, max-age=300",
+  };
+  const contentLength = upstream.headers.get("content-length");
+  if (contentLength) headers["content-length"] = contentLength;
+  const acceptRanges = upstream.headers.get("accept-ranges");
+  if (acceptRanges) headers["accept-ranges"] = acceptRanges;
+  const contentRange = upstream.headers.get("content-range");
+  if (contentRange) headers["content-range"] = contentRange;
+
   return new NextResponse(upstream.body, {
-    status: 200,
-    headers: {
-      "content-type": contentType,
-      // Short cache — these URLs rotate frequently. 5 min is enough to keep
-      // navigation snappy without serving deeply stale CDN URLs.
-      "cache-control": "private, max-age=300",
-    },
+    status: upstream.status,
+    headers,
   });
 }

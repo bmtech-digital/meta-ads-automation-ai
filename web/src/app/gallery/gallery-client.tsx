@@ -21,6 +21,7 @@ function fbToOrganic(p: FacebookPagePost): OrganicPost {
     id: p.id,
     caption: p.message,
     thumbnail: p.full_picture,
+    video_url: null, // FB Page posts via /published_posts don't expose video src directly
     permalink: p.permalink_url,
     timestamp: p.created_time,
     isVideo: false,
@@ -28,16 +29,19 @@ function fbToOrganic(p: FacebookPagePost): OrganicPost {
 }
 
 function igToOrganic(m: InstagramMedia): OrganicPost {
-  const thumb =
-    m.media_type === "VIDEO" ? (m.thumbnail_url ?? m.media_url) : m.media_url;
+  const isVideo = m.media_type === "VIDEO";
+  // For VIDEO: thumbnail_url is the poster frame; media_url is the actual video.
+  // For IMAGE/CAROUSEL: media_url is already an image URL.
+  const thumb = isVideo ? (m.thumbnail_url ?? m.media_url) : m.media_url;
   return {
     source: "instagram",
     id: m.id,
     caption: m.caption,
     thumbnail: thumb,
+    video_url: isVideo ? m.media_url : null,
     permalink: m.permalink,
     timestamp: m.timestamp,
-    isVideo: m.media_type === "VIDEO",
+    isVideo,
   };
 }
 

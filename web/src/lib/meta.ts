@@ -101,7 +101,6 @@ export interface MetaInsights {
   reach?: string;
   actions?: Array<{ action_type: string; value: string }>;
   cost_per_action_type?: Array<{ action_type: string; value: string }>;
-  video_3_sec_watched_actions?: Array<{ action_type: string; value: string }>;
   date_start?: string;
   date_stop?: string;
 }
@@ -312,12 +311,13 @@ export async function getCampaignInsights(
  * Used by the gallery's "באוויר עכשיו" section to score live creatives by
  * actual performance (CTR, hook rate, frequency, spend).
  *
- * Default window is `last_30d` — wide enough to surface signal on campaigns
- * that paused recently. last_7d misses too many paused-but-recent ads.
+ * Default window is `maximum` (lifetime) — many ads run for months, and
+ * narrow windows like 7d/30d miss the bigger picture. The agent's decision
+ * loop wants the *overall* signal per creative, not a recency snapshot.
  */
 const INSIGHTS_DEFAULT_RANGE: DateRange = {
   kind: "preset",
-  preset: "last_30d",
+  preset: "maximum",
 };
 
 /**
@@ -366,8 +366,11 @@ export async function listAdInsights(
       `${adAccountId}/insights`,
       {
         level: "ad",
+        // `video_3_sec_watched_actions` was rejected as invalid by Graph v21.
+        // The 3-sec view count lives in the `actions` array as `video_view`
+        // (Meta's standard event taxonomy: video_view = 3-second view).
         fields:
-          "ad_id,impressions,clicks,ctr,spend,cpm,cpc,frequency,reach,actions,cost_per_action_type,video_3_sec_watched_actions",
+          "ad_id,impressions,clicks,ctr,spend,cpm,cpc,frequency,reach,actions,cost_per_action_type",
         limit: "500",
         ...dateRangeParams(range),
       },
