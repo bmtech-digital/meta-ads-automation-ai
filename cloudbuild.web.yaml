@@ -1,0 +1,30 @@
+# Cloud Build config for the campaigner-web image.
+#
+# Why: building locally on Apple Silicon produces an arm64-only image, which
+# GKE nodes (amd64) refuse to pull. Cloud Build runs natively on amd64, no
+# qemu emulation, and keeps the same dockerfile + build context the Makefile
+# already uses.
+#
+# Run: `gcloud builds submit --config=cloudbuild.web.yaml .` from repo root.
+# Or via the Makefile: `make web_cloudbuild`.
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    # BuildKit needed for the `--mount=type=cache` directives in the dockerfile.
+    env:
+      - DOCKER_BUILDKIT=1
+    args:
+      - build
+      - --tag=us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-web:latest
+      - --file=dockerfiles/web.dockerfile
+      - web
+
+images:
+  - us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-web:latest
+
+options:
+  # 8-core builder so pnpm install + next build complete in a few minutes.
+  machineType: E2_HIGHCPU_8
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s

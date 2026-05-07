@@ -74,7 +74,7 @@ agent: agent_build_push agent_deploy
 
 agent_build_push:
 	- docker rmi $(REPO)/campaigner-agent:latest || true
-	docker build --no-cache -t campaigner-agent:latest -t $(REPO)/campaigner-agent:latest -f dockerfiles/agent.dockerfile .
+	docker build --no-cache --platform linux/amd64 -t campaigner-agent:latest -t $(REPO)/campaigner-agent:latest -f dockerfiles/agent.dockerfile .
 	docker push $(REPO)/campaigner-agent:latest
 
 agent_deploy: get_gcp_cluster
@@ -95,10 +95,23 @@ agent_run_once:
 
 web: web_build_push web_deploy web_restart
 
+# Default — local docker build. Forces linux/amd64 because GKE nodes are amd64
+# and an arm64-only image (the default on Apple Silicon) yields ImagePullBackOff.
+# On Apple Silicon this runs through qemu emulation and is slow; prefer
+# `make web_cloudbuild` for a faster path.
 web_build_push:
 	- docker rmi $(REPO)/campaigner-web:latest || true
-	docker build --no-cache -t campaigner-web:latest -t $(REPO)/campaigner-web:latest -f dockerfiles/web.dockerfile web
+	docker build --no-cache --platform linux/amd64 -t campaigner-web:latest -t $(REPO)/campaigner-web:latest -f dockerfiles/web.dockerfile web
 	docker push $(REPO)/campaigner-web:latest
+
+# Faster path on Apple Silicon — Cloud Build runs natively on amd64.
+# See cloudbuild.web.yaml for the build spec and .gcloudignore for what's
+# uploaded. ~2 min total vs ~25 min for the local qemu cross-build.
+web_cloudbuild:
+	gcloud builds submit --config=cloudbuild.web.yaml --project=$(PROJECT_ID) --region=global .
+
+# Convenience: cloud build + apply + rollout. Use this for routine web ships.
+web_cloud: web_cloudbuild web_deploy web_restart
 
 web_deploy: get_gcp_cluster
 	kubectl apply -f kubefiles/web_deployment.yaml
@@ -127,7 +140,7 @@ webhook: webhook_build_push webhook_deploy webhook_restart
 
 webhook_build_push:
 	- docker rmi $(REPO)/campaigner-webhook:latest || true
-	docker build --no-cache -t campaigner-webhook:latest -t $(REPO)/campaigner-webhook:latest -f dockerfiles/webhook.dockerfile webhook
+	docker build --no-cache --platform linux/amd64 -t campaigner-webhook:latest -t $(REPO)/campaigner-webhook:latest -f dockerfiles/webhook.dockerfile webhook
 	docker push $(REPO)/campaigner-webhook:latest
 
 webhook_deploy: get_gcp_cluster
