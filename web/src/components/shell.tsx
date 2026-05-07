@@ -62,7 +62,12 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div className="flex flex-col gap-1.5">
+      <div
+        className={cn(
+          "flex flex-col gap-1.5",
+          eyebrow ? "page-eyebrow-rule" : undefined,
+        )}
+      >
         {eyebrow ? (
           <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-500 dark:text-brand-400">
             {eyebrow}

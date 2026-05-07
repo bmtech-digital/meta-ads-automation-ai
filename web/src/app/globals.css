@@ -42,25 +42,30 @@
   }
 
   .dark {
-    --background: 33 10% 6%;
+    /* Per docs/DESIGN.md: dark surface gets a slight warm tint (saturation up
+       from 8% → 12% on cards/popovers/muted) so the page reads as warm
+       interior instead of neutral grey-black. The hue stays 33 (Aiweon
+       orange) at very low saturation — invisible on its own but noticeable
+       against the radial wash. */
+    --background: 33 12% 6%;
     --foreground: 33 15% 96%;
 
-    --card: 33 8% 9%;
+    --card: 33 12% 10%;
     --card-foreground: 33 15% 96%;
 
-    --popover: 33 8% 9%;
+    --popover: 33 12% 10%;
     --popover-foreground: 33 15% 96%;
 
     --primary: 33 93% 56%;
     --primary-foreground: 33 20% 8%;
 
-    --secondary: 33 6% 13%;
+    --secondary: 33 9% 14%;
     --secondary-foreground: 33 15% 96%;
 
-    --muted: 33 6% 12%;
+    --muted: 33 9% 13%;
     --muted-foreground: 33 8% 64%;
 
-    --accent: 33 6% 14%;
+    --accent: 33 9% 15%;
     --accent-foreground: 33 15% 96%;
 
     --destructive: 0 65% 55%;
@@ -72,8 +77,8 @@
     --warning: 38 92% 58%;
     --warning-foreground: 33 20% 8%;
 
-    --border: 33 6% 16%;
-    --input: 33 6% 16%;
+    --border: 33 10% 18%;
+    --input: 33 10% 18%;
     --ring: 33 93% 56%;
   }
 
@@ -112,11 +117,30 @@
       ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 
-  /* Subtle page backdrop — a single soft radial spark in brand orange */
+  /* Page backdrop — twin soft radial sparks in brand orange (top-end + bottom-start),
+     so the dark surface reads as lit interior instead of flat black. Per
+     docs/DESIGN.md "Surface system". Mirrored on the start side at lower
+     opacity to avoid a single hot corner. */
   .dark body {
+    background-image:
+      radial-gradient(
+        ellipse 900px 480px at 95% -10%,
+        hsl(33 93% 56% / 0.09),
+        transparent 70%
+      ),
+      radial-gradient(
+        ellipse 700px 420px at 5% 110%,
+        hsl(33 93% 56% / 0.05),
+        transparent 70%
+      );
+    background-attachment: fixed;
+  }
+
+  /* Light mode gets a single warm wash so the cream background isn't sterile */
+  body {
     background-image: radial-gradient(
-      ellipse 900px 480px at 95% -10%,
-      hsl(33 93% 56% / 0.07),
+      ellipse 1100px 520px at 100% -10%,
+      hsl(33 93% 54% / 0.07),
       transparent 70%
     );
     background-attachment: fixed;
@@ -151,12 +175,58 @@
     height: 2px;
     width: 0;
     border-radius: 999px;
-    background-color: hsl(var(--primary));
+    background-image: linear-gradient(90deg, hsl(33 93% 54%), hsl(33 88% 48%));
     transition: width 0.28s ease;
   }
   .nav-link-underline:hover::after,
   .nav-link-underline[aria-current="page"]::after {
     width: 100%;
+  }
+
+  /* Card surface that picks up a warm border-tint on hover — used for any
+     "select one of these" list (users, approvals, campaign cards). Per
+     docs/DESIGN.md "Surface system → Card glow utility". */
+  .card-warm {
+    border: 1px solid hsl(var(--border));
+    transition:
+      border-color 200ms ease,
+      box-shadow 200ms ease,
+      transform 200ms ease;
+  }
+  .card-warm:hover {
+    border-color: hsl(33 93% 54% / 0.35);
+    box-shadow:
+      0 0 0 1px hsl(33 93% 54% / 0.18),
+      0 8px 24px hsl(33 93% 54% / 0.10);
+  }
+  .card-warm[data-emphasis="active"] {
+    border-color: hsl(33 93% 54% / 0.50);
+    box-shadow:
+      0 0 0 1px hsl(33 93% 54% / 0.28),
+      0 12px 32px hsl(33 93% 54% / 0.14);
+  }
+
+  /* Page-header eyebrow strip — a thin warm accent above page titles, picks
+     up the same tint as nav active links so the page reads "anchored" to a
+     section. Used by `<PageHeader>`. */
+  .page-eyebrow-rule {
+    position: relative;
+    padding-inline-start: 0.875rem;
+  }
+  .page-eyebrow-rule::before {
+    content: "";
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0.35rem;
+    bottom: 0.35rem;
+    width: 3px;
+    border-radius: 999px;
+    background-image: linear-gradient(
+      180deg,
+      hsl(33 93% 54%),
+      hsl(33 88% 48%)
+    );
+    box-shadow: 0 0 12px hsl(33 93% 54% / 0.45);
   }
 }
 

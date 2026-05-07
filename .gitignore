@@ -8,6 +8,8 @@ generated_images/
 *.png
 *.jpg
 *.jpeg
+# Brand assets are committed (whitelist exception to *.png above)
+!web/public/brand/*.png
 
 # Gallery uploads (local dev filesystem storage; prod uses Supabase Storage)
 web/uploads/*

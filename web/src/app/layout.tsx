@@ -16,11 +16,6 @@ export const metadata: Metadata = {
     "החזון שלך | הידע שלנו | הכוח של AI — פלטפורמת אופטימיזציה של קמפיינים במטא, בלב של Aiweon.",
   icons: {
     icon: [
-      {
-        url: "/brand/aiweon-favicon-64.png",
-        sizes: "64x64",
-        type: "image/png",
-      },
       { url: "/brand/aiweon-mark.png", sizes: "any", type: "image/png" },
     ],
     apple: "/brand/aiweon-mark.png",

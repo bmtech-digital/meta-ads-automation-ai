@@ -56,12 +56,12 @@ export function Nav({ active, right }: { active?: string; right?: ReactNode }) {
           className="flex shrink-0 items-center rounded-md outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-label="Aiweon Campaigner — בית"
         >
-          <AiweonLogo size={30} subtitle="Campaigner" />
+          <AiweonLogo size={34} subtitle="Campaigner" />
         </Link>
 
         {/* Desktop nav (lg+): all links inline */}
         <nav
-          className="hidden flex-1 items-center gap-1 lg:flex"
+          className="hidden flex-1 items-center justify-center gap-1 lg:flex"
           aria-label="ניווט ראשי"
         >
           {LINKS.map((link) => (
@@ -95,8 +95,8 @@ function NavPill({ link, active }: { link: NavLink; active?: string }) {
       className={cn(
         "nav-link-underline inline-flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-[13.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
         isActive
-          ? "text-foreground"
-          : "text-muted-foreground hover:text-foreground",
+          ? "bg-brand-500/10 text-foreground dark:bg-brand-400/10"
+          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
       )}
     >
       <Icon
