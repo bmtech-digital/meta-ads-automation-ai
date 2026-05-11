@@ -41,7 +41,7 @@ pip install pre-commit && pre-commit install
 For the web dashboard:
 
 ```bash
-docker compose --profile web up web             # http://localhost:3000
+docker compose --profile web up web             # http://localhost:3100
 ```
 
 See [`web/README.md`](web/README.md) for frontend-specific setup.

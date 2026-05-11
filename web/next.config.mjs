@@ -10,7 +10,7 @@ const nextConfig = {
     // https://nextjs.org/docs/app/api-reference/config/next-config-js/middlewareClientMaxBodySize
     middlewareClientMaxBodySize: "4gb",
     serverActions: {
-      allowedOrigins: ["localhost:3000"],
+      allowedOrigins: ["localhost:3100"],
       bodySizeLimit: "4gb",
     },
   },

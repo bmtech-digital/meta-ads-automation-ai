@@ -29,7 +29,7 @@ the flag before wiring Supabase fails loudly.
 
 ```bash
 cp web/.env.example web/.env.local   # optional; compose also injects defaults
-docker compose --profile web up web  # http://localhost:3000
+docker compose --profile web up web  # http://localhost:3100
 ```
 
 The `web` service is behind the `web` compose profile so `docker compose up` (backend-only

@@ -32,7 +32,7 @@ Per [`../docs/plans/decisions-log.md`](../docs/plans/decisions-log.md) §1.4, Su
 
 ```bash
 # Recommended — Docker, matches production stack
-docker compose --profile web up web         # http://localhost:3000
+docker compose --profile web up web         # http://localhost:3100
 
 # Host (debugging only)
 cd web && pnpm install && pnpm dev          # requires DATABASE_URL reachable
