@@ -136,7 +136,7 @@ You just saw the agent run. That's the whole MVP.
 
 ```bash
 docker compose --profile web up web
-# open http://localhost:3000
+# open http://localhost:3100
 ```
 
 Hebrew RTL dashboard. Login with the dev cookie (any email). Browse approvals, view decision history.
@@ -239,7 +239,7 @@ make webhook
 | `ConfigError: METa_ACCESS_TOKEN expired` | Meta token rotates ~every 60 days | Generate new long-lived token, update `.env` |
 | `permission denied` on `gcloud` calls | ADC auth expired | `gcloud auth application-default login` |
 | `dubious ownership` from git inside container | Windows host UID mismatch | `docker compose exec campaigner git config --global --add safe.directory /app` |
-| Web at `localhost:3000` shows DB error | Postgres container not healthy | `docker compose ps`; restart with `make dev` |
+| Web at `localhost:3100` shows DB error | Postgres container not healthy | `docker compose ps`; restart with `make dev` |
 | Pre-commit fails on `detect-secrets` first run | No baseline yet | `docker compose run --rm campaigner detect-secrets scan > .secrets.baseline` |
 | `ruff check` reports issues you didn't write | You're on a stale branch | `git pull origin main` and re-apply your changes |
 | Tests pass locally but fail in CI | Different Postgres state | CI uses fresh DB; check your test isolation |

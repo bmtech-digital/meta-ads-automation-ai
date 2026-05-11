@@ -11,7 +11,7 @@ export default defineConfig({
     ? [["github"], ["html", { open: "never" }]]
     : [["list"]],
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000",
+    baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3100",
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
@@ -19,7 +19,7 @@ export default defineConfig({
     ? undefined
     : {
         command: "pnpm build && pnpm start",
-        url: "http://localhost:3000/api/health",
+        url: "http://localhost:3100/api/health",
         timeout: 120_000,
         reuseExistingServer: !process.env.CI,
         env: {

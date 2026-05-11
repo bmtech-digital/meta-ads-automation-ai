@@ -78,7 +78,7 @@ docker compose run --rm campaigner bash scripts/seed_local.sh
 # 5. Validate credentials
 docker compose run --rm campaigner python scripts/validate_credentials.py
 
-# 6. (Optional) Web dashboard at http://localhost:3000
+# 6. (Optional) Web dashboard at http://localhost:3100
 docker compose --profile web up web
 ```
 
