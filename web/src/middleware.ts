@@ -14,6 +14,13 @@ const PUBLIC_PATHS = [
   "/api/auth/login",
   "/api/auth/logout",
   "/api/health",
+  // Meta webhooks — called by Meta with no session cookie. Authenticated by
+  // `signed_request` HMAC inside each route handler.
+  "/api/meta/deauthorize",
+  "/api/meta/data-deletion",
+  // OAuth callback — Meta redirects the browser here without our session
+  // cookie in some flows. Authenticated by the HMAC-signed `state` param.
+  "/api/meta/oauth/callback",
 ];
 
 function hasSession(req: NextRequest): boolean {

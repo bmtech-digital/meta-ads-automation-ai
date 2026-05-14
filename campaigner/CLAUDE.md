@@ -22,7 +22,7 @@ The user prompt carries the flow name. Parse it, follow CAMPAIGNER.md, exit with
 - **Proposals only, never direct Meta writes from Flow A.** The only flow that calls Meta is Flow B (execute), and only on approvals that already cleared guardrails twice.
 - **Every action → `agent_decisions` row.** Via [`tools/log_decision.py`](tools/log_decision.py). No exceptions.
 - **Every run gets a fresh `RUN_ID`.** Reuse it across every decision and proposal in this invocation.
-- **Hebrew output in rationale / summary fields — plain, speakable Hebrew, understandable by a non-marketer.** Follow [`prompts/hebrew-copy-style.md`](prompts/hebrew-copy-style.md) §11. Paragraph 1 of every rationale: zero English acronyms (no `CPM`, `CTR`, `CPA`, `ROAS`, `LEARNING_LIMITED`, `Andromeda`, `Advantage+`); first-use glosses in paragraph 2+. The reader may have no marketing background.
+- **Hebrew output in rationale / summary fields — plain, speakable Hebrew, understandable by a non-marketer.** Follow [`prompts/hebrew-copy-style.md`](prompts/hebrew-copy-style.md) §11 (the full forbidden-tokens table covers metric acronyms, Meta engine names, state strings, placement names, ad-format ratios, CTA enum tokens, and internal doc references — translate every one of them to plain Hebrew in paragraph 1; first-use glosses are allowed only in paragraph 2+). The reader may have no marketing background.
 - **English output in the outer one-line cron summary.** Operators scan it via `tail -f`.
 
 ## Tool invocation style

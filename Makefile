@@ -207,6 +207,7 @@ delete_all: get_gcp_cluster
 	- kubectl delete -f kubefiles/agent_cronjob_daily_observe.yaml || true
 	- kubectl delete -f kubefiles/agent_cronjob_execute_approvals.yaml || true
 	- kubectl delete -f kubefiles/agent_cronjob_weekly_creative.yaml || true
+	- kubectl delete -f kubefiles/agent_cronjob_weekly_competitive_research.yaml || true
 	- kubectl delete -f kubefiles/web_ingress.yaml || true
 	- kubectl delete -f kubefiles/web_deployment.yaml || true
 	- kubectl delete -f kubefiles/webhook_deployment.yaml || true

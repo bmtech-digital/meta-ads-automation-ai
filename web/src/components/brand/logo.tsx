@@ -1,75 +1,62 @@
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 type LogoProps = {
   className?: string;
-  /** Rendered height in px (width auto, aspect preserved) */
+  /** Rendered height in px (width auto, aspect preserved by viewBox) */
   size?: number;
   /** Small uppercase subtitle shown after the wordmark (e.g. "Campaigner") */
   subtitle?: string;
-  /** Render only the Ai mark (no wordmark) */
-  markOnly?: boolean;
+  /** "wordmark" (default — Aiweon + orange A) or "full" (with Hebrew tagline) */
+  variant?: "wordmark" | "full";
 };
 
 /**
- * Aiweon logo — uses the official brand PNGs (served by weon.co.il, mirrored
- * locally at `web/public/brand/`) with separate light/dark variants so the
- * black "weOn" wordmark stays readable in both themes.
+ * Aiweon logo — inline SVG so the wordmark color follows the theme via
+ * `currentColor`. The orange swoosh `A` and dot stay #f5841f always.
+ *
+ * Source: D:\Downloads\icontcgart\AIWEON SERVICE\logo aiweon final.svg, with
+ * `.st0 { fill: #231f20 }` → `currentColor` so dark/light mode swap is free.
  */
 export function AiweonLogo({
   className,
   size = 28,
   subtitle,
-  markOnly = false,
+  variant = "wordmark",
 }: LogoProps) {
-  const logoHeight = size;
-  // The official logo has an aspect ratio of ~3.17:1 (1024×323). Derive width.
-  const logoWidth = Math.round(logoHeight * 3.17);
-
-  if (markOnly) {
-    return (
-      <span dir="ltr" className={cn("inline-flex items-center", className)}>
-        <Image
-          src="/brand/aiweon-mark.png"
-          width={size}
-          height={size}
-          alt="Aiweon"
-          priority
-          className="block h-auto w-auto select-none"
-          style={{ height: size }}
-        />
-      </span>
-    );
-  }
+  // Crop viewBox to wordmark area when no tagline is requested. Full SVG is
+  // 461×316; wordmark + swoosh sit roughly y=100→185.
+  const viewBox = variant === "full" ? "0 100 461 116" : "0 100 421 90";
+  const aspect = variant === "full" ? 461 / 116 : 421 / 90;
+  const width = Math.round(size * aspect);
 
   return (
     <span
       dir="ltr"
-      className={cn("inline-flex items-center gap-2.5", className)}
+      className={cn("inline-flex shrink-0 items-center gap-2.5", className)}
     >
-      <picture className="inline-flex shrink-0">
-        {/* Light mode: black "weOn" on light background */}
-        <Image
-          src="/brand/aiweon-logo.png"
-          alt="Aiweon Campaigner"
-          width={logoWidth}
-          height={logoHeight}
-          priority
-          className="block dark:hidden select-none"
-          style={{ height: logoHeight, width: "auto" }}
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox={viewBox}
+        width={width}
+        height={size}
+        role="img"
+        aria-label="Aiweon"
+        className="block select-none"
+      >
+        {/* Wordmark "weon" — currentColor so it follows theme text color */}
+        <g fill="currentColor">
+          <path d="M175.62,129.63c.35.11,1.59,3.73,3.73,10.86l8.92,27.23h.32l11.67-37.93.16-.16h4.38c.35,0,1.32,2.86,2.92,8.59l9.24,29.34h.16l12.32-37.77.16-.16h6.81l.32.32c-11.56,34.07-17.45,51.2-17.67,51.39l-.16.16h-3.89c-.35,0-1.22-2.54-2.59-7.62l-9.73-30.96h-.16l-11.67,38.42-.16.16h-4.05c-.41,0-1.54-3.13-3.4-9.4-6.92-20.02-11.67-34.12-14.27-42.31l.16-.16h6.48Z" />
+          <path d="M267.21,128.13c11.1,0,19.1,5.78,23.99,17.35,1.3,4.19,1.95,8.13,1.95,11.83l-.49.32h-45.88c-.22,0-.32.16-.32.49,0,4.73,2.38,9.43,7.13,14.1,3.73,2.92,7.83,4.38,12.32,4.38,7.92,0,13.86-3.84,17.83-11.51h7.13l.32.32v.16c-2.65,6.89-7.35,11.97-14.1,15.24-3.43,1.51-7.05,2.27-10.86,2.27-9.19,0-16.7-4.11-22.53-12.32-3.03-5-4.54-10.35-4.54-16.05,0-8.46,3.67-15.75,11.02-21.88,5-3.13,10.67-4.7,17.02-4.7ZM246.79,151.63l.16.16h38.1l.32-.32c-.24-2.97-1.92-6.54-5.03-10.7-3.7-4.21-8.46-6.32-14.27-6.32-8.94,0-15.1,4.43-18.48,13.29-.54,1.51-.81,2.81-.81,3.89Z" />
+          <path d="M331.08,110.17c12.08,0,21.64,5.03,28.69,15.08,4.21,6.51,6.32,13.21,6.32,20.1v1.46c0,9.81-4.27,18.72-12.81,26.75-6.59,5.3-14.21,7.94-22.86,7.94-9.83,0-18.32-3.67-25.45-11.02-6.27-7.7-9.4-15.64-9.4-23.83v-1.78c0-10.62,4.7-19.97,14.1-28.04,6.57-4.43,13.7-6.65,21.4-6.65ZM302.71,146c0,9.05,3.78,16.78,11.35,23.18,5.29,3.78,10.97,5.67,17.02,5.67,7.35,0,13.78-2.7,19.29-8.11,5.73-6.24,8.59-13.32,8.59-21.24,0-10.13-4.86-18.45-14.59-24.96-4.89-2.38-9.43-3.57-13.62-3.57-8.78,0-16.29,3.89-22.53,11.67-3.67,5.67-5.51,11.46-5.51,17.35Z" />
+          <path d="M391.87,128.49h.32c9.29,0,15.67,4.54,19.13,13.62.65,2.35.97,4.57.97,6.65v32.26l-.49.49h-5.84l-.49-.49v-31.94c0-5.32-2.16-9.43-6.48-12.32-2.78-1.19-5.38-1.78-7.78-1.78-8.24,0-13.37,4-15.4,12-.32,1.62-.49,3.57-.49,5.84v28.37l-.32.32h-6c-.32-.11-.49-.43-.49-.97v-49.61c.08-.65.24-.97.49-.97h6l.32.32v4.38l.32.32c4.67-4.32,10.08-6.48,16.21-6.48Z" />
+        </g>
+        {/* Orange swoosh "A" + dot — always brand orange */}
+        <path
+          fill="#f5841f"
+          d="M96.51,179.66c-.04,7,60.77-31.9,61.34-25.54.18,1.91.6,4.27,1.16,6.96.6,2.73,1.42,5.49,2.43,8.3,1.06,2.84,2.3,5.5,3.68,8.08,1.42,2.55,3.03,4.67,4.9,6.36,1.84,1.69,3.89,2.76,6.1,3.22,2.2.48,4.6-.04,7.22-1.43.7-.37,1.34-.44,1.87-.32.56.07.93.32,1.2.7.26.38.34.83.22,1.35-.08.53-.45,1.05-1.01,1.5-3.52,2.65-7.3,4.33-11.43,5.04-4.1.67-8.03.45-11.85-.71-3.82-1.15-7.26-3.21-10.33-6.12-3.07-2.92-5.28-6.7-6.81-11.26-1.65-4.94-63.58,34.38-64.22,26.66-.56-6.61-.72-13.53-.64-20.75.08-7.22.26-14.51.6-21.92-3.33.26-6.7.49-10.07.64-5.92.25-7.6,1.6-8.94,6.55-1.43,5.19-2.93,10.14-4.53,14.81-1.91,5.42-3.78,9.75-5.62,13.01-1.65,3.1-3.51,5.45-5.65,7.11-2.1,1.65-4.19,2.61-6.29,2.87-2.1.3-4.08-.11-5.92-1.23-1.87-1.1-3.41-2.85-4.57-5.27-.19-.42-.26-.83-.19-1.24.04-.42.19-.71.38-.94.19-.21.45-.33.71-.33.3,0,.6.18.86.52.97,1.39,2.06,2.1,3.26,2.1,1.16-.04,2.4-.5,3.63-1.46,1.23-.94,2.47-2.21,3.67-3.86,1.23-1.6,2.36-3.36,3.44-5.24,1.09-1.86,2.02-3.74,2.88-5.6.82-1.88,1.5-3.47,1.98-4.86,1.58-4.46,3.07-9.21,4.46-14.25,4.56-16.24,7.33-43.57,17.85-56.48,2.99-3.74,6.51-6.32,10.55-7.74,3.18-1.12,5.92-.82,8.2.86,1.87,1.46,3.3,3.78,4.3,6.96,1.02,3.21,1.65,7.63,1.99,13.28.26,4.75.34,9.98.23,15.67-.68,31.15-.86,7.74-1.05,44.02h0ZM71.43,155.5c3.26-.15,6.51-.34,9.77-.6.19-6.06.34-11.86.45-17.32.11-5.5.04-10.44-.26-14.85-.12-1.98-.26-3.85-.38-5.65-.15-1.8-.3-3.33-.52-4.64-.23-1.31-.53-2.35-.93-3.14-.38-.75-.94-1.12-1.68-1.01-1.13.07-2.25.89-3.3,2.47-5.65,8.42-9.17,25.77-11.15,35.72-2.36,11.67-3.41,9.5,8.01,9.01h0Z"
         />
-        {/* Dark mode: white "weOn" on dark background */}
-        <Image
-          src="/brand/aiweon-logo-dark.png"
-          alt=""
-          aria-hidden="true"
-          width={logoWidth}
-          height={logoHeight}
-          priority
-          className="hidden dark:block select-none"
-          style={{ height: logoHeight, width: "auto" }}
-        />
-      </picture>
+        <circle fill="#f5841f" cx="146.98" cy="141.15" r="10.38" />
+      </svg>
 
       {subtitle ? (
         <span className="inline-flex items-center gap-2">
@@ -77,7 +64,7 @@ export function AiweonLogo({
             aria-hidden
             className="hidden sm:inline-block h-4 w-px bg-border"
           />
-          <span className="hidden sm:inline text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="hidden sm:inline text-[10.5px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
             {subtitle}
           </span>
         </span>

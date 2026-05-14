@@ -4,6 +4,7 @@ Meta Ads Manager — create campaigns, ad sets, creatives, and ads via the Marke
 
 import os
 import subprocess
+import sys
 import tempfile
 
 import requests as http_requests
@@ -55,7 +56,7 @@ class MetaAdsManager:
 
         self.ad_account = AdAccount(self.ad_account_id)
         self._usdils_rate = None
-        print(f"✅ Meta Ads API inicializada para conta: {self.ad_account_id}")
+        print(f"✅ Meta Ads API inicializada para conta: {self.ad_account_id}", file=sys.stderr)
 
     @property
     def usdils_rate(self) -> float:

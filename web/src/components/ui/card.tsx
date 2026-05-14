@@ -8,7 +8,12 @@ export const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      // Default surface is now `glass-panel` (the heavy blur + present
+      // surface), per "Glassmorphic full atmosphere" doctrine. Border is
+      // neutral — brand orange is reserved for decision elements (CTAs,
+      // KPI verdicts), not paint. Cards that need emphasis add
+      // `.glass-panel-emphasis` for the orange hairline + glow.
+      "glass-panel rounded-lg text-card-foreground",
       className,
     )}
     {...props}

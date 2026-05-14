@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -8,11 +10,14 @@ import {
 } from "@/components/ui/card";
 import { Shell, PageHeader } from "@/components/shell";
 import { BudgetHealthCard } from "@/components/budget-health-card";
+import { HistoryIcon } from "@/components/brand/icons";
+import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import { ApprovalsFilteredList } from "./approvals-filtered-list";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "ממתינות לאישור" };
 
 export default async function ApprovalsPage({
   searchParams,
@@ -25,14 +30,12 @@ export default async function ApprovalsPage({
   if (!session) redirect("/login?next=/approvals");
 
   const db = getDataClient();
-  const business = process.env.BUSINESS_ID
-    ? await db.getBusinessById(process.env.BUSINESS_ID)
-    : await db.getFirstBusiness();
+  const business = await getActiveBusiness();
 
   if (!business) {
     return (
       <Shell active="/approvals">
-        <PageHeader eyebrow="הצעות" title="הצעות ממתינות" />
+        <PageHeader eyebrow="הצעות" title="ממתינות לאישור" />
         <Card>
           <CardHeader>
             <CardTitle>אין עסק ב-DB</CardTitle>
@@ -50,8 +53,19 @@ export default async function ApprovalsPage({
     <Shell active="/approvals">
       <PageHeader
         eyebrow="הצעות"
-        title="הצעות ממתינות"
+        title="ממתינות לאישור"
         subtitle={`ממוין לפי דחיפות ואז לפי זמן יצירה. ${pending.length} ממתינות בסה״כ.`}
+        actions={
+          <Link
+            href="/history"
+            aria-label="היסטוריית החלטות"
+            title="היסטוריית החלטות"
+            className="glass-surface inline-flex h-10 items-center gap-2 rounded-full px-4 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <HistoryIcon size={16} />
+            <span className="hidden sm:inline">היסטוריה</span>
+          </Link>
+        }
       />
 
       <div className="flex flex-col gap-6">

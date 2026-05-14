@@ -4,9 +4,11 @@
 
 @layer base {
   :root {
-    /* Light mode — mirrors weon.co.il's marketing palette */
-    --background: 30 25% 99%;
-    --foreground: 33 15% 10%;
+    /* Light mode — paper-warm editorial canvas. Deepened from 99% L to
+       97% so it reads as "warm cream paper" instead of "clean white
+       screen". Cards + buttons now have something to lift off of. */
+    --background: 32 28% 97%;         /* #faf6ef — warm cream */
+    --foreground: 28 18% 11%;         /* #1f1814 — warm near-black */
 
     --card: 0 0% 100%;
     --card-foreground: 33 15% 10%;
@@ -14,7 +16,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 33 15% 10%;
 
-    --primary: 33 93% 54%; /* #F7941D — Aiweon orange (exact) */
+    --primary: 28 91% 54%; /* #F7941D — Aiweon orange (exact) */
     --primary-foreground: 0 0% 100%;
 
     --secondary: 33 15% 96%;
@@ -37,49 +39,51 @@
 
     --border: 33 15% 90%;
     --input: 33 15% 90%;
-    --ring: 33 93% 54%;
+    --ring: 28 91% 54%;
     --radius: 0.75rem; /* 12px — matches weon.co.il's 10–16px rounded feel */
   }
 
   .dark {
-    /* Per docs/DESIGN.md: dark surface gets a slight warm tint (saturation up
-       from 8% → 12% on cards/popovers/muted) so the page reads as warm
-       interior instead of neutral grey-black. The hue stays 33 (Aiweon
-       orange) at very low saturation — invisible on its own but noticeable
-       against the radial wash. */
-    --background: 33 12% 6%;
-    --foreground: 33 15% 96%;
+    /* ChatGPT-grade calm — pure NEUTRAL near-black. Hue is 0 (gray axis,
+       no chroma) so the surface reads as black-on-gray, not "blue tinted
+       slate". Per Roi: previous 240-hue surfaces leaked blue even at 4%
+       saturation. Goal: clean to the eye, no cool cast. */
+    --background: 0 0% 4%;            /* #0a0a0a — true neutral near-black */
+    --foreground: 0 0% 96%;           /* #f5f5f5 — clean off-white */
 
-    --card: 33 12% 10%;
-    --card-foreground: 33 15% 96%;
+    --card: 0 0% 8%;                  /* #141414 — barely lifted, neutral */
+    --card-foreground: 0 0% 96%;
 
-    --popover: 33 12% 10%;
-    --popover-foreground: 33 15% 96%;
+    --popover: 0 0% 9%;               /* #171717 — same family as card */
+    --popover-foreground: 0 0% 96%;
 
-    --primary: 33 93% 56%;
-    --primary-foreground: 33 20% 8%;
+    --primary: 28 91% 54%;            /* #f5841f — aiweon orange (CTAs only) */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 33 9% 14%;
-    --secondary-foreground: 33 15% 96%;
+    --secondary: 0 0% 10%;            /* #1a1a1a — neutral gray */
+    --secondary-foreground: 0 0% 96%;
 
-    --muted: 33 9% 13%;
-    --muted-foreground: 33 8% 64%;
+    --muted: 0 0% 9%;
+    --muted-foreground: 0 0% 64%;     /* #a3a3a3 — neutral, no tint */
 
-    --accent: 33 9% 15%;
-    --accent-foreground: 33 15% 96%;
+    --accent: 0 0% 11%;
+    --accent-foreground: 0 0% 96%;
 
     --destructive: 0 65% 55%;
     --destructive-foreground: 0 0% 100%;
 
     --success: 150 50% 50%;
-    --success-foreground: 33 20% 8%;
+    --success-foreground: 240 4% 6%;
 
     --warning: 38 92% 58%;
-    --warning-foreground: 33 20% 8%;
+    --warning-foreground: 240 4% 6%;
 
-    --border: 33 10% 18%;
-    --input: 33 10% 18%;
-    --ring: 33 93% 56%;
+    /* Borders kept as solid HSL so Tailwind opacity classes
+       (border-border/60) still resolve correctly — but lightness dropped
+       to 12% so they read as barely-there hairlines like ChatGPT. */
+    --border: 0 0% 12%;               /* #1f1f1f — subtle separator */
+    --input: 0 0% 16%;
+    --ring: 28 91% 54%;
   }
 
   * {
@@ -108,41 +112,55 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Force LTR, mono for Meta IDs / budgets / codes */
+  /* Force LTR, mono for Meta IDs / budgets / codes — uses Geist Mono via the
+     CSS variable set in layout.tsx so it matches the body sans grade. */
   .mono-ltr {
     direction: ltr;
     unicode-bidi: isolate;
     font-variant-numeric: tabular-nums;
     font-family:
-      ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, Monaco,
+      Consolas, monospace;
   }
 
-  /* Page backdrop — twin soft radial sparks in brand orange (top-end + bottom-start),
-     so the dark surface reads as lit interior instead of flat black. Per
-     docs/DESIGN.md "Surface system". Mirrored on the start side at lower
-     opacity to avoid a single hot corner. */
+  /* Page backdrop — ChatGPT-style calm. Pure near-black base; a single
+     whisper-soft warm ember in one far corner so the room isn't dead-flat,
+     but the dominant impression is FOCUS, not "cinematic atmosphere". The
+     orange remains the ember of the brand only on decision-bearing
+     elements, never on the canvas itself. */
   .dark body {
     background-image:
       radial-gradient(
-        ellipse 900px 480px at 95% -10%,
-        hsl(33 93% 56% / 0.09),
-        transparent 70%
-      ),
-      radial-gradient(
-        ellipse 700px 420px at 5% 110%,
-        hsl(33 93% 56% / 0.05),
-        transparent 70%
+        ellipse 1600px 1000px at 100% 0%,
+        rgb(245 132 31 / 0.04),
+        transparent 60%
       );
     background-attachment: fixed;
   }
 
-  /* Light mode gets a single warm wash so the cream background isn't sterile */
+  /* Light mode — warmer paper composition. Two gentle ember washes (top
+     corners) so the page reads as "lit studio paper" instead of "flat
+     spreadsheet white". Subtle vignette tightens the gaze toward the
+     center. Stronger than before since the deeper cream base
+     (#faf6ef) can carry more chroma without going muddy. */
   body {
-    background-image: radial-gradient(
-      ellipse 1100px 520px at 100% -10%,
-      hsl(33 93% 54% / 0.07),
-      transparent 70%
-    );
+    background-image:
+      radial-gradient(
+        ellipse 1700px 1100px at 50% 50%,
+        transparent 55%,
+        rgb(196 100 26 / 0.06) 100%
+      ),
+      radial-gradient(
+        ellipse 900px 560px at 5% 115%,
+        rgb(245 132 31 / 0.09),
+        transparent 65%
+      ),
+      radial-gradient(
+        ellipse 1400px 780px at 95% -10%,
+        rgb(245 132 31 / 0.18),
+        rgb(245 132 31 / 0.05) 45%,
+        transparent 75%
+      );
     background-attachment: fixed;
   }
 }
@@ -150,7 +168,7 @@
 @layer components {
   /* Signature Aiweon gradient — matches weon.co.il's accessibility-toggle + cookie-banner CTAs */
   .bg-brand-gradient {
-    background-image: linear-gradient(135deg, hsl(33 93% 54%), hsl(33 88% 48%));
+    background-image: linear-gradient(135deg, hsl(28 91% 54%), hsl(22 88% 44%));
   }
   .bg-brand-gradient-hover {
     transition:
@@ -159,7 +177,35 @@
   }
   .bg-brand-gradient-hover:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px hsl(33 93% 54% / 0.35);
+    box-shadow: 0 8px 24px hsl(28 91% 54% / 0.35);
+  }
+
+  /* `.btn-brand` — the signature CTA pill from aiweon-ser. Solid brand
+     orange, white text, dramatic halo. Use for ONE primary action per page
+     (Approve, Run now, Save). The halo is part of the brand identity, not
+     decoration. */
+  .btn-brand {
+    background-color: #f5841f;
+    color: #ffffff;
+    box-shadow:
+      0 8px 30px rgb(245 132 31 / 0.35),
+      0 0 0 1px rgb(255 255 255 / 0.05) inset;
+    transition:
+      background-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+  .btn-brand:hover {
+    background-color: #ffb878;
+    box-shadow:
+      0 10px 40px rgb(245 132 31 / 0.45),
+      0 0 0 1px rgb(255 255 255 / 0.08) inset;
+  }
+  .btn-brand:active {
+    transform: scale(0.98);
+  }
+  .dark .btn-brand {
+    color: #0a0a0a;
   }
 
   /* Underline-on-hover nav link — direct port of weon.co.il .header-nav .nav-link */
@@ -175,7 +221,7 @@
     height: 2px;
     width: 0;
     border-radius: 999px;
-    background-image: linear-gradient(90deg, hsl(33 93% 54%), hsl(33 88% 48%));
+    background-image: linear-gradient(90deg, hsl(28 91% 54%), hsl(22 88% 44%));
     transition: width 0.28s ease;
   }
   .nav-link-underline:hover::after,
@@ -194,16 +240,16 @@
       transform 200ms ease;
   }
   .card-warm:hover {
-    border-color: hsl(33 93% 54% / 0.35);
+    border-color: hsl(28 91% 54% / 0.35);
     box-shadow:
-      0 0 0 1px hsl(33 93% 54% / 0.18),
-      0 8px 24px hsl(33 93% 54% / 0.10);
+      0 0 0 1px hsl(28 91% 54% / 0.18),
+      0 8px 24px hsl(28 91% 54% / 0.10);
   }
   .card-warm[data-emphasis="active"] {
-    border-color: hsl(33 93% 54% / 0.50);
+    border-color: hsl(28 91% 54% / 0.50);
     box-shadow:
-      0 0 0 1px hsl(33 93% 54% / 0.28),
-      0 12px 32px hsl(33 93% 54% / 0.14);
+      0 0 0 1px hsl(28 91% 54% / 0.28),
+      0 12px 32px hsl(28 91% 54% / 0.14);
   }
 
   /* Page-header eyebrow strip — a thin warm accent above page titles, picks
@@ -223,10 +269,10 @@
     border-radius: 999px;
     background-image: linear-gradient(
       180deg,
-      hsl(33 93% 54%),
-      hsl(33 88% 48%)
+      hsl(28 91% 54%),
+      hsl(22 88% 44%)
     );
-    box-shadow: 0 0 12px hsl(33 93% 54% / 0.45);
+    box-shadow: 0 0 12px hsl(28 91% 54% / 0.45);
   }
 }
 
@@ -245,5 +291,126 @@
     -webkit-backdrop-filter: blur(12px) saturate(140%);
     background-color: hsl(var(--background) / 0.72);
     border-bottom: 1px solid hsl(var(--border));
+  }
+
+  /* Glass system — three tiers, dark + light tuned independently. Lives in
+     @layer utilities so it wins over Tailwind's bg-card when applied directly
+     on a shadcn <Card>. Dark variant mirrors aiweon-ser's clean neutral
+     palette so the brand orange stays the only chromatic accent. */
+
+  /* Tier 1 — `.glass-surface`: container panels wrapping lists / sets.
+     Softer than tier-2 — quieter orange edge (10% opacity) and a smaller
+     warm shadow. Used for inner containers so they don't compete with
+     the primary cards. */
+  .glass-surface {
+    background-color: rgb(255 255 255 / 0.6) !important;
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid rgb(245 132 31 / 0.10);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.8),
+      0 8px 24px -6px rgb(196 100 26 / 0.06);
+  }
+  .dark .glass-surface {
+    /* Tier-1 neon ring — softer than glass-panel. Inner containers (dl
+       wrappers, lists) get a quiet orange edge so the language is
+       consistent across the page, but don't compete with primary cards. */
+    background-color: rgb(18 18 18 / 0.7) !important;
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    border-color: rgb(245 132 31 / 0.18);
+    box-shadow:
+      0 0 0 1px rgb(245 132 31 / 0.05),
+      0 0 20px -6px rgb(245 132 31 / 0.10),
+      inset 0 1px 0 rgb(255 255 255 / 0.03);
+  }
+
+  /* Tier 2 — `.glass-panel`: the default for every Card.
+     Light mode = "warm letterpress" — the print-magazine cousin of the
+     dark-mode neon ring. Same brand orange anchors the edge of every
+     card, but it's a soft hairline + a deep warm drop-shadow instead of
+     a glowing halo (which doesn't read on white). The card looks gently
+     embossed off the paper-warm canvas. */
+  .glass-panel {
+    background-color: rgb(255 255 255 / 0.72) !important;
+    backdrop-filter: blur(22px) saturate(160%);
+    -webkit-backdrop-filter: blur(22px) saturate(160%);
+    border: 1px solid rgb(245 132 31 / 0.18);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.95),
+      0 14px 40px -6px rgb(196 100 26 / 0.10),
+      0 2px 6px -2px rgb(28 22 17 / 0.06);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+  }
+  .glass-panel:hover {
+    border-color: rgb(245 132 31 / 0.32);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.95),
+      0 18px 50px -6px rgb(196 100 26 / 0.16),
+      0 2px 6px -2px rgb(28 22 17 / 0.08);
+  }
+  .dark .glass-panel {
+    /* Neon-ring card — Claude Code chat-input style. Brand orange becomes
+       the structural signature of every card in dark mode: a tight 1px
+       outline + a soft outer glow halo. The center stays neutral glass
+       (no warm tint inside the box) so content reads cleanly. On hover
+       the ring brightens, giving every card a subtle "alive" reaction.
+
+       Transition is on both border-color and box-shadow so the glow can
+       breathe in/out smoothly. */
+    background-color: rgb(20 20 20 / 0.55) !important;
+    backdrop-filter: blur(18px) saturate(150%);
+    -webkit-backdrop-filter: blur(18px) saturate(150%);
+    border: 1px solid rgb(245 132 31 / 0.28);
+    box-shadow:
+      0 0 0 1px rgb(245 132 31 / 0.08),
+      0 0 28px -4px rgb(245 132 31 / 0.18),
+      inset 0 1px 0 rgb(255 255 255 / 0.04);
+    transition: border-color 200ms ease, box-shadow 200ms ease;
+  }
+  .dark .glass-panel:hover {
+    border-color: rgb(245 132 31 / 0.45);
+    box-shadow:
+      0 0 0 1px rgb(245 132 31 / 0.20),
+      0 0 36px -4px rgb(245 132 31 / 0.28),
+      inset 0 1px 0 rgb(255 255 255 / 0.06);
+  }
+
+  /* Tier 2-E — emphasis variant. When you want the card to STAND OUT
+     (login hero, the one critical alert), use this. Brand-orange hairline
+     + faint glow. In dark mode the glow is muted so it whispers, not
+     screams, against the calm canvas. */
+  .glass-panel-emphasis {
+    border-color: rgb(245 132 31 / 0.30) !important;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.85),
+      0 12px 36px rgb(245 132 31 / 0.14),
+      0 1px 0 rgb(14 14 16 / 0.04) !important;
+  }
+  .dark .glass-panel-emphasis {
+    border-color: rgb(245 132 31 / 0.22) !important;
+    box-shadow:
+      0 0 0 1px rgb(245 132 31 / 0.10),
+      0 8px 28px rgb(245 132 31 / 0.08) !important;
+  }
+
+  /* Subtle ambient grain — adds a film-like texture across the whole page,
+     which is what gives aiweon-ser's hero its "cinematic still" feel. Pure
+     CSS, no extra asset. Renders behind everything via `body::before`. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    mix-blend-mode: overlay;
+  }
+  .dark body::before {
+    /* Grain removed in dark mode — on near-true-black it shows up as
+       visible noise that fights the "calm focus" goal. Grain stays in
+       light mode where the paper-warm canvas benefits from texture. */
+    opacity: 0;
   }
 }

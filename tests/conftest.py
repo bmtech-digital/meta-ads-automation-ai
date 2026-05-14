@@ -66,6 +66,13 @@ def invoke_tool() -> Callable[..., subprocess.CompletedProcess]:
     imports, no mocked argv. This is what the contract promises.
     """
 
+    # Default 120s — Python + DB import warm-up runs 20-30s on Docker-on-Windows
+    # cold spawns; with the Phase 1-4 expansion (CustomAudience SDK, lead_fetching
+    # httpx, etc.) cold import of `campaigner.lib.meta_client` can hit 45s. The
+    # previous 60s default was on the edge after the Phase 3 chain methods landed.
+    # Override via CAMPAIGNER_TEST_TIMEOUT_S if you need a deliberately-slow path.
+    invoke_timeout = int(os.environ.get("CAMPAIGNER_TEST_TIMEOUT_S", "120"))
+
     def _invoke(tool_module: str, *cli_args: str) -> subprocess.CompletedProcess:
         return subprocess.run(
             [sys.executable, "-m", f"campaigner.tools.{tool_module}", *cli_args],
@@ -73,7 +80,7 @@ def invoke_tool() -> Callable[..., subprocess.CompletedProcess]:
             text=True,
             cwd=str(REPO_ROOT),
             env={**os.environ, "PYTHONPATH": str(REPO_ROOT)},
-            timeout=30,
+            timeout=invoke_timeout,
         )
 
     return _invoke

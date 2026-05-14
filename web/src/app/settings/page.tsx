@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -12,10 +13,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Shell, PageHeader } from "@/components/shell";
+import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
-import type { SeasonalHint, SeasonalHints } from "@/lib/db/types";
-import { businessSettingsFormSchema } from "@/lib/schemas/business-settings";
+import type { AgentMode, SeasonalHint, SeasonalHints } from "@/lib/db/types";
 import {
   overlappingPairs,
   seasonalHintSchema,
@@ -28,32 +29,7 @@ import {
 } from "@/lib/token-expiry";
 
 export const dynamic = "force-dynamic";
-
-async function saveSettingsAction(formData: FormData) {
-  "use server";
-  const session = await getAuth().getSession();
-  if (!session) redirect("/login?next=/settings");
-
-  const id = String(formData.get("id") ?? "");
-  if (!id) redirect("/settings?error=missing_id");
-
-  const parsed = businessSettingsFormSchema.safeParse({
-    name: formData.get("name") ?? "",
-    meta_ad_account_id: formData.get("meta_ad_account_id") ?? "",
-    meta_page_id: formData.get("meta_page_id") ?? "",
-    monthly_budget_ils: formData.get("monthly_budget_ils") ?? "",
-  });
-
-  if (!parsed.success) {
-    const msg = parsed.error.issues
-      .map((i) => `${i.path.join(".")}: ${i.message}`)
-      .join("; ");
-    redirect(`/settings?error=${encodeURIComponent(msg)}`);
-  }
-
-  await getDataClient().updateBusinessSettings(id, parsed.data);
-  redirect("/settings?saved=1");
-}
+export const metadata: Metadata = { title: "הגדרות" };
 
 async function addSeasonalWindowAction(formData: FormData) {
   "use server";
@@ -86,6 +62,21 @@ async function addSeasonalWindowAction(formData: FormData) {
   const next: SeasonalHints = { windows: [...existing, parsed.data] };
   await db.updateSeasonalHints(id, next);
   redirect("/settings?saved=1#seasonal");
+}
+
+async function setAgentModeAction(formData: FormData) {
+  "use server";
+  const session = await getAuth().getSession();
+  if (!session) redirect("/login?next=/settings");
+
+  const id = String(formData.get("id") ?? "");
+  const modeRaw = String(formData.get("agent_mode") ?? "");
+  const allowed: AgentMode[] = ["insight", "draft", "action"];
+  if (!id || !(allowed as string[]).includes(modeRaw)) {
+    redirect("/settings?error=bad_agent_mode#agent-mode");
+  }
+  await getDataClient().setAgentMode(id, modeRaw as AgentMode);
+  redirect("/settings?saved=1#agent-mode");
 }
 
 async function removeSeasonalWindowAction(formData: FormData) {
@@ -131,14 +122,27 @@ export default async function SettingsPage({
 
   const { error, saved } = await searchParams;
   const db = getDataClient();
-  const business = process.env.BUSINESS_ID
-    ? await db.getBusinessById(process.env.BUSINESS_ID)
-    : await db.getFirstBusiness();
+  const business = await getActiveBusiness();
+  // Read the connection's real expiry (single source of truth across all
+  // businesses that share an OAuth handshake) and fold it onto the local
+  // copy so the token banner shows accurate state even if the column wasn't
+  // mirrored at OAuth time.
+  const connection = business
+    ? await db.getConnectionByAdAccountId(business.meta_ad_account_id)
+    : null;
+  const businessWithLiveExpiry = business
+    ? {
+        ...business,
+        meta_access_token_expires_at:
+          connection?.token_expires_at ??
+          business.meta_access_token_expires_at,
+      }
+    : null;
 
   if (!business) {
     return (
       <Shell active="/settings">
-        <PageHeader eyebrow="הגדרות" title="הגדרות עסק" />
+        <PageHeader eyebrow="הגדרות" title="פרטי עסק" />
         <Card>
           <CardHeader>
             <CardTitle>אין עסק ב-DB</CardTitle>
@@ -155,7 +159,7 @@ export default async function SettingsPage({
     <Shell active="/settings">
       <PageHeader
         eyebrow="הגדרות"
-        title="הגדרות עסק"
+        title="פרטי עסק"
         subtitle="הקלט המינימלי שהסוכן קורא לפני כל ריצה."
         actions={
           <Link href="/">
@@ -173,8 +177,10 @@ export default async function SettingsPage({
         </div>
 
         {(() => {
-          const state = tokenExpiryState(business);
-          const expiresAtIso = business.meta_access_token_expires_at;
+          const state = tokenExpiryState(businessWithLiveExpiry ?? business);
+          const expiresAtIso =
+            connection?.token_expires_at ??
+            business.meta_access_token_expires_at;
           const expiresAtHuman = expiresAtIso
             ? new Date(expiresAtIso).toLocaleString("he-IL", {
                 dateStyle: "short",
@@ -186,9 +192,8 @@ export default async function SettingsPage({
               <CardHeader>
                 <CardTitle>טוקן גישה ל-Meta</CardTitle>
                 <CardDescription>
-                  {business.meta_auth_mode === "system_user_token"
-                    ? "עסק זה משתמש ב-System User Token — אין תפוגה אוטומטית."
-                    : "User Token נוכחי. תפוגה כל ~60 יום. חידוש ידני דרך Facebook Graph API Explorer או Meta Business Suite."}
+                  OAuth User Token (~60 יום). חידוש בלחיצה אחת ב-/integrations
+                  כשמתקרב לסוף החיים.
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
@@ -198,29 +203,19 @@ export default async function SettingsPage({
                   >
                     {tokenStateLabelHe(state)}
                   </span>
-                  <span className="text-xs text-muted-foreground">
-                    מצב אימות:{" "}
-                    <span dir="ltr" className="font-mono">
-                      {business.meta_auth_mode}
-                    </span>
-                  </span>
                 </div>
                 {expiresAtHuman ? (
                   <div className="text-xs text-muted-foreground">
-                    תאריך תפוגה בפועל:{" "}
+                    תאריך תפוגה:{" "}
                     <span dir="ltr" className="font-mono">
                       {expiresAtHuman}
                     </span>
                   </div>
-                ) : business.meta_auth_mode === "user_token" ? (
+                ) : (
                   <div className="text-xs text-muted-foreground">
-                    עדיין לא תועד תאריך תפוגה. הרץ{" "}
-                    <code dir="ltr" className="font-mono">
-                      campaigner rotate-token
-                    </code>{" "}
-                    כדי לאמת ולשמור את התפוגה דרך debug_token של Meta.
+                    עדיין לא חובר. עבור ל-/integrations ולחץ &quot;התחבר ל-Meta&quot;.
                   </div>
-                ) : null}
+                )}
                 {state.kind === "critical" ||
                 state.kind === "expired" ||
                 state.kind === "warning" ? (
@@ -228,27 +223,18 @@ export default async function SettingsPage({
                     <p className="font-semibold">איך מחדשים?</p>
                     <ol className="mt-1 list-inside list-decimal space-y-1 text-muted-foreground">
                       <li>
-                        פתח{" "}
-                        <a
-                          href="https://developers.facebook.com/tools/explorer"
-                          target="_blank"
-                          rel="noreferrer"
+                        עבור ל{" "}
+                        <Link
+                          href="/integrations"
                           className="text-primary underline-offset-2 hover:underline"
                         >
-                          Graph API Explorer
-                        </a>{" "}
-                        → בחר את ה-App + Page המתאימים → צור User Token חדש.
+                          /integrations
+                        </Link>{" "}
+                        → &quot;נתק חיבור&quot; → &quot;התחבר ל-Meta&quot;.
                       </li>
                       <li>
-                        החלף את <code dir="ltr">META_ACCESS_TOKEN</code>{" "}
-                        ב-Secret Manager של הסביבה.
-                      </li>
-                      <li>
-                        הרץ{" "}
-                        <code dir="ltr" className="font-mono">
-                          campaigner rotate-token
-                        </code>{" "}
-                        כדי לאמת ולעדכן את תאריך התפוגה ב-DB.
+                        אשר את ההרשאות ב-Meta — הטוקן ייכתב מוצפן אוטומטית,
+                        תאריך התפוגה החדש יופיע כאן.
                       </li>
                     </ol>
                   </div>
@@ -258,80 +244,125 @@ export default async function SettingsPage({
           );
         })()}
 
-        <Card>
+        <Card id="agent-mode">
           <CardHeader>
-            <CardTitle>{business.name}</CardTitle>
-            <CardDescription dir="ltr" className="font-mono text-xs">
-              {business.id}
+            <CardTitle>מצב פעולת הסוכן</CardTitle>
+            <CardDescription>
+              שולט במה הסוכן רשאי לעשות. ברירת מחדל: טיוטות (HITL). מעבר ל-
+              &quot;פעולה&quot; פותח כתיבה ישירה ל-Meta אחרי אישור ב-/approvals.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form action={saveSettingsAction} className="flex flex-col gap-4">
+            <form
+              action={setAgentModeAction}
+              className="flex flex-col gap-3 sm:flex-row sm:items-end"
+            >
               <input type="hidden" name="id" value={business.id} />
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="name">שם עסק</Label>
-                <Input
-                  id="name"
-                  name="name"
-                  defaultValue={business.name}
-                  required
-                />
+              <div className="flex flex-1 flex-col gap-2">
+                <Label htmlFor="agent_mode">מצב נוכחי</Label>
+                <select
+                  id="agent_mode"
+                  name="agent_mode"
+                  defaultValue={business.agent_mode}
+                  className="h-9 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <option value="insight">
+                    תובנות בלבד — קריאה וניתוח, ללא כתיבה
+                  </option>
+                  <option value="draft">
+                    טיוטות — כותב הצעות ל-/approvals, ממתין לאישור (ברירת מחדל)
+                  </option>
+                  <option value="action">
+                    פעולה — מבצע אחרי אישור ב-/approvals
+                  </option>
+                </select>
               </div>
-
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="meta_ad_account_id">Meta Ad Account ID</Label>
-                  <Input
-                    id="meta_ad_account_id"
-                    name="meta_ad_account_id"
-                    defaultValue={business.meta_ad_account_id}
-                    dir="ltr"
-                    className="text-left font-mono text-sm"
-                    placeholder="act_1234567890"
-                    required
-                  />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <Label htmlFor="meta_page_id">Meta Page ID</Label>
-                  <Input
-                    id="meta_page_id"
-                    name="meta_page_id"
-                    defaultValue={business.meta_page_id}
-                    dir="ltr"
-                    className="text-left font-mono text-sm"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="monthly_budget_ils">
-                  תקציב פרסום חודשי (₪)
-                </Label>
-                <Input
-                  id="monthly_budget_ils"
-                  name="monthly_budget_ils"
-                  type="number"
-                  min="0"
-                  step="1"
-                  defaultValue={business.monthly_budget_ils ?? ""}
-                  placeholder="לדוגמה 1500"
-                />
-                <p className="text-xs text-muted-foreground">
-                  התקציב היומי נגזר אוטומטית מהסכום החודשי (חודשי ÷ 30). הסוכן
-                  משתמש בזה כתקרת הוצאה חודשית.
-                </p>
-              </div>
-
-              {error ? (
-                <p className="text-sm text-destructive">{error}</p>
-              ) : null}
-
-              <div className="flex gap-2">
-                <Button type="submit">שמור</Button>
-              </div>
+              <Button type="submit" size="sm">
+                שמור מצב
+              </Button>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>נכסי Meta של העסק הפעיל</CardTitle>
+            <CardDescription>
+              חשבון המודעות + ה-Page נקבעים ב-/integrations מתוך הנכסים שנמצאו
+              ב-OAuth. שם העסק והתקציב החודשי עברו ל-/business-knowledge.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {/* RTL rule: parent <dd> stays in document RTL direction. Only
+                the LTR code/ID is wrapped in `.mono-ltr` (which sets
+                `dir:ltr` + `unicode-bidi: isolate`). Mixing LTR onto the
+                whole row would flip the Hebrew "ערוך ב-..." link to the
+                wrong side of the separator. */}
+            <dl className="grid grid-cols-1 gap-y-2 gap-x-6 text-[13.5px] sm:grid-cols-[auto_1fr]">
+              <dt className="text-muted-foreground">שם עסק</dt>
+              <dd className="font-medium">
+                {business.name}
+                <span className="mx-2 text-muted-foreground/60">·</span>
+                <Link
+                  href="/business-knowledge"
+                  className="text-primary underline-offset-2 hover:underline"
+                >
+                  ערוך ב-העסק שלי
+                </Link>
+              </dd>
+              <dt className="text-muted-foreground">Meta Ad Account ID</dt>
+              <dd>
+                <span className="mono-ltr text-[12.5px]">
+                  {business.meta_ad_account_id}
+                </span>
+                <span className="mx-2 text-muted-foreground/60">·</span>
+                <Link
+                  href="/integrations"
+                  className="text-primary underline-offset-2 hover:underline"
+                >
+                  שנה ב-integrations
+                </Link>
+              </dd>
+              <dt className="text-muted-foreground">Meta Page ID</dt>
+              <dd>
+                {business.meta_page_id ? (
+                  <span className="mono-ltr text-[12.5px]">
+                    {business.meta_page_id}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    — לא נבחר עדיין —
+                  </span>
+                )}
+                <span className="mx-2 text-muted-foreground/60">·</span>
+                <Link
+                  href="/integrations"
+                  className="text-primary underline-offset-2 hover:underline"
+                >
+                  שנה ב-integrations
+                </Link>
+              </dd>
+              <dt className="text-muted-foreground">תקציב חודשי (₪)</dt>
+              <dd>
+                {business.monthly_budget_ils
+                  ? `₪${Number(business.monthly_budget_ils).toLocaleString("he-IL")}`
+                  : "— לא הוגדר —"}
+                <span className="mx-2 text-muted-foreground/60">·</span>
+                <Link
+                  href="/business-knowledge"
+                  className="text-primary underline-offset-2 hover:underline"
+                >
+                  ערוך ב-העסק שלי
+                </Link>
+              </dd>
+              <dt className="text-muted-foreground">מזהה עסק</dt>
+              <dd>
+                <span className="mono-ltr text-[12.5px]">{business.id}</span>
+              </dd>
+            </dl>
+            {error ? (
+              <p className="mt-4 text-sm text-destructive">{error}</p>
+            ) : null}
           </CardContent>
         </Card>
 
@@ -492,11 +523,15 @@ export default async function SettingsPage({
                     min="0.1"
                     max="3.0"
                     step="0.05"
-                    placeholder="1.3 לעונה חזקה, 0.7 לעונה חלשה"
-                    dir="ltr"
-                    className="text-left font-mono"
+                    placeholder="1.3"
+                    className="text-right font-mono"
                     required
                   />
+                  {/* Hint stays in RTL context (no dir override), reads
+                      naturally right-to-left. */}
+                  <span className="text-[11.5px] text-muted-foreground">
+                    לעונה חזקה השתמש ב-1.3 · לעונה חלשה ב-0.7
+                  </span>
                 </div>
                 <div className="flex flex-col gap-1">
                   <Label htmlFor="window_start">מתאריך</Label>

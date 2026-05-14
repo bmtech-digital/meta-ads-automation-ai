@@ -1,0 +1,46 @@
+# Flow D — weekly competitive research. Mon 11:00 Asia/Jerusalem (1h after Flow C).
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: agent-weekly-competitive-research
+  namespace: campaigner
+spec:
+  schedule: "0 11 * * 1"
+  timeZone: "Asia/Jerusalem"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 1800
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 3600
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: agent
+              image: us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-agent:latest
+              imagePullPolicy: Always
+              command: ["bash", "runners/weekly_competitive_research.sh"]
+              envFrom:
+                - secretRef:
+                    name: campaigner-secrets
+              env:
+                - name: GCP_PROJECT_ID
+                  value: "bemtech-478413"
+                - name: GCP_LOCATION
+                  value: "us-central1"
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: "/var/secrets/gcp/credentials.json"
+              volumeMounts:
+                - name: gcp-credentials
+                  mountPath: /var/secrets/gcp
+                  readOnly: true
+              resources:
+                requests: { cpu: 200m, memory: 512Mi }
+                limits: { cpu: 1000m, memory: 2Gi }
+          volumes:
+            - name: gcp-credentials
+              secret:
+                secretName: gcp-vertexai-credentials

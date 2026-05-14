@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 
@@ -47,9 +48,7 @@ export async function POST(req: NextRequest) {
   }
 
   const db = getDataClient();
-  const business = process.env.BUSINESS_ID
-    ? await db.getBusinessById(process.env.BUSINESS_ID)
-    : await db.getFirstBusiness();
+  const business = await getActiveBusiness();
   if (!business) {
     return NextResponse.json({ error: "business_not_found" }, { status: 404 });
   }

@@ -9,16 +9,18 @@ const ALLOWED_FLOWS = new Set([
   "daily_observe_propose",
   "execute_approvals",
   "weekly_creative_firehose",
+  "weekly_competitive_research",
 ]);
 
 export async function POST(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json(
-      { error: "disabled_in_production" },
-      { status: 403 },
-    );
-  }
-
+  // Auth is the admin gate — anyone signed in (i.e. through the login form)
+  // can trigger a run from the dashboard. We previously also blocked on
+  // NODE_ENV=production, but the local dev container runs `pnpm build &&
+  // pnpm start` for performance, which set NODE_ENV=production and hid the
+  // buttons in dev. The actual execution still requires the docker-cli +
+  // /var/run/docker.sock mount (see docker-compose.yml web service) — in
+  // real cloud production neither is present, so the spawn would fail
+  // naturally rather than silently fire.
   const session = await getAuth().getSession();
   if (!session)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

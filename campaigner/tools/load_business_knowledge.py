@@ -42,6 +42,9 @@ def main() -> None:
             SELECT id, name, timezone, meta_ad_account_id, meta_page_id,
                    meta_auth_mode, gcp_project_id,
                    monthly_budget_ils, daily_budget_ils, primary_kpi,
+                   target_cpa_ils, target_cpl_ils, target_roas,
+                   kpis_per_objective,
+                   monthly_brief,
                    active, created_at
             FROM businesses
             WHERE id = %s
@@ -71,12 +74,68 @@ def main() -> None:
         emit_runtime_error(f"business knowledge load failed: {e}", exc=e)
         return
 
+    # Convenience: select the KPI target that matches business.primary_kpi.
+    # Saves every caller from re-implementing the branching. None = not set
+    # for the active KPI; per migration 019 the agent should emit an alert
+    # in that case rather than fall back to baseline medians.
+    primary_kpi = business.get("primary_kpi") if business else None
+    target_value = None
+    target_field = None
+    if primary_kpi == "cpa":
+        target_field = "target_cpa_ils"
+        target_value = business.get("target_cpa_ils")
+    elif primary_kpi == "cpl":
+        target_field = "target_cpl_ils"
+        target_value = business.get("target_cpl_ils")
+    elif primary_kpi == "roas":
+        target_field = "target_roas"
+        target_value = business.get("target_roas")
+    # cpm/cpi deferred per migration 019 — leave target_value None.
+
+    # Monthly brief — flag staleness so the agent knows whether to trust it.
+    # `month` is YYYY-MM in Israel time as stamped by the web layer on save.
+    from datetime import datetime as _dt
+    from zoneinfo import ZoneInfo
+
+    brief = business.get("monthly_brief") if business else None
+    now_il = _dt.now(ZoneInfo("Asia/Jerusalem"))
+    current_month = now_il.strftime("%Y-%m")
+    brief_summary: dict = {
+        "is_set": brief is not None and bool(brief),
+        "is_current_month": False,
+        "month_in_brief": None,
+        "current_month": current_month,
+    }
+    if isinstance(brief, dict) and brief:
+        brief_month = brief.get("month")
+        brief_summary["month_in_brief"] = brief_month
+        brief_summary["is_current_month"] = brief_month == current_month
+        if brief_month and brief_month != current_month:
+            brief_summary["stale_reason"] = (
+                f"brief is for {brief_month} but current month is {current_month}"
+            )
+
+    # Phase 5 (mastery plan §8) — per-objective KPI map. Surfaced as a
+    # convenience `kpis_per_objective` block so the agent can look up
+    # `kpis_per_objective[OBJECTIVE].target` directly for any campaign's
+    # objective without re-implementing the lookup. Empty dict if not set.
+    kpis_per_obj = (business.get("kpis_per_objective") if business else None) or {}
+
     emit_success(
         {
             "business_id": args.business_id,
             "business": business,
             "knowledge": knowledge,
             "knowledge_present": knowledge is not None,
+            "kpi_target": {
+                "primary_kpi": primary_kpi,
+                "target_field": target_field,
+                "target_value": float(target_value) if target_value is not None else None,
+                "is_set": target_value is not None,
+            },
+            "kpis_per_objective": kpis_per_obj,
+            "kpis_per_objective_count": len(kpis_per_obj) if isinstance(kpis_per_obj, dict) else 0,
+            "monthly_brief_summary": brief_summary,
         }
     )
 

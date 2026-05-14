@@ -81,6 +81,7 @@ The agent runs stateless via `cron` → `claude -p "..."` headless invocations:
 1. **Daily observe-propose** (09:00 IL): Fetches Meta snapshot, evaluates using the two-gate model (CAMPAIGN_EVALUATION.md), writes proposals to Supabase `approvals` table.
 2. **Execute approvals** (every 15 min): Reads approved rows, re-checks guardrails, calls Meta Marketing API.
 3. **Weekly creative firehose** (Mon 10:00 IL): Generates 3-5 new creatives per active campaign (Andromeda prefers 10-50+ diverse creatives; don't prune manually).
+4. **Weekly competitive research** (Mon 11:00 IL): WebSearch on market prices, trending creative angles, and new ad formats in the business's vertical — emits `task_type='alert'` proposals with source-cited findings (guardrail §27 blocks unsourced competitive claims).
 
 All decisions are logged to Supabase `agent_decisions` — replaces LangSmith/Langfuse for MVP observability.
 

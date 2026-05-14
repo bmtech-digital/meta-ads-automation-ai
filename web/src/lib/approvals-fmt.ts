@@ -15,6 +15,7 @@ export const URGENCY_STYLES: Record<Urgency, string> = {
 };
 
 export const TASK_TYPE_LABEL_HE: Record<string, string> = {
+  // Ads
   scale_up: "הגדלת תקציב",
   scale_down: "הקטנת תקציב",
   pause: "השהיה",
@@ -24,6 +25,23 @@ export const TASK_TYPE_LABEL_HE: Record<string, string> = {
   consolidate_adsets: "איחוד ad sets",
   increase_budget: "הגדלת תקציב",
   new_campaign: "קמפיין חדש",
+  verify_pixel_capi: "אימות Pixel + CAPI",
+  // Organic page management (Phase 3)
+  publish_fb_post: "פוסט בפייסבוק",
+  publish_ig_post: "פוסט באינסטגרם",
+  publish_ig_story: "סטורי באינסטגרם",
+  publish_ig_reel: "Reel באינסטגרם",
+  // Business config
+  set_kpi_target: "הגדרת יעד KPI",
+  // Gallery → campaign loop (Block 7 + 8, 2026-05-13)
+  boost_post: "קידום פוסט אורגני",
+  redeploy_creative: "שימוש בקריאייטיב מהגלריה",
+  // Informational
+  alert: "התראה",
+  budget_change: "שינוי תקציב",
+  pause_campaign: "השהיית קמפיין",
+  resume_campaign: "הפעלת קמפיין",
+  pause_adset: "השהיית ad set",
 };
 
 export function taskTypeLabel(raw: string): string {
@@ -73,6 +91,61 @@ export function formatExpectedImpact(
     }
   }
   return parts.length > 0 ? parts.join(" · ") : null;
+}
+
+/**
+ * Split a rationale string into the explanatory prose and the trailing
+ * `**תוכנית:**` (work plan) section, when present.
+ *
+ * Per [hebrew-copy-style.md §11.6](../../../campaigner/prompts/hebrew-copy-style.md),
+ * every operator-facing rationale closes with a numbered plan section so the
+ * operator sees the priority chain, not an isolated single action. The plan
+ * marker is `**תוכנית:**` on its own line (or with leading/trailing
+ * whitespace). Anything after that line is the plan body.
+ *
+ * Tolerant of variations: `**תוכנית:**`, `**תוכנית**:`, `תוכנית:`, with or
+ * without surrounding blank lines. First match wins so spurious mentions in
+ * the prose don't trigger a false split.
+ */
+export function parsePlanSection(
+  rationale: string | null | undefined,
+): { main: string; plan: string | null } {
+  if (!rationale) return { main: "", plan: null };
+  const trimmed = rationale.replace(/\r\n/g, "\n");
+  const re = /(?:^|\n)\s*(?:\*\*\s*)?תוכנית\s*(?::\*\*|\*\*:|:)\s*\n?/;
+  const match = re.exec(trimmed);
+  if (!match || match.index === undefined) {
+    return { main: trimmed.trim(), plan: null };
+  }
+  const main = trimmed.slice(0, match.index).replace(/\s+$/, "");
+  const plan = trimmed.slice(match.index + match[0].length).trim();
+  if (!plan) {
+    return { main: trimmed.trim(), plan: null };
+  }
+  return { main, plan };
+}
+
+/**
+ * Break a plan body into numbered steps. Recognizes `1.`, `2)`, `3 -`, `4:`
+ * markers at line start. Returns the array of step texts (without the
+ * marker). If nothing parses as a list, returns a single-item array with the
+ * whole body.
+ */
+export function parsePlanSteps(plan: string): string[] {
+  const steps: string[] = [];
+  let current = "";
+  for (const line of plan.split("\n")) {
+    const headerMatch = /^\s*(?:\*\*)?\s*\d+\s*[.)\-:]\s*/.exec(line);
+    if (headerMatch) {
+      if (current.trim()) steps.push(current.trim());
+      current = line.slice(headerMatch[0].length);
+    } else {
+      current += "\n" + line;
+    }
+  }
+  if (current.trim()) steps.push(current.trim());
+  if (steps.length === 0) return [plan.trim()];
+  return steps;
 }
 
 export function requiresHumanReview(a: Approval): string | null {

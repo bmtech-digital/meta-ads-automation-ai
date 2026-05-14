@@ -27,6 +27,7 @@ The cluster is shared with the sibling `generic_agent` project — that's why th
 | [`agent_cronjob_daily_observe.yaml`](agent_cronjob_daily_observe.yaml) | CronJob | Flow A — 09:00 IL daily. |
 | [`agent_cronjob_execute_approvals.yaml`](agent_cronjob_execute_approvals.yaml) | CronJob | Flow B — every 15 min. |
 | [`agent_cronjob_weekly_creative.yaml`](agent_cronjob_weekly_creative.yaml) | CronJob | Flow C — Mon 10:00 IL. |
+| [`agent_cronjob_weekly_competitive_research.yaml`](agent_cronjob_weekly_competitive_research.yaml) | CronJob | Flow D — Mon 11:00 IL. |
 | [`web_deployment.yaml`](web_deployment.yaml) | Deployment + Service | Next.js dashboard. |
 | [`web_ingress.yaml`](web_ingress.yaml) | Ingress + ManagedCertificate | Public HTTPS at `campaigner.aiweon.co.il`. Apply only after DNS A-record points to the static IP. |
 | [`webhook_deployment.yaml`](webhook_deployment.yaml) | Deployment + Service | Flask webhook receiver. |

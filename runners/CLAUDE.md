@@ -4,13 +4,19 @@
 
 ## What this folder is
 
-Three Bash scripts. Each is a **cron entrypoint** that wraps a single `claude -p` headless invocation with environment validation, heartbeats, and exit-code discipline. They are the seam between Cloud Scheduler / cron and the agent.
+Five Bash scripts. Each wraps a single `claude -p` headless invocation with environment validation, heartbeats, and exit-code discipline. Four are cron entrypoints (the seam between Cloud Scheduler / cron and the agent); one is operator-initiated.
 
 | Script | Flow | Schedule (Asia/Jerusalem) |
 |---|---|---|
 | [`daily_observe_propose.sh`](daily_observe_propose.sh) | A — observe & queue proposals to `approvals` | 09:00 daily |
 | [`execute_approvals.sh`](execute_approvals.sh) | B — execute approved rows against Meta | every 15 min |
 | [`weekly_creative_firehose.sh`](weekly_creative_firehose.sh) | C — generate 3-5 new creatives per active campaign | Mon 10:00 |
+| [`weekly_competitive_research.sh`](weekly_competitive_research.sh) | D — weekly WebSearch on market prices, trending angles, new formats — emits `alert` proposals with sources | Mon 11:00 |
+| [`weekly_audience_refresh.sh`](weekly_audience_refresh.sh) | Page audience-signals refresh — UPSERTs hour-of-week into `page_audience_signals` for §T9 organic cadence | Sun 04:00 |
+| [`propose_audiences_for_service.sh`](propose_audiences_for_service.sh) | E — per-service audience proposals (§T_AUD); requires `SERVICE_NAME` env var | operator-initiated (not cron) |
+| [`weekly_self_audit.sh`](weekly_self_audit.sh) | F — weekly self-audit; agent writes a Hebrew ~200-word digest summarising what was proposed/approved/rejected/outcomes (the "agency replacement" weekly status report) | Sun 08:00 |
+| [`daily_ab_test_decisions.sh`](daily_ab_test_decisions.sh) | G — for every A/B test past its `planned_end_at`, propose `ab_test_decide` with the evaluated winner | 09:30 daily |
+| [`midday_health_check.sh`](midday_health_check.sh) | H — short midday check; emergency-pause candidates + tracking-health drift only (does NOT redo full Flow A) | 13:00 daily |
 
 The matching k8s `CronJob` manifests live in [`../kubefiles/`](../kubefiles/) (`agent_cronjob_*.yaml`).
 
@@ -40,7 +46,7 @@ Every runner does these five things, in this order. If you write a new runner, c
 
 ## Adding a new runner
 
-1. **Don't.** Three flows is the spec. A fourth flow needs spec changes first.
+1. **Don't unilaterally.** Each flow needs spec alignment first (CAMPAIGNER.md flow section + table at top + this folder's catalog + a matching k8s CronJob). The current set is Flow A/B/C/D — A=daily, B=every-15-min, C+D=weekly. Adding a fifth flow needs an operator decision, not an agent decision.
 2. If the spec adds one (e.g. monthly review, ad hoc backfill), copy `daily_observe_propose.sh` byte-for-byte and change three things: `FLOW=...`, the `claude -p` prompt, and the runtime expectations comment block at the top.
 3. Add a matching `kubefiles/agent_cronjob_<flow>.yaml` and wire it in the [Makefile](../Makefile) `agent_deploy` target.
 4. Update [root CLAUDE.md "Architecture"](../CLAUDE.md#architecture-mvp--claude-code-native) and `CAMPAIGNER.md` flow table.

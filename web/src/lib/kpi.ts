@@ -12,6 +12,7 @@ export function deriveKpiFromVertical(
     case "ecommerce":
       return "roas";
     case "leads":
+    case "b2b_saas":
       return "cpl";
     case "awareness":
       return "cpm";
@@ -26,7 +27,8 @@ export function deriveKpiFromVertical(
 
 export const VERTICAL_LABELS_HE: Record<Vertical, string> = {
   ecommerce: "eCommerce",
-  leads: "לידים B2C",
+  leads: "לידים B2C / שירותים",
+  b2b_saas: "B2B SaaS / פלטפורמה",
   awareness: "Awareness / מותג",
   app: "אפליקציה",
   other: "אחר",
@@ -35,6 +37,7 @@ export const VERTICAL_LABELS_HE: Record<Vertical, string> = {
 export const VERTICALS: Vertical[] = [
   "ecommerce",
   "leads",
+  "b2b_saas",
   "awareness",
   "app",
   "other",

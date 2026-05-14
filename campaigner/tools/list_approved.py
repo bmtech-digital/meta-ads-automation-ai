@@ -48,6 +48,10 @@ def main() -> None:
         END
     """
 
+    # `scheduled_for IS NULL OR scheduled_for <= now()` keeps publish-style
+    # approvals that should fire later (e.g. story at 20:00) out of the
+    # executor's hands until their moment arrives. NULL means "as soon as
+    # approved" — that's the existing behavior for ad-mutation task types.
     try:
         rows = with_db_retry(
             lambda: fetch_all(
@@ -55,9 +59,12 @@ def main() -> None:
             SELECT id, business_id, created_by_run_id, task_type,
                    target_kind, target_id, payload, rationale,
                    expected_impact, urgency, status,
-                   approved_at, approved_by, expires_at, created_at
+                   approved_at, approved_by, expires_at, created_at,
+                   scheduled_for
             FROM approvals
-            WHERE business_id = %s AND status = 'approved'
+            WHERE business_id = %s
+              AND status = 'approved'
+              AND (scheduled_for IS NULL OR scheduled_for <= now())
             ORDER BY {urgency_rank} DESC, created_at ASC
             LIMIT %s
             """,

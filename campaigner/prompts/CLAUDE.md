@@ -12,9 +12,9 @@ Five files. Together they are the agent's brain — diagnostic method, decision 
 
 | # | File | What it answers | When in the flow |
 |---|---|---|---|
-| 1 | [`performance-brain.md`](performance-brain.md) | "Is this campaign good enough?" — the two-gate model (leading vs lagging), data sufficiency (§6.4) | Before any diagnosis |
-| 2 | [`decision-tree.md`](decision-tree.md) | "What label fits this state?" — winner / solid / loser / fatigued, and the action that follows | After diagnosis, before drafting a proposal |
-| 3 | [`guardrails.md`](guardrails.md) | "Am I allowed to propose this?" — 13 deterministic rules (also enforced by `check_guardrails.py`) + 5 judgment-only | Every draft proposal, twice (Flow A propose + Flow B re-check) |
+| 1 | [`performance-brain.md`](performance-brain.md) | "Is this campaign good enough?" — the two-gate model (leading vs lagging), data sufficiency (§6.4), portfolio thinking (§8 — Block 9) | Before any diagnosis |
+| 2 | [`decision-tree.md`](decision-tree.md) | "What label fits this state?" — winner / solid / loser / fatigued, and the action that follows. Per-campaign lanes §T0–§T9.1; **portfolio rebalance §T11** runs once per run after all per-campaign routes (Block 9, 2026-05-13). | After diagnosis, before drafting a proposal |
+| 3 | [`guardrails.md`](guardrails.md) | "Am I allowed to propose this?" — 36 deterministic rules (also enforced by `check_guardrails.py`) + 5 judgment-only | Every draft proposal, twice (Flow A propose + Flow B re-check) |
 | 4 | [`creative-guide.md`](creative-guide.md) | "How do I generate the next batch?" — angles, prompt patterns, Andromeda-aware diversity | Only when touching creatives (Flow A `new_creative`, Flow C firehose) |
 | 5 | [`hebrew-copy-style.md`](hebrew-copy-style.md) | "How do I write the Hebrew?" — operator rationale (§11), customer ad copy (§§2-9), voice defaults | Every `rationale` / `summary` field, every `new_creative` payload |
 

@@ -87,6 +87,8 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       PORT: "3000"
       HOSTNAME: 0.0.0.0
+      # next build OOMs on this Windows/Docker setup with default Node heap.
+      NODE_OPTIONS: "--max-old-space-size=4096"
       # Windows bind mounts don't propagate inotify events into the container,
       # so Next.js HMR misses file changes. Polling fixes that.
       WATCHPACK_POLLING: "true"
@@ -107,7 +109,11 @@ services:
         condition: service_healthy
     # apk add docker-cli (for runner-trigger API) and ffmpeg (for the upload
     # transcoding pipeline — see web/src/lib/transcode.ts) on boot.
-    command: sh -c "apk add --no-cache docker-cli ffmpeg >/dev/null 2>&1 && corepack enable && corepack prepare pnpm@9.12.0 --activate && pnpm install && pnpm dev"
+    # Production build for fast page loads. Dev mode (`pnpm dev`) on this Windows
+    # + Docker + 1173-module setup takes 15+ min per route to compile, which is
+    # unusable. To re-enable HMR for active frontend dev, swap the tail back to
+    # `pnpm dev`.
+    command: sh -c "apk add --no-cache docker-cli ffmpeg >/dev/null 2>&1 && corepack enable && corepack prepare pnpm@9.12.0 --activate && pnpm install && pnpm build && pnpm start"
     profiles: ["web"]
 
 volumes:

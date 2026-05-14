@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import { deleteAsset } from "@/lib/storage";
@@ -16,9 +17,7 @@ export async function POST(
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const db = getDataClient();
-  const business = process.env.BUSINESS_ID
-    ? await db.getBusinessById(process.env.BUSINESS_ID)
-    : await db.getFirstBusiness();
+  const business = await getActiveBusiness();
   if (!business)
     return NextResponse.json({ error: "business_not_found" }, { status: 404 });
 

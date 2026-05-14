@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Shell, PageHeader } from "@/components/shell";
+import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import {
@@ -29,8 +31,35 @@ import {
   listCampaignsWithInsights,
   parseDateRange,
 } from "@/lib/meta";
+import {
+  getTokenForBusiness,
+  MetaConnectionExpired,
+  MetaConnectionRequired,
+} from "@/lib/meta-tokens";
+import { matchSubVertical, SUBVERTICALS } from "@/lib/cpl-infrastructure";
+import type { Vertical } from "@/lib/db/types";
+
+// Hebrew labels mirroring SUB_VERTICAL_HE in /business-knowledge. Kept here
+// to avoid a circular dep — single source of truth would be a shared map.
+const SUB_VERTICAL_HE_LOCAL: Record<string, string> = {
+  ai_chatbot_services: "סוכני AI",
+  ai_video_production: "סרטוני AI",
+  ai_campaign_management: "ניהול קמפיינים AI",
+  saas_marketing_tech: "טכנולוגיית שיווק",
+  agency_services: "סוכנות שיווק",
+  real_estate_residential: "נדל\"ן מגורים",
+  home_services: "שירותי בית",
+  beauty_aesthetic: "אסתטיקה",
+  fitness_studio: "סטודיו כושר",
+  legal_personal: "עו\"ד אישי",
+  insurance_agent: "סוכן ביטוח",
+  renovation_contractor: "קבלן שיפוצים",
+  dental_clinic: "מרפאת שיניים",
+  other: "אחר",
+};
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "קמפיינים" };
 
 const STATUS_STYLES: Record<string, string> = {
   ACTIVE: "bg-green-100 text-green-800",
@@ -151,9 +180,14 @@ export default async function CampaignsPage({
   const range = parseDateRange(sp);
 
   const db = getDataClient();
-  const business = process.env.BUSINESS_ID
-    ? await db.getBusinessById(process.env.BUSINESS_ID)
-    : await db.getFirstBusiness();
+  const business = await getActiveBusiness();
+  // Per-campaign service inference (G5, 2026-05-13). For each Meta campaign,
+  // we run matchSubVertical with campaign.name as `campaign_name` (×3 weight)
+  // → derives which AIWEON service this campaign is about. Shown as a badge
+  // on the campaign card so the operator can verify the agent's anchoring.
+  const knowledgeForServiceInference = business
+    ? await db.getBusinessKnowledge(business.id)
+    : null;
 
   if (!business) {
     return (
@@ -175,19 +209,24 @@ export default async function CampaignsPage({
   let errorMsg: string | null = null;
 
   try {
+    const { token } = await getTokenForBusiness(db, business);
     [accountInfo, campaigns, allAds, allAdSets] = await Promise.all([
-      getAdAccountInfo(business.meta_ad_account_id),
-      listCampaignsWithInsights(business.meta_ad_account_id, range),
-      listAdsForAccount(business.meta_ad_account_id),
-      listAdSetsForAccount(business.meta_ad_account_id),
+      getAdAccountInfo(token, business.meta_ad_account_id),
+      listCampaignsWithInsights(token, business.meta_ad_account_id, range),
+      listAdsForAccount(token, business.meta_ad_account_id),
+      listAdSetsForAccount(token, business.meta_ad_account_id),
     ]);
   } catch (e) {
     errorMsg =
-      e instanceof MetaApiError
-        ? `Meta API: ${e.message}${e.code ? ` (code ${e.code})` : ""}`
-        : e instanceof Error
-          ? e.message
-          : String(e);
+      e instanceof MetaConnectionRequired
+        ? "אין חיבור פעיל ל-Meta — עבור ל-/integrations להתחבר"
+        : e instanceof MetaConnectionExpired
+          ? "החיבור ל-Meta פג — עבור ל-/integrations להתחבר מחדש"
+          : e instanceof MetaApiError
+            ? `Meta API: ${e.message}${e.code ? ` (code ${e.code})` : ""}`
+            : e instanceof Error
+              ? e.message
+              : String(e);
   }
 
   const currency = accountInfo?.currency ?? "USD";
@@ -247,7 +286,7 @@ export default async function CampaignsPage({
     <Page>
       <PageHeader
         eyebrow="קמפיינים"
-        title="קמפיינים (חיים מ-Meta)"
+        title="חיים מ-Meta"
         subtitle={`חשבון: ${accountInfo?.id ?? "—"} · ${accountInfo?.name ?? ""} · ${currency} · timezone ${accountInfo?.timezone_name ?? ""}`}
       />
 
@@ -293,6 +332,38 @@ export default async function CampaignsPage({
             const effectiveDailyCents =
               Number(c.daily_budget ?? 0) || adSetDailyTotal;
             const pendingCount = pendingByCampaign.get(c.id) ?? 0;
+            // Per-campaign service inference (G5). The matcher consumes the
+            // business haystack plus this campaign's name as `campaign_name`
+            // (×3 weight). When the campaign name carries a service term
+            // (e.g. "סוכן AI - שלב 1"), that wins. If not, falls back to
+            // aggregate match and the badge reads as warm-amber to nudge
+            // the operator to rename.
+            const serviceInference = knowledgeForServiceInference
+              ? matchSubVertical({
+                  vertical: knowledgeForServiceInference.vertical as Vertical | null,
+                  products_raw: (knowledgeForServiceInference.products ?? [])
+                    .map((p) => (p.description ? `${p.name} — ${p.description}` : p.name))
+                    .join("  ") || null,
+                  ideal_customer:
+                    (knowledgeForServiceInference.questionnaire_answers as Record<string, string | undefined> | null)
+                      ?.ideal_customer ?? null,
+                  usp:
+                    (knowledgeForServiceInference.questionnaire_answers as Record<string, string | undefined> | null)
+                      ?.usp ?? null,
+                  main_pain:
+                    (knowledgeForServiceInference.questionnaire_answers as Record<string, string | undefined> | null)
+                      ?.main_pain ?? null,
+                  campaign_name: c.name,
+                })
+              : null;
+            const serviceIsExplicit =
+              serviceInference?.confidence_of_match === "exact" &&
+              serviceInference.matched_terms.some((t) =>
+                c.name.toLowerCase().includes(t.toLowerCase()),
+              );
+            const serviceLabelHe = serviceInference
+              ? (SUB_VERTICAL_HE_LOCAL[serviceInference.sub] ?? serviceInference.sub)
+              : null;
             return (
               <Card key={c.id} id={`campaign-${c.id}`} className="scroll-mt-6">
                 <CardHeader>
@@ -316,6 +387,24 @@ export default async function CampaignsPage({
                         <span className="text-xs text-muted-foreground">
                           {objectiveLabel}
                         </span>
+                        {serviceLabelHe ? (
+                          <span
+                            className={
+                              "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium " +
+                              (serviceIsExplicit
+                                ? "border border-emerald-300/60 bg-emerald-50/60 text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-950/40 dark:text-emerald-300"
+                                : "border border-amber-300/60 bg-amber-50/60 text-amber-800 dark:border-amber-500/30 dark:bg-amber-950/40 dark:text-amber-300")
+                            }
+                            title={
+                              serviceIsExplicit
+                                ? `שם הקמפיין מזכיר את השירות '${serviceLabelHe}' — הסוכן יחקור לפי תת-ורטיקל זה`
+                                : `שם הקמפיין לא ספציפי — הסוכן נופל ל-${serviceLabelHe} כברירת מחדל. שנה את שם הקמפיין לתיאורי כדי לקבל אומדן מדויק.`
+                            }
+                          >
+                            שירות: {serviceLabelHe}
+                            {!serviceIsExplicit ? " (משוער)" : ""}
+                          </span>
+                        ) : null}
                         {pendingCount > 0 ? (
                           <Link
                             href={`/approvals?campaign=${c.id}`}

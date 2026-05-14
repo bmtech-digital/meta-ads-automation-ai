@@ -18,6 +18,8 @@ import {
   TARGET_KIND_LABEL_HE,
   URGENCY_LABEL_HE,
   URGENCY_STYLES,
+  parsePlanSection,
+  parsePlanSteps,
   relativeHe,
   requiresHumanReview,
   taskTypeLabel,
@@ -28,6 +30,14 @@ import {
   humanPayloadRows,
 } from "@/lib/approvals-display";
 import { DecisionRow } from "@/components/decision-row";
+import {
+  OrganicPostPreview,
+  isPublishTaskType,
+} from "@/components/organic-post-preview";
+import {
+  KpiTargetProposalView,
+  isSetKpiTargetTask,
+} from "@/components/kpi-target-proposal";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +47,45 @@ async function approveAction(formData: FormData) {
   if (!session) redirect("/login");
   const id = String(formData.get("id") ?? "");
   if (!id) redirect("/approvals");
-  await getDataClient().approveApproval(id, session.email);
+  const db = getDataClient();
+  // Pull the row before flipping status so we can dispatch task-specific
+  // side effects below. Cheaper than fetching post-approve and avoids a TOCTOU
+  // window where the row's payload could be edited mid-approve.
+  const before = await db.getApprovalById(id);
+  await db.approveApproval(id, session.email);
+
+  // Web-side execution for purely-DB approvals — no need to wait for the
+  // execute_approvals cron (which dispatches Meta API writes via Python).
+  // Currently: verify_pixel_capi (Pixel/CAPI guardrail) and set_kpi_target
+  // (writes businesses.target_*). Both are pure DB flips.
+  if (before?.task_type === "verify_pixel_capi") {
+    const pixels = (before.payload as { pixels?: Array<{ pixel_id: string }> })
+      ?.pixels;
+    const firstPixelId = pixels && pixels.length > 0 ? pixels[0].pixel_id : null;
+    await db.markTrackingVerified(before.business_id, {
+      pixel_id: firstPixelId,
+      // Human attested via approval — the row's payload carries
+      // capi_attested=false at creation; we treat the act of approving as
+      // attesting yes.
+      capi_configured: true,
+    });
+  }
+
+  if (before?.task_type === "set_kpi_target") {
+    const payload = before.payload as {
+      kpi?: "cpa" | "cpl" | "roas";
+      value?: number;
+    };
+    if (
+      payload.kpi &&
+      ["cpa", "cpl", "roas"].includes(payload.kpi) &&
+      typeof payload.value === "number" &&
+      payload.value > 0
+    ) {
+      await db.setKpiTarget(before.business_id, payload.kpi, payload.value);
+    }
+  }
+
   redirect("/approvals?action=approved");
 }
 
@@ -111,6 +159,18 @@ export default async function ApprovalDetailPage({
   const isPending = approval.status === "pending";
   const canUndo = approval.status === "approved" && !approval.executed_at;
 
+  // Per propose_task.py + guardrails §33 (2026-05-13): an `alert` proposal
+  // carries `payload.acknowledgment_only: true` because there's no Meta call
+  // behind it — "approve" is an acknowledgement, not an execution. Render
+  // distinct copy + labels so the operator doesn't think they're triggering
+  // a real action.
+  const payloadObj =
+    approval.payload && typeof approval.payload === "object"
+      ? (approval.payload as Record<string, unknown>)
+      : {};
+  const isAckOnly =
+    approval.task_type === "alert" && payloadObj.acknowledgment_only === true;
+
   return (
     <Shell active="/approvals">
       <PageHeader
@@ -151,6 +211,14 @@ export default async function ApprovalDetailPage({
           </Card>
         ) : null}
 
+        {isPublishTaskType(approval.task_type) ? (
+          <OrganicPostPreview approval={approval} />
+        ) : null}
+
+        {isSetKpiTargetTask(approval.task_type) ? (
+          <KpiTargetProposalView approval={approval} />
+        ) : null}
+
         <Card>
           <CardHeader>
             <div className="flex flex-wrap items-center gap-2">
@@ -178,14 +246,54 @@ export default async function ApprovalDetailPage({
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
-            <section>
-              <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
-                למה?
-              </h3>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                {approval.rationale}
-              </p>
-            </section>
+            {(() => {
+              const { main, plan } = parsePlanSection(approval.rationale);
+              const steps = plan ? parsePlanSteps(plan) : [];
+              return (
+                <>
+                  <section>
+                    <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+                      למה?
+                    </h3>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                      {main || approval.rationale}
+                    </p>
+                  </section>
+                  {plan ? (
+                    <section className="rounded-lg border-2 border-brand-500/30 bg-brand-500/5 p-4">
+                      <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-brand-700 dark:text-brand-400">
+                        <span aria-hidden>🧭</span>
+                        תוכנית עבודה
+                      </h3>
+                      {steps.length > 1 ? (
+                        <ol className="flex flex-col gap-2 text-sm leading-relaxed">
+                          {steps.map((step, i) => (
+                            <li
+                              key={i}
+                              className="flex gap-3 items-start"
+                            >
+                              <span
+                                className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500/15 text-xs font-semibold text-brand-700 dark:text-brand-300"
+                                aria-hidden
+                              >
+                                {i + 1}
+                              </span>
+                              <span className="whitespace-pre-wrap">
+                                {step}
+                              </span>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                          {plan}
+                        </p>
+                      )}
+                    </section>
+                  ) : null}
+                </>
+              );
+            })()}
 
             {impactRows.length > 0 ? (
               <section>
@@ -271,30 +379,46 @@ export default async function ApprovalDetailPage({
         {isPending ? (
           <Card>
             <CardHeader>
-              <CardTitle>החלטה</CardTitle>
+              <CardTitle>{isAckOnly ? "סגירת ההתראה" : "החלטה"}</CardTitle>
               <CardDescription>
-                אישור יעביר לביצוע ב-cron הבא של execute_approvals. דחייה סופית.
+                {isAckOnly ? (
+                  <>
+                    אין פעולה אוטומטית מאחורי ההתראה הזאת. &quot;ראיתי&quot; סוגר את ההתראה
+                    ומסמן שעברת עליה. &quot;לא רלוונטי&quot; סוגר אותה כדחויה — אם זיהיתי
+                    שגוי, כתוב מה החמצתי.
+                  </>
+                ) : (
+                  <>אישור יעביר לביצוע אוטומטי תוך 15 דקות. דחייה סופית.</>
+                )}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <form action={approveAction} className="flex gap-2">
                 <input type="hidden" name="id" value={approval.id} />
-                <Button type="submit">אשר</Button>
+                <Button type="submit">{isAckOnly ? "ראיתי" : "אשר"}</Button>
               </form>
               <form action={rejectAction} className="flex flex-col gap-2">
                 <input type="hidden" name="id" value={approval.id} />
-                <Label htmlFor="reason">סיבת דחייה (1-200 תווים)</Label>
+                <Label htmlFor="reason">
+                  {isAckOnly
+                    ? "סיבה לסגירה כלא-רלוונטי (1-200 תווים)"
+                    : "סיבת דחייה (1-200 תווים)"}
+                </Label>
                 <Input
                   id="reason"
                   name="reason"
                   required
                   minLength={1}
                   maxLength={200}
-                  placeholder="מה גרם לדחייה? (חובה — יתועד ל-RLHF)"
+                  placeholder={
+                    isAckOnly
+                      ? "למה ההתראה לא רלוונטית? (יעזור לסוכן לא לחזור עליה)"
+                      : "מה גרם לדחייה? (חובה — יתועד ל-RLHF)"
+                  }
                 />
                 <div>
                   <Button type="submit" variant="outline">
-                    דחה
+                    {isAckOnly ? "לא רלוונטי" : "דחה"}
                   </Button>
                 </div>
               </form>

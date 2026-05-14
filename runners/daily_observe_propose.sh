@@ -58,6 +58,12 @@ claude -p \
   --output-format json \
   "BUSINESS_ID=$BUSINESS_ID. Run the daily observe-propose flow per campaigner/CAMPAIGNER.md."
 
+# ----- plans_carryover hygiene (Migration 023, 2026-05-13 PM) -----
+# Flip stale pending plans → expired so the audit trail stays clean. Idempotent
+# and global; safe to run even if no business has expired plans. Non-fatal —
+# expired plans aren't operationally harmful, just visually noisy.
+python -m campaigner.tools.expire_plans --business-id "$BUSINESS_ID" 2>/dev/null || true
+
 # ----- heartbeat end (only reached on success) -----
 DURATION=$(($(date +%s%3N) - START_TS))
 python -m campaigner.tools.heartbeat \

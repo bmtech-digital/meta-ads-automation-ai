@@ -14,6 +14,7 @@ import {
   DECISION_LABEL_HE,
   DECISION_STYLES,
 } from "@/components/decision-row";
+import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import type { AgentDecision, DecisionType } from "@/lib/db/types";
@@ -58,9 +59,7 @@ export default async function RunDetailPage({
   if (!session) redirect(`/login?next=/runs/${runId}`);
 
   const db = getDataClient();
-  const business = process.env.BUSINESS_ID
-    ? await db.getBusinessById(process.env.BUSINESS_ID)
-    : await db.getFirstBusiness();
+  const business = await getActiveBusiness();
   if (!business) notFound();
 
   const decisions = await db.listDecisionsForRun(business.id, runId);

@@ -1,3 +1,4 @@
+import { Wallet } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -52,8 +53,8 @@ function statusTone(status: PaceStatus | undefined): {
     case "underrun":
       return {
         label: "תת-ניצול",
-        accent: "border-sky-500/30 bg-sky-500/5",
-        headline: "text-sky-600 dark:text-sky-400",
+        accent: "border-warning/30 bg-warning/5",
+        headline: "text-warning",
       };
     case "no_budget_set":
       return {
@@ -85,9 +86,17 @@ export function BudgetHealthCard({
 }) {
   if (!decision) {
     return (
-      <Card className="border-border bg-card/40">
+      <Card>
         <CardHeader>
-          <CardTitle>💰 תקציב בריא?</CardTitle>
+          <CardTitle className="flex items-center gap-2.5">
+            <span
+              aria-hidden
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground ring-1 ring-border/60"
+            >
+              <Wallet size={16} strokeWidth={2} />
+            </span>
+            <span>תקציב בריא?</span>
+          </CardTitle>
           <CardDescription>
             אין pace היום — הסוכן עוד לא רץ.{" "}
             {business.monthly_budget_ils
@@ -108,11 +117,30 @@ export function BudgetHealthCard({
       : "—";
   const windows = outputs.active_windows ?? [];
 
+  // Tone-specific icon chip styling — the Wallet ring picks up the same
+  // status color as the headline so the eye reads the state instantly.
+  const chipCls =
+    status === "overrun"
+      ? "bg-destructive/15 text-destructive ring-destructive/30"
+      : status === "underrun"
+        ? "bg-warning/15 text-warning ring-warning/30"
+        : status === "no_budget_set"
+          ? "bg-muted text-muted-foreground ring-border"
+          : "bg-brand-500/15 text-brand-500 ring-brand-500/30";
+
   return (
     <Card className={tone.accent}>
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <CardTitle>💰 תקציב בריא?</CardTitle>
+          <CardTitle className="flex items-center gap-2.5">
+            <span
+              aria-hidden
+              className={`inline-flex h-8 w-8 items-center justify-center rounded-full ring-1 ${chipCls}`}
+            >
+              <Wallet size={16} strokeWidth={2} />
+            </span>
+            <span>תקציב בריא?</span>
+          </CardTitle>
           <CardDescription className={tone.headline}>
             {tone.label}
             {outputs.pace !== undefined && outputs.pace !== null

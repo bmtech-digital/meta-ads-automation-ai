@@ -17,8 +17,14 @@ function mkBusiness(overrides: Partial<Business>): Business {
     meta_access_token_expires_at: null,
     monthly_budget_ils: null,
     daily_budget_ils: null,
+    seasonal_hints: {},
     primary_kpi: null,
+    target_cpa_ils: null,
+    target_cpl_ils: null,
+    target_roas: null,
+    monthly_brief: null,
     active: true,
+    agent_mode: "draft",
     created_at: "2026-01-01T00:00:00Z",
     ...overrides,
   };
@@ -27,12 +33,7 @@ function mkBusiness(overrides: Partial<Business>): Business {
 const NOW = new Date("2026-04-21T12:00:00Z");
 
 describe("tokenExpiryState", () => {
-  it("returns no_expiry for system_user_token mode", () => {
-    const b = mkBusiness({ meta_auth_mode: "system_user_token" });
-    expect(tokenExpiryState(b, NOW)).toEqual({ kind: "no_expiry" });
-  });
-
-  it("returns unknown when user_token but no expiry date", () => {
+  it("returns unknown when no expiry date is recorded (pre-OAuth)", () => {
     const b = mkBusiness({
       meta_auth_mode: "user_token",
       meta_access_token_expires_at: null,
@@ -93,10 +94,7 @@ describe("tokenExpiryState", () => {
 
 describe("tokenStateLabelHe", () => {
   it("renders Hebrew for each state", () => {
-    expect(tokenStateLabelHe({ kind: "no_expiry" })).toContain(
-      "System User Token",
-    );
-    expect(tokenStateLabelHe({ kind: "unknown" })).toContain("לא ידוע");
+    expect(tokenStateLabelHe({ kind: "unknown" })).toContain("חובר");
     expect(tokenStateLabelHe({ kind: "expired", daysAgo: 5 })).toContain(
       "פג לפני 5",
     );
@@ -109,15 +107,14 @@ describe("tokenStateLabelHe", () => {
     expect(tokenStateLabelHe({ kind: "warning", daysLeft: 7 })).toContain(
       "בעוד 7",
     );
-    expect(tokenStateLabelHe({ kind: "healthy", daysLeft: 50 })).toContain(
-      "עוד 50",
+    expect(tokenStateLabelHe({ kind: "healthy", daysLeft: 50 })).toBe(
+      "מחובר",
     );
   });
 });
 
 describe("isTokenActionable", () => {
   it("flags only states requiring action", () => {
-    expect(isTokenActionable({ kind: "no_expiry" })).toBe(false);
     expect(isTokenActionable({ kind: "unknown" })).toBe(false);
     expect(isTokenActionable({ kind: "healthy", daysLeft: 20 })).toBe(false);
     expect(isTokenActionable({ kind: "warning", daysLeft: 7 })).toBe(true);

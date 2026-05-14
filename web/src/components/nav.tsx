@@ -7,13 +7,17 @@ import {
   SignalIcon,
   InboxIcon,
   TargetIcon,
-  HistoryIcon,
   KnowledgeIcon,
 } from "@/components/brand/icons";
 import {
   Menu,
   Settings as SettingsIcon,
   Images as ImagesIcon,
+  Plug as PlugIcon,
+  FileText as ReportIcon,
+  FlaskConical as AbTestIcon,
+  Users as AudienceIcon,
+  ClipboardCheck as LeadsIcon,
 } from "lucide-react";
 import { AiweonLogo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -41,43 +45,59 @@ const LINKS: NavLink[] = [
   { href: "/", label: "דשבורד", Icon: SignalIcon },
   { href: "/approvals", label: "הצעות", Icon: InboxIcon },
   { href: "/campaigns", label: "קמפיינים", Icon: TargetIcon },
-  { href: "/history", label: "היסטוריה", Icon: HistoryIcon },
-  { href: "/business-knowledge", label: "ידע עסקי", Icon: KnowledgeIcon },
+  { href: "/business-knowledge", label: "העסק שלי", Icon: KnowledgeIcon },
   { href: "/gallery", label: "גלריה", Icon: ImagesIcon as IconCmp },
+  { href: "/reports", label: "דוחות", Icon: ReportIcon as IconCmp },
+  { href: "/plans", label: "תוכניות", Icon: ReportIcon as IconCmp },
+  { href: "/ab-tests", label: "מבחני A/B", Icon: AbTestIcon as IconCmp },
+  { href: "/audiences", label: "קהלים", Icon: AudienceIcon as IconCmp },
+  { href: "/leads", label: "לידים", Icon: LeadsIcon as IconCmp },
+  { href: "/integrations", label: "אינטגרציות", Icon: PlugIcon as IconCmp },
   { href: "/settings", label: "הגדרות", Icon: SettingsIcon as IconCmp },
 ];
 
+/**
+ * Three-pill floating header — ported from aiweon-ser (D:\aiweon-ser\src\
+ * components\site-header.tsx). Logo pill (right in RTL), nav pill (center),
+ * action pill (left). All three sit on `glass-surface rounded-full` so the
+ * page atmosphere shows through behind them.
+ */
 export function Nav({ active, right }: { active?: string; right?: ReactNode }) {
   return (
-    <header className="glass-header sticky top-0 z-40">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
+    <header className="fixed inset-x-0 top-0 z-40 pt-2 sm:pt-4">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-1.5 px-2 sm:gap-3 sm:px-4">
+        {/* Logo pill — tighter on mobile, full lockup with subtitle on sm+ */}
         <Link
           href="/"
-          className="flex shrink-0 items-center rounded-md outline-none transition-transform hover:scale-[1.02] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           aria-label="Aiweon Campaigner — בית"
+          className="glass-surface group inline-flex shrink-0 items-center rounded-full py-1.5 pe-2.5 ps-2.5 transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:py-2 sm:pe-4 sm:ps-3"
         >
-          <AiweonLogo size={34} subtitle="Campaigner" />
+          {/* Mobile: compact mark only */}
+          <AiweonLogo size={20} className="sm:hidden" />
+          {/* sm+: full wordmark + Campaigner subtitle */}
+          <AiweonLogo
+            size={26}
+            subtitle="Campaigner"
+            className="hidden sm:inline-flex"
+          />
         </Link>
 
-        {/* Desktop nav (lg+): all links inline */}
+        {/* Nav pill — desktop only */}
         <nav
-          className="hidden flex-1 items-center justify-center gap-1 lg:flex"
           aria-label="ניווט ראשי"
+          className="glass-surface hidden items-center gap-0.5 rounded-full px-1 py-1 lg:flex"
         >
           {LINKS.map((link) => (
             <NavPill key={link.href} link={link} active={active} />
           ))}
         </nav>
 
-        {/* Tablet/Mobile: spacer */}
-        <div className="flex-1 lg:hidden" />
-
-        <div className="flex shrink-0 items-center gap-1.5">
-          <ThemeToggle />
+        {/* Right pill — theme + user menu + mobile hamburger */}
+        <div className="glass-surface flex shrink-0 items-center gap-0.5 rounded-full px-1 py-1">
+          <ThemeToggle className="h-9 w-9 hover:bg-foreground/5" />
           {right ? (
-            <div className="flex items-center gap-2">{right}</div>
+            <div className="flex items-center gap-0.5">{right}</div>
           ) : null}
-          {/* Hamburger appears below lg */}
           <MobileNav active={active} />
         </div>
       </div>
@@ -93,17 +113,17 @@ function NavPill({ link, active }: { link: NavLink; active?: string }) {
       href={href}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "nav-link-underline inline-flex items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-[13.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+        "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
         isActive
-          ? "bg-brand-500/10 text-foreground dark:bg-brand-400/10"
-          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+          ? "bg-brand-500/15 text-foreground"
+          : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground",
       )}
     >
       <Icon
-        size={16}
+        size={14}
         className={cn(
           "transition-colors",
-          isActive ? "text-brand-500 dark:text-brand-400" : "opacity-80",
+          isActive ? "text-brand-500" : "opacity-80",
         )}
       />
       <span>{label}</span>
@@ -119,7 +139,7 @@ function MobileNav({ active }: { active?: string }) {
         <button
           type="button"
           aria-label="תפריט"
-          className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
         >
           <Menu size={18} />
         </button>
@@ -145,7 +165,7 @@ function MobileNav({ active }: { active?: string }) {
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                   isActive
-                    ? "bg-brand-500/10 text-foreground"
+                    ? "bg-brand-500/15 text-foreground"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
                 )}
               >
@@ -153,7 +173,7 @@ function MobileNav({ active }: { active?: string }) {
                   size={18}
                   className={
                     isActive
-                      ? "text-brand-500 dark:text-brand-400"
+                      ? "text-brand-500"
                       : "opacity-80"
                   }
                 />
@@ -161,7 +181,7 @@ function MobileNav({ active }: { active?: string }) {
                 {isActive ? (
                   <span
                     aria-hidden
-                    className="ms-auto inline-block h-2 w-2 rounded-full bg-brand-500 dark:bg-brand-400"
+                    className="ms-auto inline-block h-2 w-2 rounded-full bg-brand-500"
                   />
                 ) : null}
               </Link>

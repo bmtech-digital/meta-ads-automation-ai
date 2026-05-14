@@ -17,6 +17,7 @@ The seam between Next.js (the app) and the outside world (Postgres, Supabase, Me
 | [`token-expiry.ts`](token-expiry.ts) | Meta token expiry math + warnings |
 | [`kpi.ts`](kpi.ts) | KPI snapshot formatters |
 | [`meta.ts`](meta.ts) | Light Meta API helpers (read-only — list ad accounts, etc.). Heavy lifting is the Python agent's job. |
+| [`meta-capabilities.ts`](meta-capabilities.ts) | Capability layer per [`meta-integration-readiness.md §3`](../../../docs/plans/meta-integration-readiness.md) — scope groups, capability spec, readiness check. Pure, no I/O. Single source of truth for "can the agent do X?" |
 | [`storage.ts`](storage.ts) | Dual-mode storage (local FS in dev, GCS in prod) for gallery uploads |
 | [`utils.ts`](utils.ts) | `cn()` for class composition. That's it. |
 

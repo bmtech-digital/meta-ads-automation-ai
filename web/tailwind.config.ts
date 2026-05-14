@@ -11,24 +11,46 @@ const config: Config = {
     },
     extend: {
       fontFamily: {
-        sans: ["var(--font-heebo)", "system-ui", "sans-serif"],
+        // Assistant carries Hebrew, Geist carries Latin. Browser picks per
+        // glyph — Assistant has Latin too but Geist's Latin is sharper at
+        // small sizes, so we list it first as a hint.
+        sans: [
+          "var(--font-assistant)",
+          "var(--font-geist)",
+          "system-ui",
+          "sans-serif",
+        ],
+        display: [
+          "var(--font-assistant)",
+          "var(--font-geist)",
+          "system-ui",
+          "sans-serif",
+        ],
+        mono: [
+          "var(--font-geist-mono)",
+          "ui-monospace",
+          "SFMono-Regular",
+          "Menlo",
+          "monospace",
+        ],
       },
       fontSize: {
-        // Tightened display sizes with negative tracking baked in
+        // Display sizes — bumped a touch with tighter tracking so headings
+        // carry editorial weight (per "looks like a form" feedback fix).
         display: [
-          "2.25rem",
-          { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" },
+          "2.5rem",
+          { lineHeight: "1.05", letterSpacing: "-0.025em", fontWeight: "700" },
         ],
         h1: [
-          "1.75rem",
-          { lineHeight: "1.15", letterSpacing: "-0.02em", fontWeight: "700" },
+          "1.875rem",
+          { lineHeight: "1.15", letterSpacing: "-0.022em", fontWeight: "700" },
         ],
         h2: [
-          "1.375rem",
-          { lineHeight: "1.25", letterSpacing: "-0.015em", fontWeight: "600" },
+          "1.4375rem",
+          { lineHeight: "1.25", letterSpacing: "-0.017em", fontWeight: "600" },
         ],
         h3: [
-          "1rem",
+          "1.0625rem",
           { lineHeight: "1.35", letterSpacing: "-0.01em", fontWeight: "600" },
         ],
       },
@@ -75,17 +97,21 @@ const config: Config = {
           foreground: "hsl(var(--card-foreground))",
         },
         brand: {
-          DEFAULT: "hsl(33 93% 54%)",
-          50: "hsl(33 100% 97%)",
-          100: "hsl(33 100% 93%)",
-          200: "hsl(33 95% 85%)",
-          300: "hsl(33 93% 73%)",
-          400: "hsl(33 92% 63%)",
-          500: "hsl(33 93% 54%)",
-          600: "hsl(33 88% 48%)" /* #E8850F — the gradient end on weon.co.il */,
-          700: "hsl(28 85% 40%)",
-          800: "hsl(25 78% 33%)",
-          900: "hsl(22 70% 27%)",
+          /* Aligned with aiweon-ser palette (D:\aiweon-ser): #f5841f /
+             #ffb878 / #c4641a. Slightly redder than the old yellow-orange
+             so it reads CRISP against neutral cool-grays in dark mode
+             instead of "muddy". */
+          DEFAULT: "hsl(28 91% 54%)" /* #f5841f */,
+          50: "hsl(28 100% 97%)",
+          100: "hsl(28 100% 92%)",
+          200: "hsl(28 100% 82%)" /* #ffb878 — brand-soft */,
+          300: "hsl(28 95% 72%)",
+          400: "hsl(28 92% 62%)",
+          500: "hsl(28 91% 54%)" /* #f5841f — brand DEFAULT */,
+          600: "hsl(22 88% 44%)" /* #c4641a — brand-deep */,
+          700: "hsl(20 84% 38%)",
+          800: "hsl(18 78% 30%)",
+          900: "hsl(16 70% 24%)",
         },
       },
       borderRadius: {

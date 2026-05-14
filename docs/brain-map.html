@@ -1,0 +1,1708 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Campaigner — מפת המח</title>
+<style>
+  :root {
+    --bg-0: #0a0a14;
+    --bg-1: #11121f;
+    --bg-2: #181a2c;
+    --bg-3: #1f2138;
+    --border: #2a2d4a;
+    --border-soft: #1e2038;
+    --text: #e8e9ff;
+    --text-dim: #9499c4;
+    --text-faint: #6b6f95;
+    --accent: #8b7dff;
+    --accent-2: #5eead4;
+    --warn: #fbbf24;
+    --danger: #f87171;
+    --ok: #4ade80;
+    --info: #60a5fa;
+    --pink: #f0abfc;
+    --orange: #fb923c;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg-0); color: var(--text); margin: 0; padding: 0; }
+  body {
+    font-family: 'Heebo','Rubik','Segoe UI',system-ui,-apple-system,sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+    background:
+      radial-gradient(1200px 800px at 80% -10%, rgba(139,125,255,0.10), transparent 60%),
+      radial-gradient(900px 600px at 10% 100%, rgba(94,234,212,0.06), transparent 60%),
+      var(--bg-0);
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 48px 24px 96px; }
+  header {
+    text-align: center;
+    padding: 32px 0 48px;
+    border-bottom: 1px solid var(--border-soft);
+    margin-bottom: 48px;
+  }
+  header h1 {
+    margin: 0 0 8px;
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 800;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 50%, var(--accent-2) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    letter-spacing: -0.02em;
+  }
+  header .sub { color: var(--text-dim); font-size: 16px; }
+  header .chips { margin-top: 20px; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  .chip {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .chip b { color: var(--text); font-weight: 700; margin-inline-end: 4px; }
+
+  section { margin-bottom: 56px; }
+  h2 {
+    font-size: 22px;
+    margin: 0 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    letter-spacing: -0.01em;
+  }
+  h2 .num {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #0a0a14;
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+  }
+  h3 { margin: 0 0 12px; font-size: 15px; color: var(--text); }
+
+  .card {
+    background: linear-gradient(180deg, var(--bg-1), var(--bg-2));
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  /* Architecture diagram */
+  .arch {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .arch-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+  }
+  .node {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+    font-size: 13px;
+  }
+  .node b { display: block; font-size: 14px; margin-bottom: 4px; color: var(--text); }
+  .node small { color: var(--text-dim); font-size: 11px; }
+  .arrow { text-align: center; color: var(--text-faint); font-size: 20px; }
+  .node.cron { border-color: var(--accent); }
+  .node.flow { border-color: var(--info); }
+  .node.tools { border-color: var(--accent-2); }
+  .node.store { border-color: var(--pink); }
+  .node.hitl { border-color: var(--warn); background: rgba(251,191,36,0.08); }
+
+  /* Flows */
+  .flows {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 16px;
+  }
+  .flow {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    position: relative;
+    overflow: hidden;
+  }
+  .flow::before {
+    content: ''; position: absolute; inset: 0; width: 4px;
+    background: var(--accent);
+  }
+  .flow.b::before { background: var(--info); }
+  .flow.c::before { background: var(--accent-2); }
+  .flow.d::before { background: var(--pink); }
+  .flow .when { color: var(--text-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .flow .name { font-size: 18px; font-weight: 700; margin: 4px 0 8px; }
+  .flow .desc { font-size: 13px; color: var(--text-dim); }
+
+  /* Decision tree — redesigned */
+  .mental-model {
+    background: linear-gradient(135deg, rgba(139,125,255,0.08), rgba(94,234,212,0.04));
+    border: 1px solid var(--accent);
+  }
+  .mental-model p { margin: 10px 0; color: var(--text-dim); line-height: 1.7; }
+  .mental-model b { color: var(--text); }
+
+  .prose {
+    color: var(--text-dim);
+    font-size: 14px;
+    line-height: 1.75;
+    margin: 12px 4px 18px;
+  }
+  .prose p { margin: 0 0 12px; }
+  .prose b { color: var(--text); font-weight: 600; }
+  .prose code {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-family: 'Menlo','Consolas',monospace;
+    font-size: 12px;
+    color: var(--accent-2);
+  }
+  .prose a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--accent);
+  }
+  .callout {
+    background: var(--bg-2);
+    border-right: 3px solid var(--info);
+    padding: 12px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 16px 0;
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .callout.warn { border-right-color: var(--warn); background: rgba(251,191,36,0.05); }
+  .callout.danger { border-right-color: var(--danger); background: rgba(248,113,113,0.05); }
+  .callout b { color: var(--text); }
+  .callout .label {
+    display: inline-block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 2px 8px;
+    background: var(--info);
+    color: #0a0a14;
+    border-radius: 4px;
+    font-weight: 700;
+    margin-left: 8px;
+  }
+  .callout.warn .label { background: var(--warn); }
+  .callout.danger .label { background: var(--danger); }
+
+  .dev-note {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--bg-3);
+    border-radius: 8px;
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.6;
+  }
+  .dev-note b { color: var(--accent-2); font-family: 'Menlo','Consolas',monospace; font-size: 11px; }
+  .dev-note code { color: var(--accent); font-family: 'Menlo','Consolas',monospace; }
+  .loop-vis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    margin: 14px 0;
+  }
+  .loop-vis > div {
+    background: var(--bg-3);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text);
+  }
+  .loop-vis .sep { background: transparent; border: 0; color: var(--accent); font-size: 18px; padding: 0; }
+  .loop-note { font-size: 12px; color: var(--text-faint); text-align: center; margin-top: 12px; }
+
+  .sub-section-head {
+    margin: 28px 0 12px;
+    font-size: 14px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-right: 3px solid var(--accent);
+    padding-right: 10px;
+  }
+
+  /* Inputs grid */
+  .inputs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 8px;
+  }
+  .input-cell {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  .input-cell b { color: var(--text); font-family: 'Menlo','Consolas',monospace; font-size: 12px; display: block; }
+  .input-cell small { color: var(--text-dim); font-size: 11px; }
+
+  /* Gate visualization (T-1) */
+  .gate-grid {
+    display: grid;
+    grid-template-columns: 140px 24px 1fr;
+    gap: 10px 14px;
+    align-items: center;
+  }
+  .gate-cond {
+    padding: 10px 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 13px;
+    border: 1px solid var(--border);
+  }
+  .gate-cond small { display: block; font-size: 11px; font-weight: 400; opacity: 0.7; margin-top: 2px; }
+  .gate-cond.severe { background: rgba(248,113,113,0.15); border-color: var(--danger); color: var(--danger); }
+  .gate-cond.under { background: rgba(251,191,36,0.12); border-color: var(--warn); color: var(--warn); }
+  .gate-cond.healthy { background: rgba(74,222,128,0.12); border-color: var(--ok); color: var(--ok); }
+  .gate-cond.over { background: rgba(96,165,250,0.12); border-color: var(--info); color: var(--info); }
+  .gate-arrow { color: var(--text-faint); text-align: center; font-size: 18px; }
+  .gate-result { font-size: 13px; color: var(--text-dim); padding: 10px 12px; background: var(--bg-2); border-radius: 8px; border: 1px solid var(--border-soft); }
+  .gate-result b { color: var(--text); }
+
+  /* Anchor */
+  .anchor-vis {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    font-size: 12px;
+  }
+  .anchor-vis code {
+    background: var(--bg-3);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: 'Menlo','Consolas',monospace;
+    color: var(--accent-2);
+  }
+  .anchor-vis .arrow { color: var(--accent); font-size: 16px; }
+
+  /* Router rules */
+  .rules { display: grid; gap: 6px; }
+  .rule-row {
+    display: grid;
+    grid-template-columns: 44px 1fr 24px 1.1fr 1fr;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+  .rule-row .rid {
+    font-family: 'Menlo','Consolas',monospace;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--bg-3);
+    text-align: center;
+    padding: 4px 0;
+    border-radius: 4px;
+    font-size: 12px;
+  }
+  .rule-row .rcond { color: var(--text); font-family: 'Menlo','Consolas',monospace; font-size: 12px; }
+  .rule-row .rarrow { color: var(--text-faint); text-align: center; font-size: 16px; }
+  .rule-row .rwhy { color: var(--text-faint); font-size: 11px; }
+  .rule-row.default { background: var(--bg-3); border-style: dashed; }
+  .rule-row.split { grid-template-columns: 44px 1fr 24px 2.1fr; }
+  .rsplit { display: grid; gap: 4px; font-size: 12px; color: var(--text-dim); }
+  .rsplit b { color: var(--text); }
+
+  .rlane {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 11px;
+    text-align: center;
+    font-family: 'Menlo','Consolas',monospace;
+  }
+  .rlane.ho { background: rgba(107,111,149,0.20); color: var(--text-dim); }
+  .rlane.pm { background: rgba(251,146,60,0.18); color: var(--orange); }
+  .rlane.cr { background: rgba(94,234,212,0.18); color: var(--accent-2); }
+  .rlane.ep { background: rgba(248,113,113,0.20); color: var(--danger); }
+  .rlane.sd { background: rgba(251,191,36,0.18); color: var(--warn); }
+  .rlane.pe { background: rgba(240,171,252,0.18); color: var(--pink); }
+  .rlane.su { background: rgba(74,222,128,0.18); color: var(--ok); }
+  .rlane.ip { background: rgba(251,146,60,0.18); color: var(--orange); }
+  .rlane.ti { background: rgba(96,165,250,0.18); color: var(--info); }
+  .rlane.ro { background: rgba(139,125,255,0.18); color: var(--accent); }
+
+  /* Lane outcome cards */
+  .lanes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+  }
+  .lane-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    border-right-width: 4px;
+  }
+  .lane-card b { display: block; font-size: 13px; font-family: 'Menlo','Consolas',monospace; margin-bottom: 6px; }
+  .lane-card .action { color: var(--text); font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .lane-card small { color: var(--text-faint); font-size: 11px; }
+  .lane-card.ho { border-right-color: var(--text-faint); }
+  .lane-card.ho b { color: var(--text-dim); }
+  .lane-card.pm { border-right-color: var(--orange); } .lane-card.pm b { color: var(--orange); }
+  .lane-card.cr { border-right-color: var(--accent-2); } .lane-card.cr b { color: var(--accent-2); }
+  .lane-card.ep { border-right-color: var(--danger); } .lane-card.ep b { color: var(--danger); }
+  .lane-card.sd { border-right-color: var(--warn); } .lane-card.sd b { color: var(--warn); }
+  .lane-card.pe { border-right-color: var(--pink); } .lane-card.pe b { color: var(--pink); }
+  .lane-card.su { border-right-color: var(--ok); } .lane-card.su b { color: var(--ok); }
+  .lane-card.ip { border-right-color: var(--orange); } .lane-card.ip b { color: var(--orange); }
+  .lane-card.ti { border-right-color: var(--info); } .lane-card.ti b { color: var(--info); }
+  .lane-card.ro { border-right-color: var(--accent); } .lane-card.ro b { color: var(--accent); }
+
+  /* Special lanes */
+  .special-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 10px;
+  }
+  .special-card {
+    background: var(--bg-2);
+    border: 1px dashed var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .special-card b {
+    display: block;
+    font-family: 'Menlo','Consolas',monospace;
+    color: var(--accent-2);
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+  .special-card .when {
+    color: var(--text);
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+  .special-card small {
+    color: var(--text-faint);
+    font-size: 11px;
+  }
+
+  /* Guardrails grid */
+  .gr-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 14px;
+  }
+  .gr-group {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .gr-group h3 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .gr-group.safety h3 { color: var(--danger); }
+  .gr-group.andromeda h3 { color: var(--accent-2); }
+  .gr-group.cadence h3 { color: var(--info); }
+  .gr-group.research h3 { color: var(--orange); }
+  .gr-group.ab h3 { color: var(--warn); }
+  .gr-group.ux h3 { color: var(--pink); }
+  .gr-group.quality h3 { color: var(--ok); }
+  .rule {
+    font-family: 'Menlo','Consolas',monospace;
+    font-size: 12px;
+    padding: 4px 0;
+    color: var(--text-dim);
+    display: flex;
+    gap: 8px;
+  }
+  .rule b { color: var(--text); min-width: 32px; font-weight: 700; }
+  .badge {
+    display: inline-block;
+    margin-inline-start: 6px;
+    padding: 1px 6px;
+    font-size: 10px;
+    border-radius: 4px;
+    background: var(--accent);
+    color: #0a0a14;
+    font-weight: 700;
+    font-family: inherit;
+  }
+  .badge.gold { background: var(--warn); }
+  .badge.teal { background: var(--accent-2); }
+
+  /* Tools */
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+  }
+  .tool-cat {
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+  .tool-cat h3 {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 14px;
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tool-cat .icon {
+    width: 28px; height: 28px;
+    background: var(--bg-3);
+    border-radius: 8px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .tool {
+    font-family: 'Menlo','Consolas',monospace;
+    font-size: 11.5px;
+    padding: 2px 0;
+    color: var(--text-dim);
+  }
+  .tool::before { content: '› '; color: var(--accent); }
+
+  /* Mastery phases */
+  .phases { display: grid; gap: 10px; }
+  .phase {
+    display: grid;
+    grid-template-columns: 80px 1fr 200px 80px;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .phase .pnum { font-weight: 700; color: var(--accent); font-family: 'Menlo',monospace; }
+  .phase .pname { color: var(--text); }
+  .phase .pname small { display: block; color: var(--text-dim); font-size: 11px; margin-top: 2px; }
+  .bar {
+    height: 10px;
+    background: var(--bg-3);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+  .bar > i {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  }
+  .status {
+    text-align: center;
+    font-size: 18px;
+  }
+  .status.done { color: var(--ok); }
+  .status.partial { color: var(--warn); }
+  .status.next { color: var(--info); }
+  .status.future { color: var(--text-faint); }
+
+  /* Weekly timeline */
+  .week {
+    display: grid;
+    grid-template-columns: 80px repeat(24, 1fr);
+    font-size: 11px;
+    gap: 2px;
+  }
+  .week .head { color: var(--text-dim); text-align: center; padding: 4px 0; }
+  .week .day { color: var(--text-dim); display: flex; align-items: center; padding: 4px 8px; }
+  .slot {
+    height: 26px;
+    background: var(--bg-3);
+    border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    color: var(--text-faint);
+  }
+  .slot.a { background: rgba(139,125,255,0.30); color: #fff; }
+  .slot.b { background: rgba(96,165,250,0.20); color: var(--info); }
+  .slot.c { background: rgba(94,234,212,0.30); color: #0a0a14; font-weight: 700; }
+  .slot.d { background: rgba(240,171,252,0.30); color: #fff; font-weight: 700; }
+  .week-legend { display: flex; gap: 16px; margin-top: 12px; font-size: 12px; color: var(--text-dim); flex-wrap: wrap; }
+  .week-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .week-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+  /* Journey flow */
+  .journey { display: grid; gap: 10px; }
+  .journey .step {
+    display: grid;
+    grid-template-columns: 40px 1fr 1fr;
+    gap: 12px;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .journey .step .n {
+    background: var(--bg-3);
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700;
+    color: var(--accent);
+    font-family: 'Menlo',monospace;
+  }
+  .journey .step.gate { border-color: var(--accent); }
+  .journey .step.hitl { border-color: var(--warn); background: rgba(251,191,36,0.05); }
+  .journey .step .what { font-weight: 600; }
+  .journey .step .why { color: var(--text-dim); font-size: 12px; }
+  .journey-arrow {
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 16px;
+    height: 8px;
+    line-height: 8px;
+  }
+
+  /* Summary */
+  .summary {
+    text-align: center;
+    padding: 40px 24px;
+    background: linear-gradient(135deg, rgba(139,125,255,0.08), rgba(94,234,212,0.05));
+    border: 1px solid var(--accent);
+    border-radius: 16px;
+  }
+  .summary .big {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 24px;
+    margin: 24px 0;
+  }
+  .summary .big div b {
+    display: block;
+    font-size: 40px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .summary .big div span { color: var(--text-dim); font-size: 13px; }
+  .summary .tag { color: var(--text-dim); font-size: 14px; margin-top: 12px; }
+
+  footer { text-align: center; color: var(--text-faint); font-size: 12px; margin-top: 48px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>🧠 Campaigner — מפת המח</h1>
+    <div class="sub">איך הסוכן רואה, חושב, מציע ומבצע — בלי לעבור על HITL</div>
+    <div class="chips">
+      <span class="chip"><b>4</b>Flows</span>
+      <span class="chip"><b>21</b>Lanes</span>
+      <span class="chip"><b>38</b>Guardrails</span>
+      <span class="chip"><b>47</b>Tools</span>
+      <span class="chip"><b>8/9</b>Phases shipped</span>
+    </div>
+  </header>
+
+  <!-- 1. Architecture -->
+  <section>
+    <h2><span class="num">1</span>תמונה כללית — איך זה רץ</h2>
+    <div class="card">
+      <div class="arch">
+        <div class="arch-row">
+          <div class="node cron"><b>Cloud Scheduler</b><small>cron</small></div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="arch-row">
+          <div class="node flow"><b>Flow A</b><small>09:00 · observe-propose</small></div>
+          <div class="node flow"><b>Flow B</b><small>כל 15 דק׳ · execute</small></div>
+          <div class="node flow"><b>Flow C</b><small>ב׳ 10:00 · creative</small></div>
+          <div class="node flow"><b>Flow D</b><small>ב׳ 11:00 · competitive</small></div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="arch-row">
+          <div class="node"><b>claude -p</b><small>+ prompts/*.md</small></div>
+          <div class="node tools"><b>Python CLI tools</b><small>tools/*.py</small></div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="arch-row">
+          <div class="node store"><b>Supabase</b><small>approvals + decisions</small></div>
+          <div class="node store"><b>Meta API</b><small>facebook-business</small></div>
+          <div class="node store"><b>Vertex AI</b><small>Imagen</small></div>
+        </div>
+        <div class="arrow">↓</div>
+        <div class="arch-row">
+          <div class="node hitl"><b>👤 אופרטור אנושי</b><small>HITL — בלי אישור, אין מימוש</small></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Flows -->
+  <section>
+    <h2><span class="num">2</span>ארבעת ה-Flows</h2>
+    <div class="flows">
+      <div class="flow a">
+        <div class="when">כל יום · 09:00</div>
+        <div class="name">A — Observe / Propose</div>
+        <div class="desc">snapshot מ-Meta → Two-Gate (leading/lagging) → הצעות לטבלת approvals</div>
+      </div>
+      <div class="flow b">
+        <div class="when">כל 15 דק׳</div>
+        <div class="name">B — Execute Approvals</div>
+        <div class="desc">קורא שורות approved → recheck_guardrails → מבצע ב-Meta</div>
+      </div>
+      <div class="flow c">
+        <div class="when">שני · 10:00</div>
+        <div class="name">C — Creative Firehose</div>
+        <div class="desc">3-5 קריאייטיבים חדשים לכל קמפיין פעיל · Andromeda-friendly</div>
+      </div>
+      <div class="flow d">
+        <div class="when">שני · 11:00</div>
+        <div class="name">D — Competitive Research</div>
+        <div class="desc">WebSearch על מחירים/זוויות/פורמטים → התרעות עם מקורות (§27)</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Decision tree -->
+  <section>
+    <h2><span class="num">3</span>עץ ההחלטה — איך זה באמת עובד</h2>
+
+    <div class="prose">
+      <p>
+        עץ ההחלטה הוא <b>הלב של Flow A (Daily Observe-Propose)</b>. הוא מוגדר בקובץ
+        <code>campaigner/prompts/decision-tree.md</code> ונטען על-ידי Claude בכל הרצה של
+        <code>claude -p</code> דרך runners/daily_observe_propose.sh. אין כאן Python שמריץ את העץ —
+        <b>Claude עצמו</b> קורא את הקובץ, מבצע את ההחלטות, ומפעיל כלים (CLI tools) שכותבים את התוצאות
+        ל-Supabase. כלומר העץ הוא <b>פרומפט מובנה</b>, לא קוד.
+      </p>
+      <p>
+        זה אומר שהרבה מההחלטות הן <b>llm-driven אבל בנויות סביב טוּלים דטרמיניסטיים</b> — הסוכן
+        קורא נתון מ-Meta, מריץ פונקציה Python שמחזירה ענייה בוליאנית, ולפי זה ממשיך. המתכנת שמתחזק
+        את העץ עורך 3 סוגי קבצים: <code>prompts/*.md</code> (לוגיקת ההחלטה), <code>tools/*.py</code>
+        (חישובים דטרמיניסטיים), ו-<code>tools/check_guardrails.py</code> (חוקי אבטחה).
+      </p>
+    </div>
+
+    <!-- Mental model -->
+    <div class="card mental-model">
+      <h3 style="margin-top:0;">המודל המנטלי</h3>
+      <p>
+        זה <b>לא עץ אחד גלובלי שעובר על כל החשבון</b>. זה <b>לולאה שרצה לכל קמפיין פעיל בנפרד</b>.
+        כל פעם שה-cron מפעיל את Flow A (09:00 בבוקר), הסוכן מושך את רשימת הקמפיינים הפעילים
+        מ-Meta דרך <code>fetch_meta_state</code>, ועובר עליהם אחד-אחד. לכל קמפיין הזרימה היא:
+      </p>
+      <div class="loop-vis">
+        <div>📊 איסוף נתונים</div>
+        <div class="sep">›</div>
+        <div>🚪 §T-1 Budget Gate</div>
+        <div class="sep">›</div>
+        <div>🎯 §T-2 Service Anchor</div>
+        <div class="sep">›</div>
+        <div>🧭 §T0r Router</div>
+        <div class="sep">›</div>
+        <div>🛣️ אחד מ-10 מסלולים</div>
+        <div class="sep">›</div>
+        <div>✅ פעולה / skip</div>
+      </div>
+      <p>
+        ה-<b>output</b> של כל איטרציה הוא בדיוק <b>אחד משלושה דברים</b>: שורה חדשה בטבלת
+        <code>approvals</code> (הצעת פעולה לאופרטור), שורה בטבלת <code>agent_decisions</code> מסוג
+        <code>skip</code> (החלטה לא לעשות כלום, עם נימוק), או שורה מסוג <code>error</code> (קרתה תקלה
+        — חסר נתון, טול נכשל). הסוכן לא יכול לסיים איטרציה בלי להשאיר receipt — זה enforcement
+        מ-<code>tools/log_decision.py</code>.
+      </p>
+      <p>
+        רק <b>אחרי</b> שכל הקמפיינים עברו את הלולאה, רצים <b>מסלולים מיוחדים</b> שלא תלויים בקמפיין
+        יחיד — למשל §T11 (portfolio rebalance) שצריך להסתכל על קבוצת קמפיינים יחד, או §T_AUD
+        (audiences) שמופעל ידנית על-ידי האופרטור מה-UI ולא מ-Flow A.
+      </p>
+    </div>
+
+    <div class="callout">
+      <span class="label">למפתח</span>
+      <b>ה-Run ID משותף לכל הלולאה.</b> בתחילת כל הרצה של Flow A, runner יוצר <code>RUN_ID</code> חדש
+      (UUID), והוא מוצמד לכל <code>agent_decisions</code> ו-<code>approvals</code> שנוצרים. ככה
+      ב-UI אפשר לפתוח עמוד <code>/runs/[run_id]</code> ולראות את <b>כל</b> מה שהסוכן עשה בריצה אחת.
+      ה-RUN_ID מועבר כ-CLI flag (<code>--run-id $RUN_ID</code>) לכל קריאת tool, ותוקף בכל קריאת
+      <code>log_decision</code>. ראה <code>runners/CLAUDE.md</code> ו-<code>migrations/004_agent_decisions.sql</code>.
+    </div>
+
+    <!-- 3.1 Inputs -->
+    <h3 class="sub-section-head">שלב 1 · איסוף נתונים לכל קמפיין</h3>
+
+    <div class="prose">
+      <p>
+        לפני שהסוכן מסווג קמפיין למסלול, הוא קורא <b>10 נתונים</b> שמספרים את "הסיפור הנוכחי"
+        של הקמפיין. כל נתון נשלף בקריאה אחת לטול Python שמדבר עם Meta API או עם הנתונים שלנו
+        ב-Supabase. הסוכן לא ניגש לקוד Python ישירות — הוא מפעיל את הטולים דרך Bash, מקבל JSON
+        חזרה, ומעביר אותו לשלב הבא. <b>אם טול נכשל</b>, הסוכן רושם <code>error</code> ב-decisions
+        וממשיך לקמפיין הבא — לא יוצר Crash על כל ההרצה.
+      </p>
+      <p>
+        ה-window של 7 ימים הוא <b>בכוונה</b> ולא 1/3/30 ימים — פחות מזה זה רעש של Meta delivery
+        (תוצאות לא יציבות), יותר מזה מסתיר שינויים אקטואליים. רוב החישובים שמסתמכים על השדות
+        האלה (utilization, CPM delta וכו') מקובעים על window=7 ב-<code>decision-tree.md §T-1</code>.
+      </p>
+    </div>
+
+    <div class="inputs-grid">
+      <div class="input-cell"><b>utilization_7d</b><small>spend ÷ (budget × 7) · fetch_insights + fetch_meta_state</small></div>
+      <div class="input-cell"><b>cpa_vs_target</b><small>actual ÷ KPI target · estimate_cpl אם target חסר</small></div>
+      <div class="input-cell"><b>hook_rate_top</b><small>video_play_actions ÷ impressions · max per ad</small></div>
+      <div class="input-cell"><b>frequency_7d</b><small>חשיפות לאדם · אזהרה בלבד (§15)</small></div>
+      <div class="input-cell"><b>fatigue_flag</b><small>check_creative_fatigue · CPR ≥ 2× היסטורי</small></div>
+      <div class="input-cell"><b>hours_since_edit</b><small>fetch_meta_state · cooldown 72h</small></div>
+      <div class="input-cell"><b>active_creatives</b><small>list_active_creatives · ≥100 imp window</small></div>
+      <div class="input-cell"><b>days_since_add</b><small>creative_gallery.created_at DESC LIMIT 1</small></div>
+      <div class="input-cell"><b>last_scale_up</b><small>check_marginal_return · cadence cap 1/wk</small></div>
+      <div class="input-cell"><b>cpm_delta_pct</b><small>fetch_insights --with-prior-window</small></div>
+    </div>
+
+    <div class="callout">
+      <span class="label">למפתח</span>
+      <b>למה זה לא קוד אחד שאוסף הכל ל-dict.</b> כי כל טול הוא <b>חוזה עצמאי</b> שאפשר להריץ בנפרד
+      לדיבאג. אם <code>fetch_insights</code> מחזיר נתון שנראה שגוי, מפעילים אותו ידנית מה-CLI
+      ובודקים את ה-JSON. אם היה wrapper אחד שעוטף את כולם, היה צריך לפתח לו --debug mode עם פלט
+      ביניים. ראה <code>tests/tools/test_contract.py</code> שמוודא שכל טול שומר על חוזה ה-stdin/stdout
+      שלו (52 בדיקות contract פעילות).
+    </div>
+
+    <!-- 3.2 T-1 Gate -->
+    <h3 class="sub-section-head">שלב 2 · §T-1 Budget Utilization Gate</h3>
+
+    <div class="prose">
+      <p>
+        זה <b>השער הראשון</b>, והוא הוקם בכוונה לפני כל אבחון אחר. הסיבה היא עיקרון לא-מתפשר
+        מ-<code>docs/PERSONALITY.md</code> non-negotiable #3: <b>"בדוק ניצול תקציב לפני שינוי תקציב"</b>.
+        אם Meta לא מצליחה להוציא את התקציב, אין טעם לאבחן קריאייטיב — אין מספיק חשיפות כדי להסיק.
+        אבחנת קריאייטיב במצב underspend היא טיפול בסימפטום ולא בסיבה.
+      </p>
+      <p>
+        החישוב פשוט: <code>utilization = spend_7d / (daily_budget_ils × 7)</code>. אבל הסף החשוב
+        הוא <b>50%</b> — מתחת לזה, הסוכן <b>חוסם הצעות מסוג new_creative</b> דרך guardrail §19
+        (<code>no_new_creative_when_underspending</code>). זה enforcement דטרמיניסטי: גם אם הסוכן
+        ישכח, ה-check_guardrails.py יחזיר BLOCK. הסיבה היא ש"להוסיף קריאייטיב למאגר שלא מקבל
+        חשיפות" זה כמו לזרוק עוד דליים למאגר ריק.
+      </p>
+      <p>
+        מקרה severely_under <b>לא ממשיך ל-Router הרגיל</b>. במקום זה, הסוכן עובר ל-<b>אבחון פנימי
+        של §T-1 עצמו</b>: בודק אם objective מתאים ל-business intent, אם estimated_audience_size
+        קטן מ-200K (מציע expand), אם CPM פי 3 מהממוצע הישראלי ($8.38) — מציע alert. רק אם שום
+        אבחנה לא תופסת, נרשם <code>diagnosis="underrun_unknown_cause"</code> עם confidence נמוך,
+        ו-alert מבקש מהאופרטור לבחון שינויים אחרונים או Learning reset.
+      </p>
+    </div>
+
+    <div class="card">
+      <div class="gate-grid">
+        <div class="gate-cond severe">&lt; 50%<small>severely_under</small></div>
+        <div class="gate-arrow">›</div>
+        <div class="gate-result"><b>חוסם new_creative.</b> Meta מסרבת להוציא — לא להוסיף קריאייטיב למאגר ריק. אבחון פנימי של §T-1: pool / audience / CPM / objective. לא ממשיך ל-Router.</div>
+
+        <div class="gate-cond under">50% – 80%<small>under</small></div>
+        <div class="gate-arrow">›</div>
+        <div class="gate-result"><b>ממשיך ל-Router,</b> אבל כל rationale חייב לפתוח במשפט שמזכיר את ה-underspend ("הוצאנו ₪X מתוך ₪Y..."). זה דורש מהסוכן להראות receipts גם כשהוא ממשיך.</div>
+
+        <div class="gate-cond healthy">80% – 105%<small>healthy</small></div>
+        <div class="gate-arrow">›</div>
+        <div class="gate-result"><b>ממשיך כרגיל</b> ל-§T-2 ול-Router. <code>utilization</code> מתועד ב-<code>inputs</code> של החלטת ה-diagnosis לטובת היסטוריה.</div>
+
+        <div class="gate-cond over">&gt; 105%<small>over</small></div>
+        <div class="gate-arrow">›</div>
+        <div class="gate-result"><b>Monitoring only.</b> Meta תאזן ביום הבא — overspend בודד מטופל אוטומטית על-ידי Meta delivery. אם נמשך 3+ ימים → נבדק תחת §T2+ כ-winner candidate (R9).</div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="label">למפתח</span>
+      <b>אין tool ייעודי ל-§T-1.</b> ה-math פשוט (חילוק) ולא מצדיק קובץ בנפרד. הסוכן מקבל
+      <code>spend</code> מ-<code>fetch_insights --level campaign --days 7</code> ו-<code>daily_budget_minor_units</code>
+      מ-<code>fetch_meta_state --object-type campaign</code>, וחישב בעצמו בתוך הפרומפט. השדה
+      <code>daily_budget_minor_units</code> ב-Meta API הוא בסנטים, לא בשקלים — חובה לחלק ב-100.
+      ה-enforcement של החסימה ל-new_creative נמצא ב-<code>tools/check_guardrails.py</code>
+      function <code>no_new_creative_when_underspending</code> שקוראת ל-<code>fetch_insights</code>
+      ומחשבת מחדש.
+    </div>
+
+    <!-- 3.3 T-2 Anchor -->
+    <h3 class="sub-section-head">שלב 3 · §T-2 Per-Campaign Service Anchor</h3>
+
+    <div class="prose">
+      <p>
+        זה השער הכי "צעיר" בעץ — הוא נוסף ב-13.5.2026 בעקבות תקרית ספציפית: AIWEON הוא <b>עסק
+        רב-מוצרי</b> (סוכני AI, סרטוני AI, קמפיינים AI, מיתוג משפיעות), ובלי השער הזה הסוכן היה
+        מאבחן <b>כל</b> קמפיין לפי המוצר הדומיננטי ב-<code>business_knowledge.products[]</code>.
+        משמע: קמפיין על "סוכן AI" היה מקבל KPI band של "משפיעות" (אם משפיעות דומיננטיות ברשימה),
+        ה-rationale היה מציין מתחרים מהענף הלא נכון, וההצעה הייתה מבוססת על תת-vertical שגוי.
+      </p>
+      <p>
+        הפתרון: <b>לחלץ את שם הקמפיין מ-Meta</b> (חינם — <code>fetch_meta_state</code> מחזיר אותו
+        ממילא), <b>להזין ל-<code>estimate_cpl --campaign-name</code></b>, ושהטול ייתן ל-terms
+        בשם משקל <b>×3</b> לעומת ה-business aggregate. ה-output כולל <code>match.sub</code>
+        (תת-vertical ספציפי) ו-<code>match.matched_terms</code> (אילו מילים תפסו) — והשני הוא
+        ה-<b>proof of identification</b> שכל rationale עתידי חייב להזכיר (enforced by §26).
+      </p>
+      <p>
+        מקרה קצה חשוב: <b>שם קמפיין גנרי</b> ("Campaign 1", "test", רק תאריך, פחות מ-5 תווים)
+        — <code>estimate_cpl</code> מסמן <code>campaign_name_diagnostic.is_generic = true</code>,
+        נופל ל-business aggregate, ו<b>הסוכן חייב לפלוט alert</b> מסוג
+        <code>alert_type="generic_campaign_name"</code> שמבקש מהאופרטור לשנות את השם. ה-alert
+        הוא idempotent — אם כבר יש pending alert לקמפיין הזה, לא פולטים שוב.
+      </p>
+    </div>
+
+    <div class="anchor-vis">
+      <code>"קמפיין סוכן AI 16.4"</code>
+      <span class="arrow">›</span>
+      <code>estimate_cpl --campaign-name</code>
+      <span class="arrow">›</span>
+      <code>matched_terms: ["סוכן AI"]</code>
+      <span class="arrow">›</span>
+      <span>שירות AIWEON ספציפי + KPI band תואם (לא aggregate)</span>
+    </div>
+
+    <div class="callout">
+      <span class="label">למפתח</span>
+      <b>איפה ה-services מוגדרים.</b> מקור האמת הוא <code>products</code> table ב-Supabase, שיובא
+      מ-<code>d:\aiweon-ser\messages\he.json</code> ע"י השריפט <code>scripts/import_aiweon_services.py</code>.
+      טבלת <code>products</code> כוללת <code>service_tag</code> (slug יציב) ו-<code>research</code>
+      (jsonb עם מקורות לפי שירות). <code>estimate_cpl</code> טוען את 4 השירותים של AIWEON ומפעיל
+      מטצ'ר עברי על מילים מתוך <code>products.terms[]</code> + <code>products.name</code> מול שם
+      הקמפיין. ראה <code>tools/estimate_cpl.py</code> וה-tests ב-<code>tests/tools/test_estimate_cpl.py</code>.
+    </div>
+
+    <!-- 3.4 Router rules -->
+    <h3 class="sub-section-head">שלב 4 · §T0r Router · 11 כללים sequential · first match wins</h3>
+
+    <div class="prose">
+      <p>
+        ה-Router הוא <b>החלק הכי קריטי בעץ</b>. בלעדיו, הסוכן נופל אוטומטית ל-§T0 (Gate 1 קריאייטיב)
+        על <b>כל</b> קמפיין שעבר את §T-1, וזה היה גורם להצעות <code>new_creative</code> בכל מצב — גם
+        כשהקמפיין חזק וצריך scale_up, גם כשהמאגר ריק וצריך firehose, גם כשעדיף לא לגעת בגלל
+        cooldown. ה-Router מסווג כל קמפיין לאחד מ-<b>10 מסלולים</b> לפני שמחליטים מה להציע.
+      </p>
+      <p>
+        הסדר חשוב: <b>sequential, first match wins</b>. R0 (cooldown) רץ ראשון כי אם היה שינוי לפני
+        72 שעות אסור לגעת בכלום, נקודה. R1 (LEARNING) שני כי guardrail §3 חוסם ממילא. R3
+        (severely_under) שלישי כי הוא ענף אבחון נפרד. R4 (fatigue), R5 (emergency) ו-R6 (CPA גבוה)
+        — בעיות אקטואליות שדורשות פעולה. R7 (pool exhausted) — תנאי תוכן, לא תנאי ביצועים.
+        R8 (winner) ו-R9 (sustained over) — הזדמנויות צמיחה. R10 default — observation בלבד.
+      </p>
+      <p>
+        <b>הסיווג עצמו לא יוצר הצעה.</b> הוא רק קובע איזה <b>תת-עץ</b> ירוץ בהמשך. למשל R8 מסווג
+        ל-<code>scale_up_candidate</code>, אבל ה-tree של §T2+ עוד יכיל 4 pre-checks (marginal-return,
+        CPM inflation, cadence cap, creative pool) שיכולים לחסום או לעצב את ההצעה הסופית. ה-Router
+        הוא ה-coarse classifier, התת-עץ הוא ה-fine-grained.
+      </p>
+      <p>
+        <b>חובה מ-§T0r:</b> בכל קמפיין שעבר את הראוטר, הסוכן חייב לרשום <code>agent_decisions</code>
+        מסוג <code>diagnosis</code> עם <code>outputs={lane, rule}</code>. גם אם הסיווג היה
+        <code>hands_off</code> (= לא תהיה הצעה), ה-receipt נשאר. ב-UI זה מופיע כ"הסוכן בדק את הקמפיין
+        ולא מצא מה לעשות, כי X" — וזה הרבה יותר אינפורמטיבי מ"לא היה proposal".
+      </p>
+    </div>
+    <div class="rules">
+
+      <div class="rule-row">
+        <span class="rid">R0</span>
+        <span class="rcond">hours_since_last_edit &lt; 72h</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane ho">hands_off</span></span>
+        <span class="rwhy">cooldown · כל שינוי מאפס למידה</span>
+      </div>
+
+      <div class="rule-row">
+        <span class="rid">R1</span>
+        <span class="rcond">status = LEARNING &amp; conv_7d &lt; 50</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane ho">hands_off</span></span>
+        <span class="rwhy">guardrail §3 חוסם ממילא</span>
+      </div>
+
+      <div class="rule-row">
+        <span class="rid">R2</span>
+        <span class="rcond">status = LEARNING_LIMITED</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane ti">targeted_intervention</span></span>
+        <span class="rwhy">→ §T5 · scale to min_budget או expand</span>
+      </div>
+
+      <div class="rule-row">
+        <span class="rid">R3</span>
+        <span class="rcond">utilization &lt; 50%</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane pm">pool_misalignment</span></span>
+        <span class="rwhy">→ §T-1 severely_under · expand audience / alert</span>
+      </div>
+
+      <div class="rule-row">
+        <span class="rid">R4</span>
+        <span class="rcond">fatigue_flag = true</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane cr">creative_refresh</span></span>
+        <span class="rwhy">CPR ≥ 2× היסטורי · firehose 3-5</span>
+      </div>
+
+      <div class="rule-row">
+        <span class="rid">R5</span>
+        <span class="rcond">CPA &gt; 3× target &amp; 0 conv (3+d)</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane ep">emergency_pause</span></span>
+        <span class="rwhy">קמפיין שבור · pause urgent</span>
+      </div>
+
+      <div class="rule-row split">
+        <span class="rid">R6</span>
+        <span class="rcond">CPA &gt; 1.3× target sustained 5d</span>
+        <span class="rarrow">›</span>
+        <span class="rsplit">
+          <div>+ CTR &gt; 2% ו-0 המרות › <span class="rlane ip">landing_page_issue</span></div>
+          <div>+ CTR &lt; 1% › <span class="rlane cr">creative_refresh</span></div>
+          <div>אחרת › <span class="rlane sd">scale_down</span></div>
+        </span>
+      </div>
+
+      <div class="rule-row">
+        <span class="rid">R7</span>
+        <span class="rcond">active_creatives &lt; 5 OR no add 7d</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane pe">pool_exhausted</span></span>
+        <span class="rwhy">→ §T_PE · firehose · §28 gallery-first</span>
+      </div>
+
+      <div class="rule-row">
+        <span class="rid">R8</span>
+        <span class="rcond">CPA ≤ target · util ≥ 95% · hook &gt; 30% · no fatigue</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane su">scale_up</span></span>
+        <span class="rwhy">winner · אחרי 4 pre-checks</span>
+      </div>
+
+      <div class="rule-row">
+        <span class="rid">R9</span>
+        <span class="rcond">over 105% sustained 3+ days</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane su">scale_up</span> · אחרת <span class="rlane ho">hands_off</span></span>
+        <span class="rwhy">רק אם winner-grade · אחרת monitor</span>
+      </div>
+
+      <div class="rule-row default">
+        <span class="rid">R10</span>
+        <span class="rcond">default · אף כלל לא תפס</span>
+        <span class="rarrow">›</span>
+        <span><span class="rlane ro">routine_observation</span></span>
+        <span class="rwhy">→ §T0 · בדיקת קריאייטיב אחד-אחד</span>
+      </div>
+
+    </div>
+
+    <div class="callout warn">
+      <span class="label">אזהרת תחזוקה</span>
+      <b>אם משנים את סדר ה-R-rules</b> בקובץ <code>decision-tree.md</code>, חייבים להבין את ההשלכות.
+      למשל אם R7 (pool_exhausted) יעלה לפני R4 (fatigue), קמפיינים עם fatigue + מאגר קטן יישלחו
+      ל-firehose במקום ל-creative refresh, וזה ישנה את המשמעות. כל ה-rules עברו validation עם
+      גולדן ב-<code>tests/golden/</code> — שינוי סדר ידרוש עדכון גם שם. ראה
+      <code>tests/golden/README.md</code> + <code>docs/CAMPAIGN_EVALUATION.md §8</code> לרגישויות
+      ההיסטוריות (מה לא להחזיר).
+    </div>
+
+    <!-- 3.5 Lane outcomes -->
+    <h3 class="sub-section-head">שלב 5 · מה כל מסלול בעצם מציע</h3>
+
+    <div class="prose">
+      <p>
+        אחרי שה-Router סיווג קמפיין למסלול, הסוכן עובר לתת-העץ של המסלול הזה ב-<code>decision-tree.md</code>.
+        כל מסלול הוא <b>אלגוריתם דטרמיניסטי</b> שמייצר פלט אחד מתוך שלושה: <b>proposal</b> (שורה
+        ל-approvals), <b>skip</b> (החלטה לא לעשות, עם נימוק), או <b>error</b>. שום מסלול לא יכול
+        לקרוא ל-Meta API ישירות — כל מוטציה עוברת דרך approvals + Flow B (HITL).
+      </p>
+      <p>
+        חשוב להבין שכל מסלול <b>עובר שוב</b> את <code>check_guardrails</code> לפני שהוא יוצא כ-proposal.
+        אפילו אם הראוטר אישר R8 winner-grade, ה-§T2+ pre-checks יכולים לחסום את ה-scale_up (cadence
+        cap, marginal-return ירוד, CPM inflation), וההצעה תהפוך ל-skip עם rationale שמסביר למה.
+        זה השכבה השנייה של אבטחה: <b>Router decides intent, guardrails decide legality</b>.
+      </p>
+      <p>
+        הכרטיסיות למטה מציגות לכל מסלול: ה-action שייצא, ה-guardrails הרלוונטיים, וקישור מנטלי
+        לסעיף ב-<code>decision-tree.md</code> ול-tools שמטפלים בו. הצבע של כל כרטיסיה זהה לצבע
+        של ה-rlane בטבלת הראוטר למעלה — ככה רואים מתי המסלול נבחר ומה הוא מציע.
+      </p>
+    </div>
+    <div class="lanes-grid">
+
+      <div class="lane-card ho">
+        <b>hands_off</b>
+        <div class="action">skip · אין הצעה</div>
+        <small>cooldown 72h · learning · sustained_over · respect-hands-off §25</small>
+      </div>
+
+      <div class="lane-card pm">
+        <b>pool_misalignment</b>
+        <div class="action">alert + expand_audience</div>
+        <small>חוסם new_creative · בעיית קהל/auction · §T-1 severe</small>
+      </div>
+
+      <div class="lane-card cr">
+        <b>creative_refresh</b>
+        <div class="action">new_creative ×3-5</div>
+        <small>firehose · אסור pause (§13) · 48h grace (§14)</small>
+      </div>
+
+      <div class="lane-card ep">
+        <b>emergency_pause</b>
+        <div class="action">pause_campaign · urgent</div>
+        <small>רק CPA פי 3 + 0 המרות 3+ ימים</small>
+      </div>
+
+      <div class="lane-card sd">
+        <b>scale_down</b>
+        <div class="action">-15% per step</div>
+        <small>§22 max 15% · §23 not 2 in 14d · §24 not in learning</small>
+      </div>
+
+      <div class="lane-card pe">
+        <b>pool_exhausted</b>
+        <div class="action">firehose · gallery-first</div>
+        <small>§T_PE · §28 prefer_gallery · 3-5 variants</small>
+      </div>
+
+      <div class="lane-card su">
+        <b>scale_up</b>
+        <div class="action">+15% / +20% / +30%</div>
+        <small>§T2+ · 4 pre-checks · §20 cadence 1/wk · §21 marginal</small>
+      </div>
+
+      <div class="lane-card ip">
+        <b>landing_page_issue</b>
+        <div class="action">alert</div>
+        <small>CTR גבוה + 0 המרות → בעיה מחוץ לקופי</small>
+      </div>
+
+      <div class="lane-card ti">
+        <b>targeted_intervention</b>
+        <div class="action">scale to min_budget / expand</div>
+        <small>§T5 · יציאה מ-LEARNING_LIMITED</small>
+      </div>
+
+      <div class="lane-card ro">
+        <b>routine_observation</b>
+        <div class="action">§T0 per creative</div>
+        <small>hook + CTR לכל קריאייטיב פעיל · default</small>
+      </div>
+
+    </div>
+
+    <!-- 3.6 Special lanes -->
+    <h3 class="sub-section-head">מסלולים מיוחדים · לא דרך הראוטר · רצים בטריגרים שונים</h3>
+
+    <div class="prose">
+      <p>
+        11 המסלולים האלה <b>לא חלק מהלולאה הפר-קמפיין</b>. כל אחד מהם מופעל ע"י <b>טריגר שונה</b>:
+        חלקם רצים פעם אחת לסבב אחרי שהלולאה הראשית הסתיימה (כמו §T11 portfolio), חלקם רצים על-ידי
+        flows אחרים לחלוטין (§T8 ב-Flow G, §T9 ב-Flow A אבל בשלב נפרד), וחלקם רק כשהאופרטור יוזם
+        אותם מה-UI (§T_AUD מהמסך של business-knowledge). הם נכנסים לעץ ההחלטה כי הם משתפים את
+        אותו infrastructure של approvals + guardrails + agent_decisions — אבל הם <b>לא מתפעלים
+        על קמפיין יחיד</b>.
+      </p>
+      <p>
+        חלוקת התוויות לפי טריגר:<br>
+        • <b>Per-run, post-loop:</b> §T11 (portfolio) — רץ פעם בסוף Flow A, דורש ≥2 קמפיינים פעילים.<br>
+        • <b>Always-on hooks:</b> §T6.1 (gallery-first) ו-§T_CR (drift) — מופעלים כל פעם שיש הצעה
+        ליצירת קריאייטיב או audience.<br>
+        • <b>Cron-driven separate flows:</b> §T8 (Flow G daily 09:30), §T9/§T9.1 (Flow A + integration
+        עם <code>page_audience_signals</code> שמתעדכן ב-Flow weekly_audience_refresh ימי א' 04:00).<br>
+        • <b>Operator-initiated:</b> §T_AUD (Flow E, נקרא מהכפתור "מצא קהל" ב-/business-knowledge).<br>
+        • <b>State-conditional:</b> §T6 (רק אם החשבון cold start), §T_BK (רק אם business_knowledge
+        חסר שדות חיוניים), §T_PA (פעם בריצה אם יש קמפיינים paused), §T_ORG (רק אם זוהה ad rejection
+        או page restriction).
+      </p>
+    </div>
+    <div class="special-grid">
+
+      <div class="special-card">
+        <b>§T11 Portfolio Rebalance</b>
+        <div class="when">פעם בריצה · אחרי כל הקמפיינים</div>
+        <small>scale_up + scale_down כזוג · דורש ≥2 קמפיינים פעילים · Block 9</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T8 A/B Test</b>
+        <div class="when">setup לפי בקשה · decide יומי 09:30</div>
+        <small>Flow G · §29 min creatives · §30 חלון 7d</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T6 Cold Start</b>
+        <div class="when">חשבון חדש · Aiweon</div>
+        <small>אין היסטוריה · 1-2 קמפיינים · process-proof במקום ROI</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T6.1 Gallery-First</b>
+        <div class="when">תמיד · לפני כל generate_creative</div>
+        <small>§28 prefer_gallery_over_generation · redeploy_creative</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T9 Organic Cadence</b>
+        <div class="when">publish_* proposals · FB/IG feed/story/reel</div>
+        <small>Phase 3 page management · page_audience_signals</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T9.1 Post-Promote</b>
+        <div class="when">פוסט אורגני שעבד → boost_post</div>
+        <small>Block 7 · gallery → campaign loop · live insights (Block 8)</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T_AUD Audiences</b>
+        <div class="when">operator-initiated · per service tag</div>
+        <small>Flow E · /business-knowledge · service card → "מצא קהל"</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T_CR Creative Drift</b>
+        <div class="when">גלריה לא תואמת ל-business knowledge</div>
+        <small>Phase 4 · check_business_alignment</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T_BK BK Audit</b>
+        <div class="when">חסרים שדות בידע העסקי (KPI / vertical / target)</div>
+        <small>alert · operator משלים את הפרטים</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T_PA Paused Audit</b>
+        <div class="when">קמפיינים paused · revival אם שווה</div>
+        <small>Phase 6 · cross-status · עם quality warning</small>
+      </div>
+
+      <div class="special-card">
+        <b>§T_ORG Organic Pivot</b>
+        <div class="when">כשהמודעות חסומות (account quality)</div>
+        <small>פיבוט לפרסום אורגני · ad rejected / page restricted</small>
+      </div>
+
+    </div>
+
+    <!-- 3.7 Developer notes -->
+    <h3 class="sub-section-head">למפתחים · קבצים קריטיים, סדר טעינה, מבנה הקוד</h3>
+
+    <div class="prose">
+      <p>
+        עץ ההחלטה <b>אינו ממומש כקוד Python בודד</b> שאפשר לפתוח ולקרוא. הוא מפוזר על-פני 3 שכבות
+        קוד וטקסט, וההפעלה היא בידי Claude שמשמש כ-runtime. זה מבנה לא-שגרתי שדורש הסבר לפני
+        שמתחילים לעבוד עליו.
+      </p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-top:0;">סדר הטעינה בכל הרצה של Flow A</h3>
+      <div class="prose">
+        <p>
+          ה-runner ב-<code>runners/daily_observe_propose.sh</code> מפעיל <code>claude -p</code> עם
+          prompt פשוט: "Run the daily observe-propose flow per CAMPAIGNER.md". Claude אז קורא את
+          הקבצים הבאים <b>בסדר הזה</b>:
+        </p>
+        <ol style="color: var(--text-dim); line-height: 1.8;">
+          <li>
+            <code>campaigner/CAMPAIGNER.md</code> — פרוטוקול ההפעלה. מגדיר את שלבי Flow A
+            (Step 0 = init RUN_ID, Step 0.5 = tracking health, Step 0.6 = account health,
+            Step 1 = pull insights, Step 2 = loop campaigns, Step 3 = post-loop §T11, Step 4 = log summary).
+          </li>
+          <li>
+            <code>prompts/performance-brain.md</code> — איך מחליטים אם קמפיין "טוב". מודל ה-Two-Gate
+            (leading vs lagging), data sufficiency thresholds (§6.4), portfolio thinking (§8).
+          </li>
+          <li>
+            <code>prompts/decision-tree.md</code> — כל ה-lanes שתואר למעלה. הקובץ הגדול ביותר
+            (1370 שורות), מחולק לפי §T-codes.
+          </li>
+          <li>
+            <code>prompts/guardrails.md</code> — 38 חוקים. נטען כי כל הצעה <b>חייבת</b> לעבור check
+            לפני כתיבה ל-approvals (Flow A) ושוב לפני ביצוע (Flow B).
+          </li>
+          <li>
+            <code>prompts/creative-guide.md</code> ו-<code>prompts/hebrew-copy-style.md</code> —
+            נטענים רק אם יש בכוונה ליצור קריאייטיב חדש או לכתוב rationale עברית (תמיד).
+          </li>
+        </ol>
+        <p style="margin-bottom:0;">
+          <b>טעות נפוצה:</b> לקרוא רק <code>decision-tree.md</code> ולנסות להבין את העץ. הוא יוצא
+          מהקשר בלי <code>performance-brain.md §6</code> (data sufficiency thresholds) ובלי
+          <code>guardrails.md §17-§28</code> (כל ה-blocking checks).
+        </p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3 style="margin-top:0;">3 שכבות הקוד</h3>
+      <div class="prose">
+        <p>
+          <b>1) שכבת הפרומפטים (<code>campaigner/prompts/*.md</code>)</b> — לוגיקת החלטה גבוהה.
+          זה ה"מח" של הסוכן. עריכה כאן משנה את ה-behavior המידי <b>בלי deploy</b> — Claude קורא את
+          הקבצים בכל הרצה. <b>אזהרה:</b> שינוי כאן לא נבדק על-ידי הקומפיילר/CI; הולכים רק עם
+          golden tests (<code>tests/golden/</code>).
+        </p>
+        <p>
+          <b>2) שכבת הטולים (<code>campaigner/tools/*.py</code>)</b> — 47 CLI scripts דטרמיניסטיים.
+          כל אחד מהם הוא <code>argparse</code> CLI עצמאי, מקבל flags, פולט JSON ל-stdout. הסוכן
+          מפעיל אותם דרך <code>Bash</code> tool של Claude. כל טול חייב לעמוד בחוזה: <code>--business-id</code>
+          חובה, פלט JSON תקין, exit code 0=success/1=error/2=validation. ראה
+          <code>tools/_contract.py</code> + <code>tests/tools/test_contract.py</code>.
+        </p>
+        <p>
+          <b>3) שכבת ה-DB (<code>migrations/*.sql</code>)</b> — סכמת Supabase. הטבלאות העיקריות:
+          <code>approvals</code> (תור HITL), <code>agent_decisions</code> (audit log + receipts),
+          <code>businesses</code> + <code>business_knowledge</code> + <code>products</code>
+          (קונפיגורציה לפי לקוח), <code>creative_gallery</code> + <code>meta_audiences</code>
+          (נכסי Meta שנשמרו אצלנו), <code>heartbeats</code> (חיים של ה-cron). 25 migrations נכון
+          ל-2026-05-13.
+        </p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3 style="margin-top:0;">תהליך פיתוח של מסלול חדש בעץ</h3>
+      <div class="prose">
+        <p>
+          אם רוצים להוסיף lane חדש (למשל §T_NEW), זה דורש <b>5 שינויים מתואמים</b>:
+        </p>
+        <ol style="color: var(--text-dim); line-height: 1.8;">
+          <li>
+            <b>הוספת R-rule ל-<code>prompts/decision-tree.md §T0r</code></b> — מי תופס את המסלול,
+            ובאיזה תנאים. שיקול הסדר חשוב — first match wins.
+          </li>
+          <li>
+            <b>הוספת תת-עץ §T_NEW</b> — מה קורה כשהמסלול נתפס. תנאי כניסה, pre-checks, action,
+            rationale template, payload schema.
+          </li>
+          <li>
+            <b>תוספת ל-<code>tools/check_guardrails.py</code></b> אם המסלול דורש guardrail חדש
+            (למשל cadence cap ייעודי). חייב tests.
+          </li>
+          <li>
+            <b>תוספת לטבלת ה-task_types המותרים</b> ב-<code>migrations/</code> אם זה task_type חדש,
+            ועדכון ה-CHECK constraint על <code>approvals.task_type</code>.
+          </li>
+          <li>
+            <b>UI ל-<code>web/src/app/approvals/</code></b> — איך ה-card נראה, איזה payload fields
+            מוצגים, אילו פעולות זמינות. בלי זה האופרטור לא יראה את ההצעה.
+          </li>
+          <li>
+            <b>Golden tests ב-<code>tests/golden/</code></b> — תרחיש מינימלי שמוודא שהמסלול נתפס.
+            אחרי הוספה, להריץ <code>docker compose run --rm campaigner pytest tests/golden/</code>.
+          </li>
+        </ol>
+        <p style="margin-bottom:0;">
+          <b>אנטי-pattern:</b> "להוסיף עוד if בתוך <code>decision-tree.md</code> בלי tool תומך".
+          כל סף החלטה (utilization, hook rate, fatigue ratio) חייב לבוא מטול שכותב receipts ב-inputs/outputs
+          של החלטת ה-diagnosis. בלי זה אי אפשר לדבג רגרסיות.
+        </p>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3 style="margin-top:0;">קישורים מהירים — איפה לקרוא מה</h3>
+      <div class="prose">
+        <p style="margin: 0; display: grid; grid-template-columns: 1fr 2fr; gap: 6px 16px;">
+          <code>campaigner/CAMPAIGNER.md</code>
+          <span>פרוטוקול ההפעלה הכללי, מבנה הזרימה של כל Flow</span>
+
+          <code>campaigner/prompts/decision-tree.md</code>
+          <span>המקור היחיד של 21 ה-lanes — קודי §T</span>
+
+          <code>campaigner/prompts/performance-brain.md</code>
+          <span>data sufficiency, two-gate model, portfolio thinking</span>
+
+          <code>campaigner/prompts/guardrails.md</code>
+          <span>38 חוקים — תיאור מילולי</span>
+
+          <code>campaigner/tools/check_guardrails.py</code>
+          <span>אותם 38 חוקים כקוד אכיפה</span>
+
+          <code>campaigner/tools/_contract.py</code>
+          <span>חוזה ה-stdin/stdout של כל טול</span>
+
+          <code>docs/PERSONALITY.md</code>
+          <span>5 העקרונות הלא-מתפשרים של הסוכן</span>
+
+          <code>docs/CAMPAIGN_EVALUATION.md</code>
+          <span>הפילוסופיה של "מה זה קמפיין טוב" + §8 deprecated rules</span>
+
+          <code>docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md</code>
+          <span>best practices 2026 לבניית קמפיינים חדשים</span>
+
+          <code>docs/plans/campaigner-spec.md</code>
+          <span>המפרט הטכני המלא — schema, cron, deferred items</span>
+
+          <code>docs/plans/campaigner-mastery-plan.md</code>
+          <span>roadmap של 9 הפאזות, מה כבר נשלח</span>
+
+          <code>migrations/</code>
+          <span>25 migrations — הסכמה המלאה של Supabase</span>
+
+          <code>tests/golden/</code>
+          <span>תרחישי end-to-end שמוודאים שהעץ עובד</span>
+
+          <code>tests/tools/test_contract.py</code>
+          <span>52 בדיקות contract לטולים</span>
+        </p>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- 4. Guardrails -->
+  <section>
+    <h2><span class="num">4</span>Guardrails — 38 בדיקות דטרמיניסטיות</h2>
+    <div class="gr-grid">
+
+      <div class="gr-group safety">
+        <h3>🛡️ Safety / Meta hygiene</h3>
+        <div class="rule"><b>§1</b>no_delete_campaigns</div>
+        <div class="rule"><b>§3</b>no_learning_phase_touch</div>
+        <div class="rule"><b>§4</b>budget_jump_max_30pct</div>
+        <div class="rule"><b>§6</b>no_horizontal_scaling</div>
+        <div class="rule"><b>§10</b>no_pause_on_recent_conv_24h</div>
+        <div class="rule"><b>§17</b>verify_tracking <span class="badge">M1</span></div>
+        <div class="rule"><b>§18</b>enforce_budget_formula</div>
+      </div>
+
+      <div class="gr-group andromeda">
+        <h3>⚙️ Andromeda 2026</h3>
+        <div class="rule"><b>§12</b>require_95pct_for_ab</div>
+        <div class="rule"><b>§13</b>prefer_add_creative_over_pause</div>
+        <div class="rule"><b>§14</b>no_manual_pruning_before_48h</div>
+        <div class="rule"><b>§15</b>no_frequency_only_kill</div>
+        <div class="rule"><b>§16</b>video_preferred_on_eq_cpa</div>
+      </div>
+
+      <div class="gr-group cadence">
+        <h3>📈 Cadence & Scaling <span class="badge teal">Brain v2</span></h3>
+        <div class="rule"><b>§19</b>no_new_creative_when_underspend</div>
+        <div class="rule"><b>§20</b>scale_up_cadence_max_1_per_week</div>
+        <div class="rule"><b>§21</b>marginal_return_check_before_scale_up</div>
+        <div class="rule"><b>§22</b>scale_down_max_15pct_per_step</div>
+        <div class="rule"><b>§23</b>no_consecutive_scale_down_14d</div>
+        <div class="rule"><b>§24</b>no_scale_down_in_learning</div>
+        <div class="rule"><b>§25</b>respect_hands_off <span class="badge gold">M2</span></div>
+      </div>
+
+      <div class="gr-group research">
+        <h3>🔬 Research & Honesty</h3>
+        <div class="rule"><b>§26</b>set_kpi_requires_research</div>
+        <div class="rule"><b>§27</b>no_competitor_hallucinations</div>
+        <div class="rule"><b>§28</b>prefer_gallery_over_generation</div>
+      </div>
+
+      <div class="gr-group ab">
+        <h3>🧪 A/B Testing</h3>
+        <div class="rule"><b>§29</b>ab_requires_min_creatives</div>
+        <div class="rule"><b>§30</b>ab_min_window_7d</div>
+      </div>
+
+      <div class="gr-group ux">
+        <h3>💬 Operator UX</h3>
+        <div class="rule"><b>§32</b>rationale_approve_reject_footer</div>
+        <div class="rule"><b>§33</b>alert_acknowledgment_only_flag</div>
+        <div class="rule"><b>§34</b>rationale_paragraph_1_clean</div>
+        <div class="rule"><b>§37</b>respect_prior_rejections</div>
+        <div class="rule"><b>§38</b>new_campaign_payload_completeness</div>
+        <div class="rule"><b>§39</b>respect_active_plans</div>
+        <div class="rule"><b>§41</b>copy_must_match_brief_voice</div>
+      </div>
+
+      <div class="gr-group quality">
+        <h3>⭐ Lead Quality · לקח 16.4</h3>
+        <div class="rule"><b>§40</b>winner_requires_quality_grade</div>
+        <div class="rule" style="color:var(--text-faint); margin-top:4px;">
+          "אין winner רק לפי מטריקות Meta — חייב דירוג איכות מהאופרטור"
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 5. Tools -->
+  <section>
+    <h2><span class="num">5</span>ארגז כלים — 47 כלי CLI</h2>
+    <div class="tools-grid">
+
+      <div class="tool-cat">
+        <h3><span class="icon">📥</span>READ — מציאות</h3>
+        <div class="tool">fetch_meta_state</div>
+        <div class="tool">fetch_insights</div>
+        <div class="tool">fetch_paused_campaigns</div>
+        <div class="tool">fetch_lead_quality_summary</div>
+        <div class="tool">list_active_creatives</div>
+        <div class="tool">list_audiences</div>
+        <div class="tool">list_ab_tests</div>
+        <div class="tool">list_gallery_assets</div>
+        <div class="tool">list_approved</div>
+        <div class="tool">load_business_knowledge</div>
+        <div class="tool">load_baselines</div>
+        <div class="tool">load_active_plans</div>
+        <div class="tool">load_feedback_history</div>
+        <div class="tool">load_recent_actions_outcomes</div>
+      </div>
+
+      <div class="tool-cat">
+        <h3><span class="icon">🔍</span>CHECK — gates</h3>
+        <div class="tool">check_data_sufficiency</div>
+        <div class="tool">check_marginal_return</div>
+        <div class="tool">check_creative_fatigue</div>
+        <div class="tool">check_tracking_health</div>
+        <div class="tool">check_business_alignment</div>
+        <div class="tool">check_account_health</div>
+        <div class="tool">check_organic_performance</div>
+        <div class="tool">check_guardrails</div>
+        <div class="tool">recheck_guardrails</div>
+      </div>
+
+      <div class="tool-cat">
+        <h3><span class="icon">📝</span>PROPOSE — כתיבה</h3>
+        <div class="tool">propose_task</div>
+        <div class="tool">propose_audience</div>
+        <div class="tool">draft_new_campaign_payload</div>
+        <div class="tool">compose_copy_brief</div>
+        <div class="tool">compose_weekly_audit</div>
+      </div>
+
+      <div class="tool-cat">
+        <h3><span class="icon">⚡</span>EXECUTE — אחרי אישור</h3>
+        <div class="tool">execute_task</div>
+        <div class="tool">generate_creative</div>
+        <div class="tool">backfill_gallery_from_meta</div>
+        <div class="tool">sync_audiences</div>
+        <div class="tool">sync_leads</div>
+        <div class="tool">grade_lead</div>
+        <div class="tool">refresh_page_audience</div>
+      </div>
+
+      <div class="tool-cat">
+        <h3><span class="icon">🧮</span>MATH / RESEARCH</h3>
+        <div class="tool">estimate_cpl <span style="color:var(--text-faint)">(26 sub-verticals)</span></div>
+        <div class="tool">compute_monthly_pace</div>
+        <div class="tool">compute_quality_adjusted_kpi</div>
+        <div class="tool">evaluate_ab_test</div>
+        <div class="tool">build_website_audience_rule</div>
+      </div>
+
+      <div class="tool-cat">
+        <h3><span class="icon">🛠️</span>INFRASTRUCTURE</h3>
+        <div class="tool">heartbeat</div>
+        <div class="tool">log_decision</div>
+        <div class="tool">mark_failed</div>
+        <div class="tool">expire_plans</div>
+        <div class="tool">suggest_where_to_save</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- 6. Mastery Plan -->
+  <section>
+    <h2><span class="num">6</span>Mastery Plan — 9 פאזות</h2>
+    <div class="phases">
+      <div class="phase">
+        <span class="pnum">Phase 1</span>
+        <span class="pname">Audiences <small>Custom · Saved · Lookalike · §T_AUD</small></span>
+        <div class="bar"><i style="width:100%"></i></div>
+        <span class="status done">✅</span>
+      </div>
+      <div class="phase">
+        <span class="pnum">Phase 2</span>
+        <span class="pname">Lead Quality Loop <small>⚡ הלקח של 16.4 · §40</small></span>
+        <div class="bar"><i style="width:100%"></i></div>
+        <span class="status done">✅</span>
+      </div>
+      <div class="phase">
+        <span class="pnum">Phase 3</span>
+        <span class="pname">New Campaign Wizard <small>create_campaign_chain · rollback · §41</small></span>
+        <div class="bar"><i style="width:100%"></i></div>
+        <span class="status done">✅</span>
+      </div>
+      <div class="phase">
+        <span class="pnum">Phase 4</span>
+        <span class="pname">Gallery Sync + Drift <small>check_business_alignment · §T_CR</small></span>
+        <div class="bar"><i style="width:100%"></i></div>
+        <span class="status done">✅</span>
+      </div>
+      <div class="phase">
+        <span class="pnum">Phase 5</span>
+        <span class="pname">Multi-Objective KPI <small>kpi-per-objective alignment</small></span>
+        <div class="bar"><i style="width:100%"></i></div>
+        <span class="status done">✅</span>
+      </div>
+      <div class="phase">
+        <span class="pnum">Phase 6</span>
+        <span class="pname">Cross-Status Audit §T12 <small>paused revival עם quality warning</small></span>
+        <div class="bar"><i style="width:100%"></i></div>
+        <span class="status done">✅</span>
+      </div>
+      <div class="phase">
+        <span class="pnum">Phase 7</span>
+        <span class="pname">Account Health <small>Pixel · CAPI · Domain · AEM · Payment</small></span>
+        <div class="bar"><i style="width:80%"></i></div>
+        <span class="status partial">🟡</span>
+      </div>
+      <div class="phase">
+        <span class="pnum">Phase 8</span>
+        <span class="pname">Reporting v2 <small>Monthly Brief + lead quality</small></span>
+        <div class="bar"><i style="width:100%"></i></div>
+        <span class="status done">✅</span>
+      </div>
+      <div class="phase">
+        <span class="pnum">Phase 9</span>
+        <span class="pname">Operational QoL <small>הבא בתור — single account-status surface</small></span>
+        <div class="bar"><i style="width:0%"></i></div>
+        <span class="status next">⏳</span>
+      </div>
+      <div class="phase">
+        <span class="pnum">v2</span>
+        <span class="pname">Future <small>Ad Library · LangGraph · Gemini · System User Token</small></span>
+        <div class="bar"><i style="width:0%"></i></div>
+        <span class="status future">❌</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Weekly timeline -->
+  <section>
+    <h2><span class="num">7</span>שבוע טיפוסי</h2>
+    <div class="card">
+      <div class="week">
+        <div class="head"></div>
+        <div class="head">0</div><div class="head"></div><div class="head"></div>
+        <div class="head">3</div><div class="head"></div><div class="head"></div>
+        <div class="head">6</div><div class="head"></div><div class="head"></div>
+        <div class="head">9</div><div class="head"></div><div class="head"></div>
+        <div class="head">12</div><div class="head"></div><div class="head"></div>
+        <div class="head">15</div><div class="head"></div><div class="head"></div>
+        <div class="head">18</div><div class="head"></div><div class="head"></div>
+        <div class="head">21</div><div class="head"></div><div class="head"></div>
+      </div>
+
+      <!-- generate days with JS to keep markup terse -->
+      <div id="weekgrid"></div>
+
+      <div class="week-legend">
+        <span><i style="background:rgba(139,125,255,0.7)"></i> A · Observe-Propose</span>
+        <span><i style="background:rgba(96,165,250,0.4)"></i> B · Execute (×96/day)</span>
+        <span><i style="background:rgba(94,234,212,0.7)"></i> C · Creative Firehose</span>
+        <span><i style="background:rgba(240,171,252,0.7)"></i> D · Competitive Research</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. Journey -->
+  <section>
+    <h2><span class="num">8</span>מסע ההצעה — מ-snapshot ועד מימוש</h2>
+    <div class="journey">
+      <div class="step"><span class="n">1</span><span class="what">fetch_meta_state + business_knowledge + baselines</span><span class="why">קריאת מציאות + הקשר עסקי</span></div>
+      <div class="journey-arrow">↓</div>
+      <div class="step gate"><span class="n">2</span><span class="what">§T-1 → §T-2 → §T0r</span><span class="why">סינון gates + שיוך שירות + ניתוב</span></div>
+      <div class="journey-arrow">↓</div>
+      <div class="step"><span class="n">3</span><span class="what">check_data_sufficiency · check_tracking · check_creative_fatigue</span><span class="why">בדיקות תוכן ספציפיות</span></div>
+      <div class="journey-arrow">↓</div>
+      <div class="step gate"><span class="n">4</span><span class="what">check_guardrails</span><span class="why">38 חוקים דטרמיניסטיים · PASS / BLOCK</span></div>
+      <div class="journey-arrow">↓</div>
+      <div class="step"><span class="n">5</span><span class="what">propose_task</span><span class="why">rationale עברית · footer §32 · payload שלם §38</span></div>
+      <div class="journey-arrow">↓</div>
+      <div class="step hitl"><span class="n">6</span><span class="what">👤 אופרטור · approve / reject</span><span class="why">HITL · /approvals או CLI</span></div>
+      <div class="journey-arrow">↓</div>
+      <div class="step gate"><span class="n">7</span><span class="what">recheck_guardrails</span><span class="why">אותה בדיקה שוב לפני ביצוע</span></div>
+      <div class="journey-arrow">↓</div>
+      <div class="step"><span class="n">8</span><span class="what">execute_task → Meta Marketing API</span><span class="why">המוטציה היחידה לאורך כל המסלול</span></div>
+      <div class="journey-arrow">↓</div>
+      <div class="step"><span class="n">9</span><span class="what">log_decision → agent_decisions</span><span class="why">תיעוד לניתוח עתידי + feedback loop</span></div>
+    </div>
+  </section>
+
+  <!-- Summary -->
+  <section>
+    <div class="summary">
+      <div style="font-size:14px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.1em;">סיכום</div>
+      <div class="big">
+        <div><b>4</b><span>Flows</span></div>
+        <div><b>21</b><span>Decision Lanes</span></div>
+        <div><b>38</b><span>Guardrails</span></div>
+        <div><b>47</b><span>CLI Tools</span></div>
+        <div><b>8/9</b><span>Phases Shipped</span></div>
+      </div>
+      <div class="tag">
+        Personality: <b style="color:var(--text);">Campaign Diagnostician</b> · 3 layers · receipts · business intent first
+      </div>
+      <div class="tag" style="margin-top:8px;">
+        HITL: כל מוטציה דרך approvals — אין כתיבה שקטה
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    Aiweon · Campaigner brain map · 2026-05-14
+  </footer>
+
+</div>
+
+<script>
+  // Render weekly grid
+  const days = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+  const grid = document.getElementById('weekgrid');
+  let html = '';
+  days.forEach((d, di) => {
+    html += '<div class="week">';
+    html += `<div class="day">${d}</div>`;
+    for (let h = 0; h < 24; h++) {
+      let cls = 'slot';
+      let label = '';
+      if (h === 9) { cls += ' a'; label = 'A'; }
+      else if (di === 1 && h === 10) { cls += ' c'; label = 'C'; }
+      else if (di === 1 && h === 11) { cls += ' d'; label = 'D'; }
+      else if (h >= 9) { cls += ' b'; label = ''; }
+      html += `<div class="${cls}">${label}</div>`;
+    }
+    html += '</div>';
+  });
+  grid.innerHTML = html;
+</script>
+
+</body>
+</html>

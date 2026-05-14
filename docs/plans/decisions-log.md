@@ -963,3 +963,66 @@ Log entry: `decision_type='cost_anomaly'` עם `run_cost_usd` + baseline.
 - **Storage bucket + signed URLs** — Supabase Storage bucket `creative-gallery` + RLS policies + signed URL generation לתצוגה מקדימה ב-UI. ייכתב ב-task 4.8 (backend upload endpoint).
 - **Video ולידציה programmatic** — aspect ratio + duration + codec נבדקים ב-upload endpoint, לא ב-CLI. library נבחר בזמן implementation (probably `ffprobe` דרך subprocess).
 - **Research ופערים פתוחים** — 6 שאלות onboarding שה-research דגל ([report 2026-04-20](../../C:\Users\harel\AppData\Local\Temp\claude\d--meta-ads-automation-ai\fd5833f0-a880-4a92-8457-092fcda5e3da\tasks\af66344b2357329a2.output), §5): per-service target CPL, funnel divergence, sales-team bandwidth, persona overlap, flagship service, budget ceiling. ייכנסו ל-questionnaire ב-task 4.9.
+
+---
+
+## 1.12 Meta integration scope — dual-path tokens + capability layer
+
+**סטטוס:** ✅ סגור 2026-05-11
+**Owner:** Roi
+**Scope:** Meta OAuth, token storage, scope/capability mapping, App Review submission strategy. לא כולל: WhatsApp messaging, webhook subscriptions לתוכן אורגני (שלב 2).
+
+### ההתלבטות
+
+3 שאלות חוסמות עלו לפני שאפשר היה לכתוב את [`meta-integration-readiness.md`](meta-integration-readiness.md):
+
+1. **CRM scope** — האם Campaigner מתרחב ל-CRM מלא (`workspace`, `crm_account`, `crm_contact`), נשאר ממוקד עם hook חיצוני, או מחליטים אחר כך?
+2. **Tenancy** — האם prod מפעיל רק את Aiweon (System User Token), רק SaaS רב-משתמשי (OAuth), או שניהם?
+3. **Instagram Login path** — FB Login + IG-linked-to-Page (הקוד הנוכחי), Instagram Login ישיר, או שניהם?
+
+### ההחלטה
+
+| # | החלטה |
+|---|---|
+| 1 | **Hook חיצוני.** אין `workspace` / `crm_account` / `crm_contact` בריפו. מוסיפים `external_crm_ref jsonb` ל-`approvals`, `creative_gallery`, ולכל טבלאות `meta_*` החדשות. |
+| 2 | **שני המסלולים.** Aiweon = System User Token (נתיב A, ללא תפוגה). SaaS עתידי + demo ל-App Review = OAuth long-lived (נתיב B, ~60 יום עם sliding). שתי הדרכים חיות במקביל ומובחנות דרך `businesses.meta_auth_mode`. |
+| 3 | **FB Login + IG-linked-to-Page בלבד.** קוד נתיב יחיד, use case יחיד ב-App Review. |
+
+### הנימוקים (בסדר יורד של חשיבות)
+
+1. **יציבות תפעולית — System User Token.** השאלה של Roi "אני לא רוצה להתחבר כל שנייה" נפתרת לא ע"י שיפור UX של OAuth, אלא ע"י לא להפעיל prod מ-User Token בכלל. System User Token מ-Business Manager לא פג; Page tokens שנגזרים ממנו גם הם ללא תפוגה. זה הסטנדרט של Meta לאוטומציות in-house ולאג'נסי. ההחלטה תלויה ב-§1.2 (Business Verification) — שכבר ✅.
+
+2. **OAuth חובה ל-App Review, גם אם Aiweon לא צריכה.** Meta דורשת screencast עם משתמש test שמחבר את החשבון. בלי Path B אי אפשר להגיש את `ads_management`. לכן Path B נבנה גם אם אין כרגע tenant SaaS.
+
+3. **CRM hook ולא CRM מלא.** הזכרת `workspace`/`crm_account`/`crm_contact` בתוכנית של Roi מקורה ב-Aiweon SaaS הרחב, לא ב-Campaigner. ייצור של טבלאות CRM ריקות עכשיו = פי 2 עבודה + סיכון Meta לדחות App Review על "scope creep" (היישום לא תואם use case). עמודות `external_crm_ref` שומרות על האפשרות לחיבור עתידי בלי לקבע צורה.
+
+4. **מסלול IG יחיד = פחות שטח דחייה.** Meta מגישה Instagram API דרך 3 use cases שונים; שני שלהם פעילים מ-2024 (FB Login + IG Login). תמיכה בשניהם = פי 2 בדיקות + פי 2 use cases ב-App Review + סיכוי דחייה גבוה אם אחד לא ברור. הקוד הקיים ב-[`web/src/lib/meta.ts:505-517`](../../web/src/lib/meta.ts#L505-L517) כבר מניח Page-token-via-FB-Login → לא משנים.
+
+### Tiering ל-App Review — בסיס להחלטות עתידיות
+
+הגשת כל ה-scopes ב-bundle אחד = סיכוי דחייה גבוה (כל skopa לא ברור מפיל את כולן). מגישים ב-4 tiers:
+
+| Tier | Use case | Scopes | תלוי ב- |
+|---|---|---|---|
+| 1 | Read Marketing + Pages + IG | `pages_show_list`, `pages_read_engagement`, `instagram_basic`, `instagram_manage_insights`, `ads_read`, `business_management` | BV (חלקית) |
+| 2 | Publish to Pages + IG | `pages_manage_posts`, `instagram_content_publish` | Tier 1 ✅ |
+| 3 | Marketing API write | `ads_management` | Tier 2 ✅ + BV `verified` |
+| 4 | WhatsApp | `whatsapp_*` | track נפרד |
+
+### קבצים שהשתנו / נוצרו
+
+1. [`docs/plans/meta-integration-readiness.md`](meta-integration-readiness.md) — **חדש**. תוכנית מלאה: שני המסלולים, capability layer, OAuth routes, 5 שלבי יישום.
+2. [`migrations/011_meta_connections.sql`](../../migrations/011_meta_connections.sql) — **חדש**. טבלאות `meta_connections`, `meta_pages`, `meta_ig_accounts`, `meta_ad_accounts`, `meta_oauth_state`.
+3. [`migrations/012_meta_api_audit.sql`](../../migrations/012_meta_api_audit.sql) — **חדש**. טבלת `meta_api_calls` ל-audit + GDPR + rate-limit accounting.
+4. [`migrations/013_agent_mode_and_crm_hooks.sql`](../../migrations/013_agent_mode_and_crm_hooks.sql) — **חדש**. `businesses.agent_mode` + `external_crm_ref` על `approvals` ו-`creative_gallery`.
+5. [`web/src/lib/meta-capabilities.ts`](../../web/src/lib/meta-capabilities.ts) — **חדש**. Scope groups + capability spec + readiness check (pure, ללא Graph calls).
+6. [`web/src/lib/schemas/meta-connection.ts`](../../web/src/lib/schemas/meta-connection.ts) — **חדש**. Zod schemas לחיבור + readiness + asset selection.
+7. [`web/CLAUDE.md`](../../web/CLAUDE.md) — **עודכן**. הכלל "No direct Meta API calls from the web" משתנה ל-"No direct Meta **write** calls; reads עבור OAuth + readiness מותרים דרך `meta-capabilities.ts`".
+
+### מה נשאר פתוח (depends on)
+
+- **Phase 2 (encryption):** `web/src/lib/crypto.ts` + secret `meta-encryption-key-v1` ב-GCP Secret Manager. לא בענף הזה.
+- **Phase 3 (OAuth routes):** `/api/meta/oauth/*` + `/api/meta/deauthorize` + `/api/meta/data-deletion`. לא בענף הזה.
+- **Phase 4 (UI):** `/integrations` route + asset picker + readiness dashboard. לא בענף הזה.
+- **Phase 5 (Submit):** live deploy של callback URLs + screencasts + הגשת Tier 1. תלוי ב-§1.2 BV verified.
+- **Webhooks אורגניים (feed/comments/mentions):** שלב 2 — `docs/plans/meta-webhooks-phase2.md` (טרם נכתב).

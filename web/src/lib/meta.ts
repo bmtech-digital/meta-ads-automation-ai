@@ -1,4 +1,5 @@
 import "server-only";
+import { createHash } from "node:crypto";
 
 const GRAPH_VERSION = "v21.0";
 const GRAPH_BASE = `https://graph.facebook.com/${GRAPH_VERSION}`;
@@ -14,18 +15,16 @@ export class MetaApiError extends Error {
   }
 }
 
-function getToken(): string {
-  const t = process.env.META_ACCESS_TOKEN;
-  if (!t) throw new MetaApiError("META_ACCESS_TOKEN is not set in env");
-  return t;
-}
-
 async function graph<T>(
   path: string,
-  params: Record<string, string> = {},
-  tokenOverride?: string,
+  params: Record<string, string>,
+  token: string,
 ): Promise<T> {
-  const token = tokenOverride ?? getToken();
+  if (!token) {
+    throw new MetaApiError(
+      "meta.graph: token is required — caller must resolve via getTokenForBusiness()",
+    );
+  }
   const qp = new URLSearchParams({ access_token: token, ...params });
   const url = `${GRAPH_BASE}/${path}?${qp.toString()}`;
   const res = await fetch(url, { cache: "no-store" });
@@ -45,33 +44,45 @@ async function graph<T>(
 }
 
 /**
- * Resolve a Page Access Token from the user-scoped META_ACCESS_TOKEN. Many
- * Page-scoped endpoints (`{page}/published_posts`, `instagram_business_account`)
- * return error #210 ("page access token is required") when called with a User
- * Access Token, even if the user is admin and the token has the right scopes.
+ * Resolve a Page Access Token from the user-scoped token. Many Page-scoped
+ * endpoints (`{page}/published_posts`, `instagram_business_account`) return
+ * error #210 ("page access token is required") when called with a User Access
+ * Token, even if the user is admin and the token has the right scopes.
  *
  * `/me/accounts` returns each managed page with its long-lived page token —
  * we look up the matching page and return its token. Requires
  * `pages_show_list` on the user token.
+ *
+ * Cache is keyed by `<hash(user_token)>:<page_id>` so different users (in
+ * future SaaS multi-tenant) don't read each other's cached Page tokens.
  */
 const pageTokenCache = new Map<string, { token: string; expires: number }>();
 
-async function getPageAccessToken(pageId: string): Promise<string> {
-  const cached = pageTokenCache.get(pageId);
+function userTokenFingerprint(userToken: string): string {
+  // SHA-256 first 12 hex chars — collision-safe and avoids logging raw tokens.
+  return createHash("sha256").update(userToken).digest("hex").slice(0, 12);
+}
+
+async function getPageAccessToken(
+  userToken: string,
+  pageId: string,
+): Promise<string> {
+  const cacheKey = `${userTokenFingerprint(userToken)}:${pageId}`;
+  const cached = pageTokenCache.get(cacheKey);
   if (cached && cached.expires > Date.now()) return cached.token;
 
   const out = await graph<{
     data: Array<{ id: string; access_token: string }>;
-  }>("me/accounts", { fields: "id,access_token", limit: "200" });
+  }>("me/accounts", { fields: "id,access_token", limit: "200" }, userToken);
   const found = (out.data ?? []).find((p) => p.id === pageId);
   if (!found) {
     throw new MetaApiError(
-      `page ${pageId} not in /me/accounts — the user behind META_ACCESS_TOKEN is not admin of this page, or pages_show_list is missing from the token's scopes`,
+      `page ${pageId} not in /me/accounts — the connected user is not admin of this page, or pages_show_list is missing from the token's scopes`,
       400,
       "PageNotAccessible",
     );
   }
-  pageTokenCache.set(pageId, {
+  pageTokenCache.set(cacheKey, {
     token: found.access_token,
     expires: Date.now() + 5 * 60 * 1000,
   });
@@ -109,7 +120,10 @@ export interface AdInsightsRow extends MetaInsights {
   ad_id: string;
 }
 
-export async function getAdAccountInfo(adAccountId: string): Promise<{
+export async function getAdAccountInfo(
+  userToken: string,
+  adAccountId: string,
+): Promise<{
   id: string;
   name: string;
   account_status: number;
@@ -122,11 +136,16 @@ export async function getAdAccountInfo(adAccountId: string): Promise<{
     account_status: number;
     currency: string;
     timezone_name: string;
-  }>(adAccountId, { fields: "id,name,account_status,currency,timezone_name" });
+  }>(
+    adAccountId,
+    { fields: "id,name,account_status,currency,timezone_name" },
+    userToken,
+  );
   return out;
 }
 
 export async function listCampaigns(
+  userToken: string,
   adAccountId: string,
 ): Promise<MetaCampaign[]> {
   const out = await graph<{ data: MetaCampaign[] }>(
@@ -136,6 +155,7 @@ export async function listCampaigns(
         "id,name,status,effective_status,objective,daily_budget,lifetime_budget,created_time,updated_time",
       limit: "100",
     },
+    userToken,
   );
   return out.data ?? [];
 }
@@ -148,12 +168,17 @@ export interface MetaAdSummary {
 }
 
 export async function listAdsForAccount(
+  userToken: string,
   adAccountId: string,
 ): Promise<MetaAdSummary[]> {
-  const out = await graph<{ data: MetaAdSummary[] }>(`${adAccountId}/ads`, {
-    fields: "id,name,effective_status,campaign_id",
-    limit: "500",
-  });
+  const out = await graph<{ data: MetaAdSummary[] }>(
+    `${adAccountId}/ads`,
+    {
+      fields: "id,name,effective_status,campaign_id",
+      limit: "500",
+    },
+    userToken,
+  );
   return out.data ?? [];
 }
 
@@ -198,13 +223,18 @@ interface RawAdWithCreative {
  * Avoids fan-out (would be one request per ad otherwise).
  */
 export async function listAdsWithCreativeAndCampaign(
+  userToken: string,
   adAccountId: string,
 ): Promise<MetaAdWithCreative[]> {
-  const out = await graph<{ data: RawAdWithCreative[] }>(`${adAccountId}/ads`, {
-    fields:
-      "id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id},adset{id},campaign{id,name,effective_status}",
-    limit: "500",
-  });
+  const out = await graph<{ data: RawAdWithCreative[] }>(
+    `${adAccountId}/ads`,
+    {
+      fields:
+        "id,name,effective_status,creative{id,name,thumbnail_url,image_url,video_id},adset{id},campaign{id,name,effective_status}",
+      limit: "500",
+    },
+    userToken,
+  );
   return (out.data ?? []).map((a) => ({
     ad_id: a.id,
     ad_name: a.name,
@@ -221,6 +251,8 @@ export async function listAdsWithCreativeAndCampaign(
   }));
 }
 
+
+
 export interface MetaAdSetSummary {
   id: string;
   campaign_id: string;
@@ -230,6 +262,7 @@ export interface MetaAdSetSummary {
 }
 
 export async function listAdSetsForAccount(
+  userToken: string,
   adAccountId: string,
 ): Promise<MetaAdSetSummary[]> {
   const out = await graph<{ data: MetaAdSetSummary[] }>(
@@ -238,6 +271,7 @@ export async function listAdSetsForAccount(
       fields: "id,campaign_id,effective_status,daily_budget,lifetime_budget",
       limit: "500",
     },
+    userToken,
   );
   return out.data ?? [];
 }
@@ -293,14 +327,19 @@ function dateRangeParams(r: DateRange): Record<string, string> {
 }
 
 export async function getCampaignInsights(
+  userToken: string,
   campaignId: string,
   range: DateRange = DEFAULT_DATE_RANGE,
 ): Promise<MetaInsights | null> {
-  const out = await graph<{ data: MetaInsights[] }>(`${campaignId}/insights`, {
-    fields:
-      "spend,impressions,clicks,ctr,cpm,cpc,frequency,reach,actions,cost_per_action_type",
-    ...dateRangeParams(range),
-  });
+  const out = await graph<{ data: MetaInsights[] }>(
+    `${campaignId}/insights`,
+    {
+      fields:
+        "spend,impressions,clicks,ctr,cpm,cpc,frequency,reach,actions,cost_per_action_type",
+      ...dateRangeParams(range),
+    },
+    userToken,
+  );
   return out.data && out.data.length > 0 ? out.data[0] : null;
 }
 
@@ -331,18 +370,21 @@ const INSIGHTS_DEFAULT_RANGE: DateRange = {
  * the tile falls back to a thumbnail.
  */
 export async function listVideoSources(
+  userToken: string,
   videoIds: string[],
   pageId?: string,
 ): Promise<Record<string, string>> {
   if (videoIds.length === 0) return {};
-  const tokenOverride = pageId ? await getPageAccessToken(pageId) : undefined;
+  const callToken = pageId
+    ? await getPageAccessToken(userToken, pageId)
+    : userToken;
   const results = await Promise.all(
     videoIds.map(async (vid) => {
       try {
         const out = await graph<{ source?: string; permalink_url?: string }>(
           vid,
           { fields: "source,permalink_url" },
-          tokenOverride,
+          callToken,
         );
         return [vid, out.source ?? null] as const;
       } catch {
@@ -358,6 +400,7 @@ export async function listVideoSources(
 }
 
 export async function listAdInsights(
+  userToken: string,
   adAccountId: string,
   range: DateRange = INSIGHTS_DEFAULT_RANGE,
 ): Promise<Record<string, AdInsightsRow>> {
@@ -374,6 +417,7 @@ export async function listAdInsights(
         limit: "500",
         ...dateRangeParams(range),
       },
+      userToken,
     );
     const map: Record<string, AdInsightsRow> = {};
     for (const row of out.data ?? []) {
@@ -395,14 +439,15 @@ export async function listAdInsights(
 }
 
 export async function listCampaignsWithInsights(
+  userToken: string,
   adAccountId: string,
   range: DateRange = DEFAULT_DATE_RANGE,
 ): Promise<Array<MetaCampaign & { insights: MetaInsights | null }>> {
-  const campaigns = await listCampaigns(adAccountId);
+  const campaigns = await listCampaigns(userToken, adAccountId);
   const results = await Promise.all(
     campaigns.map(async (c) => {
       try {
-        const insights = await getCampaignInsights(c.id, range);
+        const insights = await getCampaignInsights(userToken, c.id, range);
         return { ...c, insights };
       } catch {
         return { ...c, insights: null };
@@ -477,10 +522,11 @@ interface RawFacebookPost {
  * Required scopes on the user token: `pages_show_list`, `pages_read_engagement`.
  */
 export async function listPagePosts(
+  userToken: string,
   pageId: string,
   limit = 50,
 ): Promise<FacebookPagePost[]> {
-  const pageToken = await getPageAccessToken(pageId);
+  const pageToken = await getPageAccessToken(userToken, pageId);
   const out = await graph<{ data: RawFacebookPost[] }>(
     `${pageId}/published_posts`,
     {
@@ -503,9 +549,10 @@ export async function listPagePosts(
  * connected. Uses the Page Access Token — same #210 reason as listPagePosts.
  */
 export async function getInstagramAccountIdForPage(
+  userToken: string,
   pageId: string,
 ): Promise<string | null> {
-  const pageToken = await getPageAccessToken(pageId);
+  const pageToken = await getPageAccessToken(userToken, pageId);
   const out = await graph<{ instagram_business_account?: { id: string } }>(
     pageId,
     {
@@ -554,13 +601,14 @@ interface RawIgMedia {
  * Required scopes on the user token: `instagram_basic`, `pages_show_list`.
  */
 export async function listInstagramMedia(
+  userToken: string,
   igUserId: string,
   limit = 50,
   linkedPageId?: string,
 ): Promise<InstagramMedia[]> {
-  const tokenOverride = linkedPageId
-    ? await getPageAccessToken(linkedPageId)
-    : undefined;
+  const callToken = linkedPageId
+    ? await getPageAccessToken(userToken, linkedPageId)
+    : userToken;
   const out = await graph<{ data: RawIgMedia[] }>(
     `${igUserId}/media`,
     {
@@ -568,7 +616,7 @@ export async function listInstagramMedia(
         "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,children{media_type,media_url,thumbnail_url}",
       limit: String(limit),
     },
-    tokenOverride,
+    callToken,
   );
   return (out.data ?? []).map((m) => {
     let mediaUrl = m.media_url ?? null;

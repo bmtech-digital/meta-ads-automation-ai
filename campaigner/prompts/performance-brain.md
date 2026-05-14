@@ -120,16 +120,32 @@ CPA > 3× יעד
 **קריאה:**
 
 ```
-🟢 Winner: CPA ≤ יעד יציב 5-7 ימים + hook > 35%
-   → scale_up 20% (default); 30% אם hook > 35% + freq < 2.0
+🟢 Winner: CPA ≤ יעד × 0.8 יציב 5-7 ימים + hook > 35%
+   → §T0r R8/R9 → §T2+ Branch A/B (20%/30% scale_up)
+   חובה: marginal-return guard + cadence cap לפני שמציעים.
 
-🟡 Solid: KPI ב-baseline ±15%
-   → המשך; הוסף 3-5 קריאייטיבים חדשים (firehose)
+🟢 Solid-Strong: CPA between 0.85-1.05× יעד + utilization ≥ 95% + hook > 30%
+   → §T0r R8 → §T2+ Branch C (+15% scale_up — Roi 2026-05-12)
+   "פוגע ביעד + מקום לצמיחה" — מקרה שלא קיבל ענף עד 2026-05-12.
+
+🟡 Average: KPI ב-baseline ±15%, ללא triggers
+   → §T0r → לפי active_creative_count:
+     active_count < 5 OR last_add > 7d → §T_PE (creative pool exhausted → firehose)
+     active_count ≥ 5 AND recent activity → §T_HO (hands_off — log SKIP, no action)
+   **חשוב:** "average + מאגר בריא" = אל תיגע. אל תוסיף קריאייטיבים אוטומטית רק כי 'יש שבוע'.
+   זה היה הפטרן הישן שגרם להצעות מיותרות. הוספה רק כשהמאגר באמת התרוקן.
+
+🟠 Expensive-but-stable: CPA between 1.3-3.0× יעד 5+ ימים, ללא fatigue, ללא CTR-low
+   → §T0r R6 default → §T_SD (scale_down -15%)
+   חדש 2026-05-12 — קודם אופציה זו לא היתה ענף; היה רק "pause או refresh".
 
 🔴 Loser: CPA > 1.3× יעד 5+ ימים
-            OR Creative Fatigue flag (CPR ≥ 2× היסטורי)
-   → Creative Fatigue → הוסף קריאייטיבים חדשים (לא פאוזה!)
-   → CPA high ללא Fatigue flag → pause_campaign / new_creative / expand_audience
+   AND Creative Fatigue flag (CPR ≥ 2×) → §T1 fatigue → new_creative × 3-5 (לא פאוזה!)
+   AND CTR < 1% → §T1 CTR-low → new_creative עם angle אחר
+   AND CTR > 2% + 0 conv → §T1 LP issue → alert (בעיה בדף הנחיתה)
+
+🚨 Emergency: CPA > 3× יעד OR 3+ ימים 0 conv עם תקציב מלא
+   → §T1 emergency → pause_campaign urgency='urgent'
 
 ℹ️ Frequency > 3 לבד
    → monitoring signal. אם CPR יציב, אל תיגע.
@@ -201,3 +217,56 @@ Meta מסמנת קריאייטיב כ-fatigued כאשר **CPR (Cost Per Result) 
 ```
 
 אין מספרים → אין דיאגנוזה. אם אין מספרים, השלב הוא `skip` לא `diagnosis`.
+
+---
+
+## 8. Portfolio Thinking — מעבר לקמפיין יחיד (חדש 2026-05-13, Block 9)
+
+> **הקשר:** עד 2026-05-13 הסוכן ראה כל קמפיין כיחידה עצמאית. כש-Aiweon (או כל לקוח) מריץ 2+ קמפיינים פעילים, "אופטימיזציה פר קמפיין" מחמיצה את ההזדמנות הגדולה: **להזיז כסף ממקום שלא צומח למקום שצומח.**
+
+### למה זה נושא של performance-brain ולא רק decision-tree?
+
+כי הקריטריון "טוב יחסי לעצמו" (§5 Solid-Strong) מקבל משמעות שונה כשמשווים שני קמפיינים:
+
+- קמפיין X: CPA 110% מהיעד, utilization 90% — "average". יחסי לעצמו: OK.
+- קמפיין Y: CPA 80% מהיעד, utilization 99% — "winner-hungry". יחסי לעצמו: עומד בלמעלה מהיעד.
+- **יחד:** Y רעב, X יציב-יקר. ה-portfolio אומר "תעביר ₪X לטובת Y".
+
+הקמפיין X לא "רע". הוא פשוט פחות טוב מ-Y עם אותו תקציב. זאת הראייה ש-§T11 מוסיף.
+
+### שני התפקידים בתיק
+
+| תפקיד | סימנים | מה הסוכן מציע |
+|---|---|---|
+| **"רעב לתקציב" (hungry winner)** | `lane = scale_up_candidate` + `utilization_7d ≥ 0.95` + `CPA ≤ target × 0.85` + ACTIVE 7+ ימים + `marginal_return_passed == true` | יעד לקבלת תקציב — הצעת `scale_up` |
+| **"יקר אבל יציב" (expensive stable)** | `lane = scale_down_candidate` + `CPA between 1.3-3.0× target` + ACTIVE 7+ ימים + לא fatigue (יש מסלול אחר) + לא Learning (§24) | מקור לוויתור על תקציב — הצעת `scale_down` -15% |
+
+קמפיינים ב-hands_off / learning / cold_start / fatigue / pool_exhausted **אינם** מועמדים — כבר טופלו במסלולים שלהם.
+
+### המתמטיקה של ה-rebalance
+
+```
+delta_ils = min(
+  expensive.daily_budget_ils × 0.15,   # §22: scale_down ≤ 15%/step
+  winner.daily_budget_ils    × 0.20,   # §3 Branch A: scale_up 20%/step
+  ₪200                                  # safety cap on daily movement
+)
+```
+
+הסף התחתון: `delta_ils ≥ ₪10`. מתחת לזה — רעש, log SKIP.
+
+### למה לא לאחד הכל ב-`portfolio_rebalance` task_type?
+
+שיקלנו את זה. הבעיה: rebalance הוא **שתי פעולות נפרדות** ב-Meta (UPDATE budget על שני adsets שונים). אם אחד מצליח והשני נכשל, יש מצב לא-עקבי. שני proposals נפרדים מהדהדים את הריאליות של ה-API — האופרטור רואה שני אישורים מקושרים, יכול לאשר/לדחות יחד או בנפרד, וה-execute_task מטפל בכל אחד עצמאית. השדה `expected_impact.linked_to_*` ב-payload מאפשר ל-UI אחר-כך להציג אותם כיחידה.
+
+### מתי **לא** לעשות rebalance
+
+- כל המועמדים hands_off (`monthly_brief.is_current_month + hands_off_campaign_ids` מכסים את כל הזוגות).
+- tracking_health_status != 'healthy' — measurement שבור עושה כל rebalance הימור.
+- אין hungry_winner ATALL — אין למי להעביר.
+- אין expensive_stable — מי שמת לב, יש כאן מצב כשהתיק "כולו מנצח" שזה דוקא מצב טוב לסקייל-אפ הוליסטי (קרה כשתקציב חודשי underrun + winner — מטופל ב-§T10, לא ב-§T11).
+- delta_ils < ₪10 — לא שווה את החיכוך של תור-אישור.
+
+### תזכורת: רק זוג אחד לריצה
+
+§T11 שולח **rebalance pair אחד בלבד לריצה** (הזוג העליון לפי הדירוגים). הזוגות הבאים נשמרים לריצות עתידיות אחרי ש-Meta הזיזה למידה ל-72 שעות. זה מותאם לפילוסופיית Andromeda של "let it stabilize".

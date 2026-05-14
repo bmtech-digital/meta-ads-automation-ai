@@ -70,7 +70,7 @@ E2E lives in [`e2e/`](e2e/). Unit tests are colocated as `<file>.test.ts` next t
 4. **No CSS files outside `globals.css`.** Tailwind for everything. Custom CSS goes into `globals.css` with a comment explaining why a utility class wasn't enough.
 5. **Image uploads** go to `web/uploads/` in dev (gitignored) or to the gallery GCS bucket in prod. The same dual-mode pattern applies — see [`src/lib/storage.ts`](src/lib/storage.ts).
 6. **API routes are thin.** [`src/app/api/`](src/app/api/) handlers should validate with Zod, call into `src/lib/db/`, and return JSON. Business logic doesn't belong in route handlers.
-7. **No direct Meta API calls from the web.** Meta is the agent's territory. The web reads `agent_decisions` / `approvals` / `creative_gallery` and triggers runners via [`src/app/api/runners/trigger/`](src/app/api/runners/trigger/).
+7. **No direct Meta *write* calls from the web.** Meta writes (publish post, create/update campaign) stay the agent's territory and only fire after an approved `approvals` row. Meta *reads* — OAuth bootstrap, asset discovery, capability readiness — are allowed from web routes under [`src/app/api/meta/`](src/app/api/meta/) via the capability layer at [`src/lib/meta-capabilities.ts`](src/lib/meta-capabilities.ts). Updated by [`decisions-log.md §1.12`](../docs/plans/decisions-log.md) — see [`meta-integration-readiness.md`](../docs/plans/meta-integration-readiness.md) for the dual-path token model.
 
 ## What NOT to do here
 
@@ -86,5 +86,6 @@ E2E lives in [`e2e/`](e2e/). Unit tests are colocated as `<file>.test.ts` next t
 | Frontend PRD | [`../docs/plans/campaigner-frontend-prd.md`](../docs/plans/campaigner-frontend-prd.md) |
 | Backend PRD (the data this UI reads) | [`../docs/plans/campaigner-backend-prd.md`](../docs/plans/campaigner-backend-prd.md) |
 | Why dual-mode adapters | [`../docs/plans/decisions-log.md`](../docs/plans/decisions-log.md) §1.4 |
+| Meta integration plan (OAuth, capability layer, App Review) | [`../docs/plans/meta-integration-readiness.md`](../docs/plans/meta-integration-readiness.md) + [`decisions-log.md §1.12`](../docs/plans/decisions-log.md) |
 | The deployment manifest | [`../kubefiles/web_deployment.yaml`](../kubefiles/web_deployment.yaml) |
 | Setup + Docker commands | [`README.md`](README.md) |

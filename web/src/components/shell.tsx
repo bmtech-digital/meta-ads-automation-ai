@@ -34,9 +34,11 @@ export function Shell({
   return (
     <>
       <Nav active={active} right={headerRight} />
+      {/* Header is `fixed` (floating-pills pattern) — main content offsets the
+          ~80px header + 24px breathing room with pt-28. */}
       <main
         className={cn(
-          "mx-auto w-full px-4 sm:px-6 py-8 sm:py-10 animate-fade-in",
+          "mx-auto w-full px-4 sm:px-6 pt-28 pb-10 sm:pb-12 animate-fade-in",
           widthCls,
           className,
         )}
@@ -61,21 +63,24 @@ export function PageHeader({
   actions,
 }: PageHeaderProps) {
   return (
-    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    // mb-12 gives the title room to breathe — every page reads "anchored"
+    // around the heading instead of "tight stack of sections". Eyebrow wider
+    // tracking + slightly larger gap; subtitle is its own row, not crammed.
+    <div className="mb-12 flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
       <div
         className={cn(
-          "flex flex-col gap-1.5",
+          "flex flex-col gap-3",
           eyebrow ? "page-eyebrow-rule" : undefined,
         )}
       >
         {eyebrow ? (
-          <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-500 dark:text-brand-400">
+          <span className="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-brand-500 dark:text-brand-400">
             {eyebrow}
           </span>
         ) : null}
-        <h1 className="text-h1 text-balance">{title}</h1>
+        <h1 className="text-display text-balance">{title}</h1>
         {subtitle ? (
-          <p className="max-w-prose text-[14.5px] leading-relaxed text-muted-foreground">
+          <p className="max-w-prose text-[15px] leading-relaxed text-muted-foreground">
             {subtitle}
           </p>
         ) : null}

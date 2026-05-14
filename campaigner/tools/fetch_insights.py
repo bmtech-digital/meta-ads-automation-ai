@@ -40,6 +40,13 @@ def main() -> None:
         default=None,
         help="Comma-separated insights fields to request (optional; uses sensible defaults)",
     )
+    p.add_argument(
+        "--with-prior-window",
+        action="store_true",
+        help="Also fetch the prior equal-length window (days N..2N back) and "
+        "merge into rows as *_current / *_prior / delta_*_pct. Used by §T2+ "
+        "Pre-check 2 (marginal-CPM guard) and §T_SD trend detection.",
+    )
     args = p.parse_args()
 
     if args.days <= 0 or args.days > 90:
@@ -55,11 +62,18 @@ def main() -> None:
         return
 
     try:
-        rows = client.fetch_insights(
-            level=args.level,
-            date_preset=f"last_{args.days}d",
-            fields=fields,
-        )
+        if args.with_prior_window:
+            rows = client.fetch_insights_with_prior_window(
+                level=args.level,
+                days=args.days,
+                fields=fields,
+            )
+        else:
+            rows = client.fetch_insights(
+                level=args.level,
+                date_preset=f"last_{args.days}d",
+                fields=fields,
+            )
     except Exception as e:
         emit_runtime_error(f"Meta insights fetch failed: {e}", exc=e)
         return
@@ -70,6 +84,7 @@ def main() -> None:
             "level": args.level,
             "days": args.days,
             "fields": fields,
+            "with_prior_window": args.with_prior_window,
             "row_count": len(rows),
             "rows": rows,
         }

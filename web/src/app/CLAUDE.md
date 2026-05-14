@@ -17,6 +17,8 @@ Next.js 15 **App Router** routes. One folder per route segment, each with `page.
 | `/campaigns` ([`campaigns/`](campaigns/)) | Active campaigns view (read-only mirror of Meta state) | required |
 | `/gallery` ([`gallery/`](gallery/)) | Creative gallery (generated assets, with live-campaign overlays) | required |
 | `/history` ([`history/`](history/)) | Decision history (`agent_decisions` rows) | required |
+| `/reports` ([`reports/`](reports/)) | Monthly client-facing reports — index + `[month]/` detail (Block 10, 2026-05-13) | required |
+| `/ab-tests` ([`ab-tests/`](ab-tests/)) | A/B test orchestration — index + `[id]/` detail with variants + winner snapshot (Block 11, 2026-05-13) | required |
 | `/runs/[run_id]/` ([`runs/`](runs/)) | Single-run trail viewer | required |
 | `/settings` ([`settings/`](settings/)) | Per-business settings (token expiry, baselines confidence) | required |
 | `/api/health/` ([`api/health/`](api/health/)) | Readiness probe for k8s | none |

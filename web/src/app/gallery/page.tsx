@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -6,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Shell, PageHeader } from "@/components/shell";
+import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import {
@@ -20,9 +22,11 @@ import {
   type FacebookPagePost,
   type InstagramMedia,
 } from "@/lib/meta";
+import { tryGetTokenForBusiness } from "@/lib/meta-tokens";
 import { GalleryClient, type CreativeUsage } from "./gallery-client";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = { title: "נכסי קריאייטיב" };
 
 function buildCreativeUsage(ads: MetaAdWithCreative[]): CreativeUsage {
   const byCreative = new Map<string, MetaAdWithCreative[]>();
@@ -40,14 +44,12 @@ export default async function GalleryPage() {
   if (!session) redirect("/login?next=/gallery");
 
   const db = getDataClient();
-  const business = process.env.BUSINESS_ID
-    ? await db.getBusinessById(process.env.BUSINESS_ID)
-    : await db.getFirstBusiness();
+  const business = await getActiveBusiness();
 
   if (!business) {
     return (
       <Shell active="/gallery">
-        <PageHeader eyebrow="גלריה" title="גלריית נכסים" />
+        <PageHeader eyebrow="גלריה" title="נכסי קריאייטיב" />
         <Card>
           <CardHeader>
             <CardTitle>אין עסק ב-DB</CardTitle>
@@ -60,31 +62,32 @@ export default async function GalleryPage() {
 
   const assets = await db.listGalleryAssets(business.id);
 
+  // Resolve token once for all Meta calls below. tryGetTokenForBusiness
+  // returns null when there's no connection / token is expired — we surface
+  // that as metaError so the page still renders the local gallery.
+  const resolved = await tryGetTokenForBusiness(db, business);
+  const userToken = resolved?.token ?? null;
+
   let creativeUsage: CreativeUsage = {};
   let adInsights: Record<string, AdInsightsRow> = {};
   let videoSources: Record<string, string> = {};
   let metaError: string | null = null;
-  if (business.meta_ad_account_id) {
+  if (userToken && business.meta_ad_account_id) {
     try {
-      // Run ads + insights queries in parallel — both depend only on the ad
-      // account id and there's no point in serializing them.
       const [ads, insights] = await Promise.all([
-        listAdsWithCreativeAndCampaign(business.meta_ad_account_id),
-        listAdInsights(business.meta_ad_account_id),
+        listAdsWithCreativeAndCampaign(userToken, business.meta_ad_account_id),
+        listAdInsights(userToken, business.meta_ad_account_id),
       ]);
       creativeUsage = buildCreativeUsage(ads);
       adInsights = insights;
 
-      // Resolve video sources for every unique video_id in live ads — lets
-      // us embed an actual <video> player in the live tiles instead of just
-      // a thumbnail. Skipped silently if the page id is missing; falls back
-      // to thumbnails per-video on any failure.
       const uniqueVideoIds = new Set<string>();
       for (const ad of ads) {
         if (ad.creative_video_id) uniqueVideoIds.add(ad.creative_video_id);
       }
       if (uniqueVideoIds.size > 0 && business.meta_page_id) {
         videoSources = await listVideoSources(
+          userToken,
           Array.from(uniqueVideoIds),
           business.meta_page_id,
         );
@@ -92,28 +95,34 @@ export default async function GalleryPage() {
     } catch (e) {
       metaError = e instanceof Error ? e.message : "meta_lookup_failed";
     }
+  } else if (!userToken) {
+    metaError = "no_active_connection";
   }
 
-  // Organic feeds — each fetched independently so a broken FB scope doesn't
-  // hide the IG feed (and vice versa). All errors surface to the client.
   let fbPosts: FacebookPagePost[] = [];
   let fbError: string | null = null;
   let igPosts: InstagramMedia[] = [];
   let igError: string | null = null;
 
-  if (business.meta_page_id) {
+  if (userToken && business.meta_page_id) {
     try {
-      fbPosts = await listPagePosts(business.meta_page_id);
+      fbPosts = await listPagePosts(userToken, business.meta_page_id);
     } catch (e) {
       fbError = e instanceof Error ? e.message : "facebook_fetch_failed";
     }
 
     try {
       const igUserId = await getInstagramAccountIdForPage(
+        userToken,
         business.meta_page_id,
       );
       if (igUserId) {
-        igPosts = await listInstagramMedia(igUserId, 50, business.meta_page_id);
+        igPosts = await listInstagramMedia(
+          userToken,
+          igUserId,
+          50,
+          business.meta_page_id,
+        );
       } else {
         igError = "no_instagram_business_account_linked_to_page";
       }
@@ -126,7 +135,7 @@ export default async function GalleryPage() {
     <Shell active="/gallery" width="wide">
       <PageHeader
         eyebrow="גלריה"
-        title="גלריית נכסים"
+        title="נכסי קריאייטיב"
         subtitle="תמונות וסרטונים שמהם הסוכן מושך קריאייטיב כשמוצע new_creative או new_campaign. תמונות: JPEG/PNG/WebP עד 30MB. וידאו: MP4/MOV עד 4GB, 1–241 שניות, aspect 1:1/4:5/9:16/16:9."
       />
       <GalleryClient

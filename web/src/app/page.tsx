@@ -7,6 +7,8 @@ import { Shell, PageHeader, SectionHeader } from "@/components/shell";
 import { PulseDot } from "@/components/brand/icons";
 import { RunNowButton } from "@/components/run-now-button";
 import { BudgetHealthCard } from "@/components/budget-health-card";
+import { CountUp } from "@/components/count-up";
+import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import {
@@ -19,6 +21,7 @@ import {
   truncate,
 } from "@/lib/approvals-fmt";
 import type {
+  AgentDecision,
   Approval,
   Business,
   Heartbeat,
@@ -30,6 +33,24 @@ import {
   tokenStateLabelHe,
   tokenStateStyles,
 } from "@/lib/token-expiry";
+import {
+  bandMedianHe,
+  classifyAgainstBenchmark,
+  formatBandHe,
+  getBenchmark,
+  verdictHe,
+  type KpiBenchmark,
+  type KpiKind,
+} from "@/lib/kpi-benchmarks";
+import {
+  estimateCPL,
+  matchSubVertical,
+  monthOf,
+  pickGeoTier,
+  SUBVERTICALS,
+  type EstimateResult,
+} from "@/lib/cpl-infrastructure";
+import { ResearchBenchmarkButton } from "@/components/research-benchmark-button";
 
 const INBOX_PREVIEW_LIMIT = 5;
 
@@ -44,6 +65,11 @@ const FLOWS: Array<{ flow: HeartbeatFlow; label: string; schedule: string }> = [
     flow: "weekly_creative_firehose",
     label: "ייצור קריאייטיבים",
     schedule: "שני 10:00",
+  },
+  {
+    flow: "weekly_competitive_research",
+    label: "מחקר תחרותי שבועי",
+    schedule: "שני 11:00",
   },
 ];
 
@@ -75,13 +101,10 @@ export default async function HomePage() {
   if (!session) redirect("/login");
 
   const db = getDataClient();
-  const business = process.env.BUSINESS_ID
-    ? await db.getBusinessById(process.env.BUSINESS_ID)
-    : await db.getFirstBusiness();
+  const business = await getActiveBusiness();
 
   const heartbeats = business ? await db.getLatestHeartbeats(business.id) : [];
   const byFlow = new Map(heartbeats.map((h) => [h.flow, h]));
-  const allowLocalRunners = process.env.NODE_ENV !== "production";
   const pendingApprovals = business
     ? await db.listPendingApprovals(business.id)
     : [];
@@ -92,6 +115,38 @@ export default async function HomePage() {
   );
   const budgetHealth = business
     ? await db.getLatestBudgetHealthDecision(business.id)
+    : null;
+  const knowledge = business
+    ? await db.getBusinessKnowledge(business.id)
+    : null;
+  // Read the latest agent-researched benchmark for the business's primary
+  // KPI. When present, the dashboard tile shows the business-specific value
+  // (researched via WebSearch grounded in business_knowledge); when null,
+  // it falls back to the generic per-vertical band and labels the source
+  // honestly. The CTA button on the tile triggers the agent to research.
+  const primaryKpi = business?.primary_kpi as
+    | "cpa"
+    | "cpl"
+    | "roas"
+    | null
+    | undefined;
+  const kpiResearch =
+    business && primaryKpi && ["cpa", "cpl", "roas"].includes(primaryKpi)
+      ? await db.getLatestKpiResearch(business.id, primaryKpi)
+      : null;
+  // Resolve the connection's real expiry — the `business.meta_access_token_expires_at`
+  // column may not be mirrored on auto-provisioned businesses from before
+  // the OAuth-callback mirror step landed. The connection is the truth.
+  const connection = business
+    ? await db.getConnectionByAdAccountId(business.meta_ad_account_id)
+    : null;
+  const businessForToken: Business | null = business
+    ? {
+        ...business,
+        meta_access_token_expires_at:
+          connection?.token_expires_at ??
+          business.meta_access_token_expires_at,
+      }
     : null;
 
   return (
@@ -118,9 +173,11 @@ export default async function HomePage() {
         }
       />
 
-      {business ? (
+      {business && businessForToken ? (
         <div className="flex flex-col gap-10">
-          <TokenExpiryBanner business={business} />
+          <TokenExpiryBanner business={businessForToken} />
+
+          <SpendHero business={business} budgetHealth={budgetHealth} />
 
           <BudgetHealthCard business={business} decision={budgetHealth} />
 
@@ -143,7 +200,7 @@ export default async function HomePage() {
                 </Link>
               }
             />
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
               <KpiTile
                 label="תקציב פרסום חודשי"
                 value={
@@ -170,12 +227,17 @@ export default async function HomePage() {
                 value={(business.primary_kpi ?? "—").toString().toUpperCase()}
                 hint="נגזר מה-vertical"
               />
+              <KpiTargetTile
+                business={business}
+                knowledge={knowledge}
+                research={kpiResearch}
+              />
             </div>
-            <dl className="mt-5 grid grid-cols-1 gap-y-2.5 gap-x-8 rounded-lg border border-border bg-card/40 p-4 text-[13px] sm:grid-cols-[auto_1fr]">
+            <dl className="glass-surface mt-5 grid grid-cols-1 gap-y-2.5 gap-x-8 rounded-lg p-4 text-[13px] sm:grid-cols-[auto_1fr]">
               <MetaRow label="חשבון Meta" value={business.meta_ad_account_id} />
-              <MetaRow label="Page ID" value={business.meta_page_id} />
+              <MetaRow label="Page ID" value={business.meta_page_id ?? "—"} />
               <MetaRow label="מזהה עסק" value={business.id} />
-              <TokenRow business={business} />
+              <TokenRow business={businessForToken} />
             </dl>
           </section>
 
@@ -184,7 +246,7 @@ export default async function HomePage() {
               title="סריקה אחרונה"
               description="כל runner כותב heartbeat ל-Supabase בכל start / end / error. אם משהו לא התחדש מעל ״הצפוי״ — יש בעיה."
             />
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card/40">
+            <ul className="glass-surface divide-y divide-border/60 rounded-lg overflow-hidden">
               {FLOWS.map(({ flow, label, schedule }) => {
                 const hb = byFlow.get(flow);
                 const meta = phaseMeta(hb);
@@ -212,7 +274,7 @@ export default async function HomePage() {
                       <span className={`text-xs font-semibold ${meta.cls}`}>
                         {meta.label}
                       </span>
-                      {allowLocalRunners ? <RunNowButton flow={flow} /> : null}
+                      <RunNowButton flow={flow} />
                     </div>
                   </li>
                 );
@@ -231,7 +293,11 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   return (
     <>
       <dt className="text-muted-foreground">{label}</dt>
-      <dd className="mono-ltr text-[12.5px] text-foreground/90">{value}</dd>
+      {/* dd stays in RTL (inherit) so value aligns naturally to the right,
+          next to the label. Only the LTR ID is isolated inside .mono-ltr. */}
+      <dd className="text-[12.5px] text-foreground/90">
+        <span className="mono-ltr">{value}</span>
+      </dd>
     </>
   );
 }
@@ -241,7 +307,9 @@ function TokenRow({ business }: { business: Business }) {
   return (
     <>
       <dt className="text-muted-foreground">טוקן Meta</dt>
-      <dd className="flex items-center gap-2">
+      {/* justify-end pushes the badge + link to the right edge of the
+          stretched dd column, lining them up with the right-aligned label. */}
+      <dd className="flex items-center justify-end gap-2">
         <span
           className={`inline-flex items-center rounded-full border px-2 py-[1px] text-[11.5px] font-medium ${tokenStateStyles(state)}`}
         >
@@ -295,6 +363,336 @@ function TokenExpiryBanner({ business }: { business: Business }) {
   );
 }
 
+// Hebrew labels for the sub-verticals we display on the dashboard tile.
+// Keep in sync with SUBVERTICALS keys in `lib/cpl-infrastructure.ts`. The
+// map only covers sub-verticals that are likely to render on the dashboard
+// — the rest fall through to the raw key.
+const SUB_VERTICAL_HE: Record<string, string> = {
+  real_estate_residential: "נדל\"ן מגורים",
+  real_estate_commercial: "נדל\"ן מסחרי",
+  home_services: "שירותי בית",
+  renovation_contractor: "קבלן שיפוצים",
+  insurance_agent: "סוכן ביטוח",
+  automotive_dealer: "סוכנות רכב",
+  automotive_service: "מוסך / שירות רכב",
+  beauty_aesthetic: "אסתטיקה",
+  wellness_alt: "רפואה משלימה",
+  fitness_studio: "סטודיו כושר",
+  dental_clinic: "מרפאת שיניים",
+  private_clinic: "מרפאה פרטית",
+  legal_personal: "עו\"ד אישי",
+  legal_corporate: "עו\"ד מסחרי",
+  accounting_tax: "רואה חשבון / מס",
+  education_private: "מורה / שיעורי עזר",
+  education_university: "השכלה גבוהה",
+  saas_horizontal: "SaaS כללי",
+  saas_marketing_tech: "טכנולוגיית שיווק",
+  saas_dev_tech: "טכנולוגיה למפתחים",
+  agency_services: "סוכנות שיווק",
+  ai_chatbot_services: "סוכני AI / צ'אט-בוטים",
+  ai_video_production: "הפקת סרטוני AI",
+  ai_campaign_management: "ניהול קמפיינים AI",
+  ecom_fashion: "אי-קומרס אופנה",
+  ecom_beauty_products: "אי-קומרס טיפוח",
+  ecom_electronics: "אי-קומרס אלקטרוניקה",
+  ecom_home_goods: "אי-קומרס מוצרי בית",
+  ecom_food_supplements: "אי-קומרס תוספי תזונה",
+};
+
+/**
+ * Static rich CPL estimate derived from business_knowledge — sub-vertical ×
+ * geo × cold × consultation × CTWA-or-lead-form × current month. Returns
+ * null when match falls back to `other` (no products / no vertical) so the
+ * caller can fall through to the flat per-vertical band.
+ *
+ * This is the Tier-2 source in the three-tier hierarchy on KpiTargetTile:
+ *   Tier 1 — agent live research (research approval exists)
+ *   Tier 2 — this static rich estimate
+ *   Tier 3 — flat per-vertical band from kpi-benchmarks
+ */
+function computeRichEstimate({
+  kpi,
+  knowledge,
+  business,
+}: {
+  kpi: KpiKind | null;
+  knowledge: {
+    vertical: string | null;
+    service_regions: string[] | null;
+    products: { name: string; description?: string }[] | null;
+    questionnaire_answers: Record<string, unknown> | null;
+  } | null;
+  business: Business;
+}): (EstimateResult & { matchedSubVerticalHe: string }) | null {
+  if (!kpi || !knowledge) return null;
+  if (kpi === "roas") return null; // ROAS isn't modeled by the multiplier stack.
+  const productsBlob = (knowledge.products ?? [])
+    .map((p) => `${p.name}${p.description ? " — " + p.description : ""}`)
+    .join("  ");
+  const qa = knowledge.questionnaire_answers ?? {};
+  const match = matchSubVertical({
+    vertical: knowledge.vertical as
+      | "ecommerce"
+      | "leads"
+      | "b2b_saas"
+      | "awareness"
+      | "app"
+      | "other"
+      | null,
+    products_raw: productsBlob || null,
+    ideal_customer: (qa.ideal_customer as string | undefined) ?? null,
+    usp: (qa.usp as string | undefined) ?? null,
+    main_pain: (qa.main_pain as string | undefined) ?? null,
+  });
+  if (match.confidence_of_match === "fallback") return null;
+  const cell = SUBVERTICALS[match.sub];
+  // Default channel: B2C services → CTWA (IL baseline); everything else
+  // → lead_form. Mirrors the Python tool's default in estimate_cpl.py.
+  const defaultChannel: "click_to_whatsapp" | "lead_form" =
+    cell.parent === "leads" ? "click_to_whatsapp" : "lead_form";
+  const estimate = estimateCPL({
+    sub: match.sub,
+    geo: pickGeoTier(knowledge.service_regions),
+    stage: "cold",
+    offer: "consultation_free",
+    channel: defaultChannel,
+    month: monthOf(new Date()),
+    security_event: false,
+  });
+  return {
+    ...estimate,
+    matchedSubVerticalHe: SUB_VERTICAL_HE[match.sub] ?? match.sub,
+  };
+}
+
+/**
+ * KpiTargetTile — surfaces the *target value* for the business's primary KPI
+ * (per migration 019), alongside the Israeli-market benchmark band for the
+ * business's vertical (per kpi-benchmarks.ts). The user shouldn't have to
+ * invent a target; we show what's realistic and let them see at a glance
+ * whether their target is "מעל הממוצע" / "בטווח" / "לא ריאלי".
+ *
+ * The agent's §T-2 reality-check gate uses the same band — if the operator's
+ * target is implausibly low, the agent emits an alert before optimizing
+ * toward it.
+ */
+function KpiTargetTile({
+  business,
+  knowledge,
+  research,
+}: {
+  business: Business;
+  knowledge: {
+    vertical: string | null;
+    service_regions: string[] | null;
+    products: { name: string; description?: string }[] | null;
+    questionnaire_answers: Record<string, unknown> | null;
+  } | null;
+  /** Agent-researched market average for this business+KPI, or null when not yet researched. */
+  research: {
+    market_average: number;
+    range_low: number | null;
+    range_high: number | null;
+    sources_count: number;
+    researched_at: string | null;
+    approval_id: string;
+  } | null;
+}) {
+  const kpi = business.primary_kpi as KpiKind | null;
+  let target: number | null = null;
+  let label = "יעד KPI";
+  let unitPrefix = "";
+  let unitSuffix = "";
+  if (kpi === "cpa") {
+    target = business.target_cpa_ils;
+    label = "יעד עלות להשגה (CPA)";
+    unitPrefix = "≤ ₪";
+  } else if (kpi === "cpl") {
+    target = business.target_cpl_ils;
+    label = "יעד עלות לליד (CPL)";
+    unitPrefix = "≤ ₪";
+  } else if (kpi === "roas") {
+    target = business.target_roas;
+    label = "יעד החזר על הפרסום (ROAS)";
+    unitSuffix = "x";
+  }
+  const hasTarget = target !== null && target !== undefined;
+  const vertical = (knowledge?.vertical ?? null) as
+    | "ecommerce"
+    | "leads"
+    | "b2b_saas"
+    | "awareness"
+    | "app"
+    | "other"
+    | null;
+  const band = kpi ? getBenchmark(vertical, kpi) : null;
+  // Rich per-business estimate (Block 2026-05-13). Only computed for CPL/CPA
+  // verticals where we have a sub-vertical match — otherwise we fall back to
+  // the flat band below. ROAS isn't modeled by the rich estimator (it's an
+  // output ratio, not a CPL); the flat band still covers it.
+  const richEstimate = computeRichEstimate({
+    kpi,
+    knowledge,
+    business,
+  });
+  // Build a band-shaped object out of the rich estimate so the existing
+  // classifier can score the operator's target against it. The classifier
+  // expects `(value, kpi, band)` — we synthesize the band from the rich
+  // estimate's value + band tuple.
+  const effectiveBand: KpiBenchmark | null = richEstimate
+    ? {
+        implausible_below: Math.round(richEstimate.band_ils[0] * 0.4),
+        good_max: richEstimate.band_ils[0],
+        median: richEstimate.value_ils,
+        realistic_max: richEstimate.band_ils[1],
+        unambitious_above: Math.round(richEstimate.band_ils[1] * 2.5),
+        source_note: "rich estimate (cpl-infrastructure)",
+      }
+    : band;
+  const verdict =
+    hasTarget && effectiveBand && kpi
+      ? classifyAgainstBenchmark(target!, kpi, effectiveBand)
+      : null;
+  const verdictUi = verdict ? verdictHe(verdict) : null;
+  const toneClass: Record<string, string> = {
+    good: "text-emerald-600 dark:text-emerald-400",
+    ok: "text-muted-foreground",
+    warn: "text-amber-600 dark:text-amber-400",
+    bad: "text-red-600 dark:text-red-400",
+  };
+  const ringClass = !kpi
+    ? ""
+    : !hasTarget
+      ? "ring-1 ring-amber-500/40"
+      : verdictUi?.tone === "bad"
+        ? "ring-1 ring-red-500/40"
+        : verdictUi?.tone === "warn"
+          ? "ring-1 ring-amber-500/30"
+          : "";
+
+  return (
+    <div
+      className={
+        "glass-panel group relative overflow-hidden rounded-lg p-4 transition-transform hover:-translate-y-0.5 " +
+        ringClass
+      }
+    >
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">
+          {label}
+        </span>
+        {hasTarget && verdictUi ? (
+          <span
+            className={
+              "text-[10.5px] font-semibold " + toneClass[verdictUi.tone]
+            }
+          >
+            {verdictUi.label}
+          </span>
+        ) : !hasTarget ? (
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-amber-500"
+            aria-hidden
+          />
+        ) : null}
+      </div>
+      <div className="mt-2 font-tabular text-[26px] font-semibold leading-none tracking-[-0.02em]">
+        {hasTarget
+          ? `${unitPrefix}${Number(target).toLocaleString("he-IL")}${unitSuffix}`
+          : "לא הוגדר"}
+      </div>
+      {/* Honest source labeling: when the agent has researched a
+          business-specific value, show that prominently with "ממוצע השוק
+          (לעסק שלך)" + sources count. Otherwise show the generic
+          per-vertical band labeled clearly as "ממוצע ענפי כללי" and offer
+          a CTA to trigger the agent's research. */}
+      {research && kpi ? (
+        // Tier 1 — agent has run live research (highest signal).
+        <div className="mt-2 flex items-baseline justify-between gap-2 rounded-md border border-emerald-300/60 bg-emerald-50/40 px-2 py-1.5 dark:border-emerald-500/30 dark:bg-emerald-950/20">
+          <div className="flex flex-col">
+            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+              ממוצע השוק (לעסק שלך)
+            </span>
+            <span className="text-[9.5px] text-emerald-700/80 dark:text-emerald-400/70">
+              {research.sources_count > 0
+                ? `מבוסס על ${research.sources_count} מקורות שהסוכן חקר`
+                : "מחקר הסוכן"}
+            </span>
+          </div>
+          <span className="font-tabular text-[15px] font-bold text-emerald-900 dark:text-emerald-100">
+            {kpi === "roas"
+              ? `${research.market_average}x`
+              : `₪${Math.round(research.market_average).toLocaleString("he-IL")}`}
+          </span>
+        </div>
+      ) : richEstimate && kpi ? (
+        // Tier 2 — static rich estimate from cpl-infrastructure. Tailored
+        // to sub-vertical + geo + funnel-stage defaults; no WebSearch.
+        <div className="mt-2 flex items-baseline justify-between gap-2 rounded-md border border-sky-300/60 bg-sky-50/40 px-2 py-1.5 dark:border-sky-500/30 dark:bg-sky-950/20">
+          <div className="flex flex-col">
+            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-sky-800 dark:text-sky-300">
+              ממוצע מותאם לעסק שלך (אומדן)
+            </span>
+            <span className="text-[9.5px] text-sky-700/80 dark:text-sky-400/70">
+              {`לפי ${richEstimate.matchedSubVerticalHe} · ₪${richEstimate.band_ils[0]}–₪${richEstimate.band_ils[1]}`}
+            </span>
+          </div>
+          <span className="font-tabular text-[15px] font-bold text-sky-900 dark:text-sky-100">
+            {`₪${richEstimate.value_ils.toLocaleString("he-IL")}`}
+          </span>
+        </div>
+      ) : band && kpi ? (
+        // Tier 3 — flat per-vertical fallback. Used when sub-vertical match
+        // returns `fallback` (no products/vertical) or KPI is ROAS.
+        <div className="mt-2 flex items-baseline justify-between gap-2 rounded-md border border-border/60 bg-background/50 px-2 py-1.5">
+          <div className="flex flex-col">
+            <span className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+              ממוצע ענפי כללי
+            </span>
+            <span className="text-[9.5px] text-muted-foreground/80">
+              נתון רוחבי לוורטיקל — לא ספציפי לעסק שלך
+            </span>
+          </div>
+          <span className="font-tabular text-[13.5px] font-semibold">
+            {bandMedianHe(kpi, band)}
+          </span>
+        </div>
+      ) : null}
+      {research && research.approval_id ? (
+        <Link
+          href={`/approvals/${research.approval_id}`}
+          className="mt-1 inline-flex items-center gap-1 text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+        >
+          צפה במחקר המלא
+          <ArrowLeft size={10} />
+        </Link>
+      ) : (richEstimate || band) && kpi ? (
+        <div className="mt-1.5 flex flex-col gap-1.5">
+          <div className="text-[10.5px] text-muted-foreground">
+            {richEstimate
+              ? `מודל סטטי — נסה מחקר חי לדיוק גבוה יותר`
+              : band
+                ? formatBandHe(kpi, band)
+                : ""}
+          </div>
+          <ResearchBenchmarkButton
+            currentResearchApprovalId={research?.approval_id ?? null}
+          />
+        </div>
+      ) : null}
+      {!hasTarget ? (
+        <Link
+          href="/business-knowledge"
+          className="mt-1.5 inline-flex items-center gap-1 text-[11.5px] font-medium text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
+        >
+          הגדר יעד ב-העסק שלי
+          <ArrowLeft size={11} />
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 function KpiTile({
   label,
   value,
@@ -307,7 +705,7 @@ function KpiTile({
   accent?: boolean;
 }) {
   return (
-    <div className="group relative overflow-hidden rounded-lg border border-border bg-card p-4 transition-colors hover:border-border/80">
+    <div className="glass-panel group relative overflow-hidden rounded-lg p-4 transition-transform hover:-translate-y-0.5">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-muted-foreground">
           {label}
@@ -331,7 +729,7 @@ function KpiTile({
 
 function EmptyBusinessState() {
   return (
-    <div className="rounded-lg border border-dashed border-border bg-card/30 p-10 text-center">
+    <div className="glass-surface rounded-lg p-10 text-center">
       <h2 className="text-h2">אין עסק פעיל ב-DB</h2>
       <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
         הרץ{" "}
@@ -341,6 +739,114 @@ function EmptyBusinessState() {
         כדי להריץ migrations ולטעון seed.
       </p>
     </div>
+  );
+}
+
+/**
+ * SpendHero — the dashboard's hero block. One enormous number (the
+ * month-to-date spend), one verdict, one utilization line. Inspired by
+ * Mercury's financial dashboards: contrast + grid precision communicate
+ * "control over complex metrics".
+ *
+ * The number plays a count-up animation on first paint — turning a static
+ * value into a moment. If the agent hasn't recorded a pace decision yet,
+ * we still render a quiet version using the configured monthly budget so
+ * the hero never collapses.
+ */
+function SpendHero({
+  business,
+  budgetHealth,
+}: {
+  business: Business;
+  budgetHealth: AgentDecision | null;
+}) {
+  const outputs = (budgetHealth?.outputs ?? {}) as {
+    spend_this_month?: number;
+    effective_monthly_budget?: number;
+    pace?: number | null;
+    status?: "ok" | "overrun" | "underrun" | "no_budget_set";
+  };
+  const spend = Math.round(outputs.spend_this_month ?? 0);
+  const budget =
+    outputs.effective_monthly_budget ??
+    (business.monthly_budget_ils ? Number(business.monthly_budget_ils) : 0);
+  const pacePct =
+    outputs.pace !== undefined && outputs.pace !== null
+      ? Math.round(outputs.pace * 100)
+      : null;
+  const utilization =
+    budget > 0 ? Math.min(100, Math.round((spend / budget) * 100)) : null;
+
+  const status = outputs.status ?? (budget > 0 ? "ok" : "no_budget_set");
+  const verdict =
+    status === "overrun"
+      ? { label: "חריגה בקצב", tone: "text-destructive" }
+      : status === "underrun"
+        ? { label: "תת-ניצול", tone: "text-warning" }
+        : status === "no_budget_set"
+          ? {
+              label: "תקציב חודשי לא מוגדר",
+              tone: "text-muted-foreground",
+            }
+          : { label: "בקצב", tone: "text-success" };
+
+  return (
+    <section className="relative overflow-hidden">
+      <div className="flex flex-col gap-1">
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          הוצאה החודש
+        </span>
+        <div
+          className="font-tabular leading-[0.95] tracking-[-0.04em]"
+          style={{ fontSize: "clamp(56px, 9vw, 96px)", fontWeight: 700 }}
+        >
+          <span className="text-muted-foreground/70">₪</span>
+          <CountUp value={spend} className="text-foreground" />
+        </div>
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[14.5px]">
+          <span className={`font-semibold ${verdict.tone}`}>
+            {verdict.label}
+          </span>
+          {pacePct !== null ? (
+            <span className="text-muted-foreground">
+              ·{" "}
+              <span className="font-tabular text-foreground">{pacePct}%</span>{" "}
+              מהצפוי
+            </span>
+          ) : null}
+          {budget > 0 ? (
+            <span className="text-muted-foreground">
+              · מתוך{" "}
+              <span className="font-tabular text-foreground">
+                ₪{budget.toLocaleString("he-IL")}
+              </span>
+            </span>
+          ) : null}
+        </div>
+
+        {utilization !== null ? (
+          <div
+            className="mt-5 h-[3px] w-full max-w-md overflow-hidden rounded-full bg-foreground/8 dark:bg-foreground/12"
+            role="progressbar"
+            aria-valuenow={utilization}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="ניצול תקציב חודשי"
+          >
+            <div
+              className={`h-full rounded-full transition-[width] duration-[1100ms] ease-out ${
+                status === "overrun"
+                  ? "bg-destructive"
+                  : status === "underrun"
+                    ? "bg-warning"
+                    : "bg-brand-500 dark:bg-brand-400"
+              }`}
+              style={{ width: `${utilization}%` }}
+            />
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
@@ -356,7 +862,7 @@ function ApprovalsInbox({
   if (total === 0) {
     return (
       <section>
-        <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-card/40 p-5">
+        <div className="glass-surface flex items-center justify-between gap-4 rounded-lg p-5">
           <div className="flex items-center gap-3">
             <PulseDot tone="idle" />
             <div className="flex flex-col">
@@ -399,7 +905,7 @@ function ApprovalsInbox({
           </Link>
         }
       />
-      <ul className="overflow-hidden rounded-lg border border-border bg-card/40">
+      <ul className="glass-surface overflow-hidden rounded-lg">
         {preview.map((a, i) => {
           const hrReason = requiresHumanReview(a);
           const targetLabel = a.target_kind
