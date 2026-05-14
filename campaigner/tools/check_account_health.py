@@ -24,7 +24,6 @@ Contract: §11.6 (JSON stdout, exit 0/1/2).
 from __future__ import annotations
 
 import argparse
-from typing import Any
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.tools._contract import (
@@ -259,18 +258,14 @@ def _check(business_id: str) -> dict:
         "funding_source": account_data.get("funding_source"),
         "min_daily_budget": account_data.get("min_daily_budget"),
         "business_country_code": account_data.get("business_country_code"),
-        "rejected_ads_30d_count": (
-            rejected_count if rejected_count >= 0 else None
-        ),
+        "rejected_ads_30d_count": (rejected_count if rejected_count >= 0 else None),
         "health_band": band,
         "signals": signals,
     }
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Pull Meta account-level health signals + classify."
-    )
+    p = argparse.ArgumentParser(description="Pull Meta account-level health signals + classify.")
     p.add_argument("--business-id", required=True)
     args = p.parse_args()
 

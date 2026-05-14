@@ -105,9 +105,7 @@ def get_ig_publishing_target(business_id: str) -> tuple[str, str]:
         (business_id,),
     )
     if fallback and fallback.get("page_access_token_encrypted"):
-        return fallback["ig_user_id"], decrypt_token(
-            fallback["page_access_token_encrypted"]
-        )
+        return fallback["ig_user_id"], decrypt_token(fallback["page_access_token_encrypted"])
 
     raise TokenLookupError(
         f"no selected IG account (or no Page token to authenticate publish) "

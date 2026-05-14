@@ -52,7 +52,7 @@ Contract: §11.6 (JSON stdout, exit 0/1/2).
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.meta_client import MetaClient
@@ -225,11 +225,7 @@ def main() -> None:
             diagnostic_reason = "current_window_zero_conversions"
         elif prior_cpr is None or not prior:
             diagnostic_only = True
-            diagnostic_reason = (
-                "prior_window_zero_conversions"
-                if prior
-                else "no_prior_window_data"
-            )
+            diagnostic_reason = "prior_window_zero_conversions" if prior else "no_prior_window_data"
         else:
             cpr_ratio = round(cur_cpr / prior_cpr, 3)
             fatigue_flag = cpr_ratio >= FATIGUE_RATIO_THRESHOLD

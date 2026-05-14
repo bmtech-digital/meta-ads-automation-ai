@@ -75,10 +75,10 @@ def _extract_plan(rationale: str) -> list[str]:
     m = _PLAN_HEADER_RX.search(rationale)
     if not m:
         return []
-    after_header = rationale[m.end():]
+    after_header = rationale[m.end() :]
     # End the plan block at the "אישור =" footer if present
     footer_m = _FOOTER_RX.search(after_header)
-    block = after_header[:footer_m.start()] if footer_m else after_header
+    block = after_header[: footer_m.start()] if footer_m else after_header
     # Capture numbered/bulleted lines as steps. We keep only non-empty trims.
     steps = []
     for sm in _STEP_LINE_RX.finditer(block):
@@ -103,8 +103,8 @@ def main() -> None:
         type=int,
         default=21,
         help="Only consider approvals approved/executed in the last N days. Default 21. "
-             "Older plans are stale — the situation has changed enough that the conditional "
-             "isn't meaningful anymore.",
+        "Older plans are stale — the situation has changed enough that the conditional "
+        "isn't meaningful anymore.",
     )
     args = p.parse_args()
 
@@ -147,7 +147,9 @@ def main() -> None:
         if key not in by_target:
             committed = r.get("committed_at")
             by_target[key] = {
-                "approval_id": str(r["source_approval_id"]) if r.get("source_approval_id") else None,
+                "approval_id": str(r["source_approval_id"])
+                if r.get("source_approval_id")
+                else None,
                 "task_type": r.get("task_type"),
                 "target_kind": r.get("target_kind"),
                 "target_id": r.get("target_id"),
@@ -203,28 +205,36 @@ def main() -> None:
             if not forward_steps:
                 continue
             committed_on = r.get("executed_at") or r.get("approved_at")
-            plans.append({
-                "approval_id": str(r["id"]),
-                "task_type": r["task_type"],
-                "target_kind": r.get("target_kind"),
-                "target_id": r.get("target_id"),
-                "status": r["status"],
-                "committed_on": committed_on.date().isoformat() if committed_on else None,
-                "step_1_already_done": steps[0],
-                "forward_steps": [{"action_text": s, "step_order": i + 2} for i, s in enumerate(forward_steps)],
-                "source": "regex_fallback",
-            })
+            plans.append(
+                {
+                    "approval_id": str(r["id"]),
+                    "task_type": r["task_type"],
+                    "target_kind": r.get("target_kind"),
+                    "target_id": r.get("target_id"),
+                    "status": r["status"],
+                    "committed_on": committed_on.date().isoformat() if committed_on else None,
+                    "step_1_already_done": steps[0],
+                    "forward_steps": [
+                        {"action_text": s, "step_order": i + 2} for i, s in enumerate(forward_steps)
+                    ],
+                    "source": "regex_fallback",
+                }
+            )
 
-    emit_success({
-        "business_id": args.business_id,
-        "lookback_days": args.days,
-        "plan_count": len(plans),
-        "plans": plans,
-        "source_summary": {
-            "plans_carryover_table": sum(1 for p in plans if p.get("source") == "plans_carryover"),
-            "regex_fallback": sum(1 for p in plans if p.get("source") == "regex_fallback"),
-        },
-    })
+    emit_success(
+        {
+            "business_id": args.business_id,
+            "lookback_days": args.days,
+            "plan_count": len(plans),
+            "plans": plans,
+            "source_summary": {
+                "plans_carryover_table": sum(
+                    1 for p in plans if p.get("source") == "plans_carryover"
+                ),
+                "regex_fallback": sum(1 for p in plans if p.get("source") == "regex_fallback"),
+            },
+        }
+    )
 
 
 if __name__ == "__main__":

@@ -28,7 +28,7 @@ Contract: §11.6 (single JSON on stdout, exit 0/1/2).
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import get_connection
@@ -38,7 +38,6 @@ from campaigner.tools._contract import (
     emit_validation_error,
     with_db_retry,
 )
-
 
 _ALLOWED_STATUS = {"ACTIVE", "PAUSED", "ARCHIVED"}
 
@@ -56,7 +55,7 @@ def _parse_meta_ts(v) -> datetime | None:
         except ValueError:
             return None
     if isinstance(v, (int, float)):
-        return datetime.fromtimestamp(v, tz=timezone.utc)
+        return datetime.fromtimestamp(v, tz=UTC)
     return None
 
 
@@ -70,8 +69,7 @@ def _aspect_from_creative(creative: dict) -> tuple[str | None, str | None]:
     object_type = (creative.get("object_type") or "").upper()
     kind = (
         "video"
-        if object_type in {"VIDEO", "SHARE"}
-        and creative.get("asset_feed_spec", {}).get("videos")
+        if object_type in {"VIDEO", "SHARE"} and creative.get("asset_feed_spec", {}).get("videos")
         else "video"
         if object_type == "VIDEO"
         else "image"
@@ -120,9 +118,7 @@ def _extract_copy(creative: dict) -> dict:
     }
 
 
-def _backfill(
-    business_id: str, effective_status: list[str], max_ads: int
-) -> dict:
+def _backfill(business_id: str, effective_status: list[str], max_ads: int) -> dict:
     from campaigner.lib.meta_client import MetaClient
 
     try:
@@ -139,7 +135,6 @@ def _backfill(
 
     # 1. List ads on the account using the SDK directly (small payload).
     try:
-        from facebook_business.adobjects.ad import Ad
         from facebook_business.adobjects.adcreative import AdCreative
 
         client._m()  # init SDK
@@ -238,8 +233,7 @@ def _backfill(
                 copy["cta"],
                 str(creative_id),
                 _parse_meta_ts(ad_row.get("created_time")),
-                (creative_data.get("name") or ad_row.get("name") or "")[:200]
-                or None,
+                (creative_data.get("name") or ad_row.get("name") or "")[:200] or None,
             ),
         )
 
@@ -266,7 +260,7 @@ def _backfill(
             skipped += 1
             continue
 
-        def _do_insert():
+        def _do_insert(cid=cid, ad=ad, creative_data=creative_data):
             with get_connection() as conn, conn.cursor() as cur:
                 _insert_one(cur, str(cid), ad, creative_data)
 
@@ -308,9 +302,7 @@ def main() -> None:
 
     for s in args.effective_status:
         if s not in _ALLOWED_STATUS:
-            emit_validation_error(
-                f"--effective-status value '{s}' not in {_ALLOWED_STATUS}"
-            )
+            emit_validation_error(f"--effective-status value '{s}' not in {_ALLOWED_STATUS}")
             return
 
     try:

@@ -175,13 +175,11 @@ def _validate_fb_schedule(scheduled_for_unix: int | None) -> None:
     lead = scheduled_for_unix - now
     if lead < _FB_MIN_SCHEDULE_LEAD_SECONDS:
         raise ValueError(
-            f"FB scheduled_publish_time must be at least 10 min from now "
-            f"(got {lead}s lead)"
+            f"FB scheduled_publish_time must be at least 10 min from now (got {lead}s lead)"
         )
     if lead > _FB_MAX_SCHEDULE_LEAD_SECONDS:
         raise ValueError(
-            f"FB scheduled_publish_time cannot be more than 6 months out "
-            f"(got {lead}s lead)"
+            f"FB scheduled_publish_time cannot be more than 6 months out (got {lead}s lead)"
         )
 
 
@@ -232,9 +230,7 @@ def publish_ig_carousel_post(
 ) -> dict[str, Any]:
     """Multi-image carousel — Meta accepts 2..10 images per carousel."""
     if not 2 <= len(image_urls) <= 10:
-        raise ValueError(
-            f"IG carousel requires 2-10 images (got {len(image_urls)})"
-        )
+        raise ValueError(f"IG carousel requires 2-10 images (got {len(image_urls)})")
     child_ids: list[str] = []
     for url in image_urls:
         cid = _create_ig_container(
@@ -385,9 +381,7 @@ def _wait_for_ig_container_ready(
                 body=body,
             )
         time.sleep(_IG_POLL_INTERVAL_SECONDS)
-    raise PagePublishError(
-        f"IG container {container_id} did not finish within {timeout_seconds}s"
-    )
+    raise PagePublishError(f"IG container {container_id} did not finish within {timeout_seconds}s")
 
 
 # ---- Audience signals ------------------------------------------------------
@@ -419,8 +413,8 @@ def get_page_audience_online(
     rows = body.get("data", [])
     # The data shape per row: {"name": "...", "values": [{"end_time": "...",
     # "value": {"0": 12, "1": 8, ...}}, ...]}
-    grid: dict[int, int] = {h: 0 for h in range(168)}
-    counts: dict[int, int] = {h: 0 for h in range(168)}
+    grid: dict[int, int] = dict.fromkeys(range(168), 0)
+    counts: dict[int, int] = dict.fromkeys(range(168), 0)
     for row in rows:
         for sample in row.get("values", []):
             end_time = sample.get("end_time")
@@ -447,9 +441,7 @@ def get_page_audience_online(
                     grid[hw] += int(score)
                     counts[hw] += 1
     # Average over the days we saw
-    return {
-        h: (grid[h] // counts[h]) if counts[h] else 0 for h in range(168)
-    }
+    return {h: (grid[h] // counts[h]) if counts[h] else 0 for h in range(168)}
 
 
 # ---- Read-back: organic post insights -------------------------------------
@@ -484,9 +476,7 @@ def _parse_insights_data(insights_body: dict[str, Any]) -> dict[str, float]:
     return out
 
 
-def _fetch_fb_post_insights(
-    post_id: str, page_access_token: str
-) -> dict[str, Any]:
+def _fetch_fb_post_insights(post_id: str, page_access_token: str) -> dict[str, Any]:
     """FB post insights — two graph calls (insights + base reactions/comments)
     merged into a normalized dict."""
     metrics = ["post_impressions", "post_impressions_unique"]
@@ -520,14 +510,8 @@ def _fetch_fb_post_insights(
         )
     except PagePublishError:
         base = {}
-    reactions_total = (
-        ((base.get("reactions") or {}).get("summary") or {}).get("total_count")
-        or 0
-    )
-    comments_total = (
-        ((base.get("comments") or {}).get("summary") or {}).get("total_count")
-        or 0
-    )
+    reactions_total = ((base.get("reactions") or {}).get("summary") or {}).get("total_count") or 0
+    comments_total = ((base.get("comments") or {}).get("summary") or {}).get("total_count") or 0
     shares_total = (base.get("shares") or {}).get("count") or 0
     return {
         "impressions": int(insights.get("post_impressions", 0)),
@@ -540,9 +524,7 @@ def _fetch_fb_post_insights(
     }
 
 
-def _fetch_ig_post_insights(
-    media_id: str, page_access_token: str, is_reel: bool
-) -> dict[str, Any]:
+def _fetch_ig_post_insights(media_id: str, page_access_token: str, is_reel: bool) -> dict[str, Any]:
     """IG media insights — reels use a different metric set than image/carousel."""
     if is_reel:
         metrics = ["plays", "reach", "total_interactions", "comments", "shares", "saved"]

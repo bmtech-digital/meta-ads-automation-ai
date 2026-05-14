@@ -30,9 +30,13 @@ from campaigner.tools._contract import (
 )
 
 
-def _classify(cpl_vs_target: float | None, ctr_pct: float | None,
-              cpm_ils: float, impressions: int,
-              lead_quality_band: str | None = None) -> str:
+def _classify(
+    cpl_vs_target: float | None,
+    ctr_pct: float | None,
+    cpm_ils: float,
+    impressions: int,
+    lead_quality_band: str | None = None,
+) -> str:
     """Return the lane name §T_PA expects.
 
     Phase 6 (mastery plan §9, the 16.4 paradox): if Meta-internal metrics
@@ -41,9 +45,13 @@ def _classify(cpl_vs_target: float | None, ctr_pct: float | None,
     targeting/creative before resuming, not just unpause).
     """
     base_lane = "archive_candidate"
-    if cpl_vs_target is not None and ctr_pct is not None:
-        if cpl_vs_target <= 1.2 and ctr_pct >= 1.5:
-            base_lane = "revival_candidate"
+    if (
+        cpl_vs_target is not None
+        and ctr_pct is not None
+        and cpl_vs_target <= 1.2
+        and ctr_pct >= 1.5
+    ):
+        base_lane = "revival_candidate"
     if base_lane == "archive_candidate" and cpm_ils > 80 and impressions < 5000:
         base_lane = "narrow_audience_revival"
 
@@ -205,13 +213,15 @@ def main() -> None:
                 filtering=[{"field": "campaign.id", "operator": "EQUAL", "value": c["id"]}],
             )
         except Exception as e:
-            audited.append({
-                "campaign_id": c["id"],
-                "campaign_name": c.get("name"),
-                "days_since_paused": days_since_paused,
-                "lane": "archive_candidate",
-                "error": f"insights fetch failed: {e}",
-            })
+            audited.append(
+                {
+                    "campaign_id": c["id"],
+                    "campaign_name": c.get("name"),
+                    "days_since_paused": days_since_paused,
+                    "lane": "archive_candidate",
+                    "error": f"insights fetch failed: {e}",
+                }
+            )
             continue
 
         row = insights[0] if insights else {}
@@ -239,44 +249,46 @@ def main() -> None:
 
         lane = _classify(cpl_vs_target, ctr_pct, cpm, impressions, lq_band)
 
-        audited.append({
-            "campaign_id": c["id"],
-            "campaign_name": c.get("name"),
-            "objective": c.get("objective"),
-            "days_since_paused": days_since_paused,
-            "spend_ils": round(spend, 2),
-            "impressions": impressions,
-            "clicks": clicks,
-            "ctr_pct": round(ctr_pct, 2),
-            "cpm_ils": round(cpm, 2),
-            "leads": leads,
-            "cpl_actual_ils": round(cpl_actual, 2) if cpl_actual is not None else None,
-            "cpl_vs_target": round(cpl_vs_target, 2) if cpl_vs_target is not None else None,
-            "lead_quality_band": lq_band,
-            "lead_quality_total": lq_total,
-            "lead_quality_graded": lq_graded,
-            "lead_quality_avg": (round(lq_avg, 2) if lq_avg is not None else None),
-            "lane": lane,
-        })
+        audited.append(
+            {
+                "campaign_id": c["id"],
+                "campaign_name": c.get("name"),
+                "objective": c.get("objective"),
+                "days_since_paused": days_since_paused,
+                "spend_ils": round(spend, 2),
+                "impressions": impressions,
+                "clicks": clicks,
+                "ctr_pct": round(ctr_pct, 2),
+                "cpm_ils": round(cpm, 2),
+                "leads": leads,
+                "cpl_actual_ils": round(cpl_actual, 2) if cpl_actual is not None else None,
+                "cpl_vs_target": round(cpl_vs_target, 2) if cpl_vs_target is not None else None,
+                "lead_quality_band": lq_band,
+                "lead_quality_total": lq_total,
+                "lead_quality_graded": lq_graded,
+                "lead_quality_avg": (round(lq_avg, 2) if lq_avg is not None else None),
+                "lane": lane,
+            }
+        )
 
     revival_count = sum(1 for r in audited if r["lane"] == "revival_candidate")
     narrow_count = sum(1 for r in audited if r["lane"] == "narrow_audience_revival")
     archive_count = sum(1 for r in audited if r["lane"] == "archive_candidate")
-    quality_warned_count = sum(
-        1 for r in audited if r["lane"] == "quality_warned_revival"
-    )
+    quality_warned_count = sum(1 for r in audited if r["lane"] == "quality_warned_revival")
 
-    emit_success({
-        "business_id": args.business_id,
-        "target_cpl_ils": target_cpl_float,
-        "paused_campaign_count": len(audited),
-        "skipped_stale_count": skipped_stale,
-        "revival_candidate_count": revival_count,
-        "narrow_audience_revival_count": narrow_count,
-        "archive_candidate_count": archive_count,
-        "quality_warned_revival_count": quality_warned_count,
-        "campaigns": audited,
-    })
+    emit_success(
+        {
+            "business_id": args.business_id,
+            "target_cpl_ils": target_cpl_float,
+            "paused_campaign_count": len(audited),
+            "skipped_stale_count": skipped_stale,
+            "revival_candidate_count": revival_count,
+            "narrow_audience_revival_count": narrow_count,
+            "archive_candidate_count": archive_count,
+            "quality_warned_revival_count": quality_warned_count,
+            "campaigns": audited,
+        }
+    )
 
 
 if __name__ == "__main__":

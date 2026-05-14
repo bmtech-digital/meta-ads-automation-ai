@@ -388,9 +388,7 @@ def main() -> None:
     scheduled_for_dt: datetime | None = None
     if args.scheduled_for:
         try:
-            scheduled_for_dt = datetime.fromisoformat(
-                args.scheduled_for.replace("Z", "+00:00")
-            )
+            scheduled_for_dt = datetime.fromisoformat(args.scheduled_for.replace("Z", "+00:00"))
         except ValueError as e:
             emit_validation_error(
                 f"--scheduled-for must be ISO-8601 with TZ (got {args.scheduled_for!r}): {e}"
@@ -467,11 +465,13 @@ def main() -> None:
         try:
             from campaigner.lib import plans as _plans
             from campaigner.lib.db import get_connection as _gc
+
             with _gc() as conn:
                 _plans.mark_triggered(conn, args.triggered_plan_id, str(row["id"]))
                 triggered_plan_id = args.triggered_plan_id
         except Exception as exc:  # noqa: BLE001
             import sys as _sys
+
             print(
                 f"plans_carryover mark_triggered failed for {args.triggered_plan_id}: {exc}",
                 file=_sys.stderr,

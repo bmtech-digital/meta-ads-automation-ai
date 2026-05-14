@@ -72,9 +72,7 @@ def _decode_key(raw: str, name: str) -> bytes:
     except Exception as e:
         raise CryptoError(f"{name} is not valid base64: {e}") from e
     if len(key) != _KEY_BYTES:
-        raise CryptoError(
-            f"{name} must decode to {_KEY_BYTES} bytes; got {len(key)}"
-        )
+        raise CryptoError(f"{name} must decode to {_KEY_BYTES} bytes; got {len(key)}")
     return key
 
 

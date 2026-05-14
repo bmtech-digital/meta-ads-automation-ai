@@ -152,14 +152,8 @@ def _compute(
         + ungraded_count * UNGRADED_WEIGHT
     )
     raw_cpl = (spend_ils / leads_total) if leads_total > 0 else None
-    quality_adjusted_cpl = (
-        (spend_ils / effective_leads) if effective_leads > 0 else None
-    )
-    multiplier = (
-        (quality_adjusted_cpl / raw_cpl)
-        if (raw_cpl and quality_adjusted_cpl)
-        else None
-    )
+    quality_adjusted_cpl = (spend_ils / effective_leads) if effective_leads > 0 else None
+    multiplier = (quality_adjusted_cpl / raw_cpl) if (raw_cpl and quality_adjusted_cpl) else None
 
     if leads_total == 0:
         status = "no_leads"
@@ -175,9 +169,7 @@ def _compute(
         status = "low_quality"
 
     # Phase 5: target lookup + vs-target verdict.
-    target_value, target_source, target_entry = _resolve_target(
-        business_id, objective
-    )
+    target_value, target_source, target_entry = _resolve_target(business_id, objective)
     target_block: dict = {
         "value": target_value,
         "source": target_source,
@@ -185,11 +177,7 @@ def _compute(
         "entry": target_entry,
     }
     vs_target: dict | None = None
-    if (
-        target_value is not None
-        and quality_adjusted_cpl is not None
-        and target_value > 0
-    ):
+    if target_value is not None and quality_adjusted_cpl is not None and target_value > 0:
         ratio = quality_adjusted_cpl / target_value
         if ratio <= 1.0:
             verdict = "under_target"
@@ -216,13 +204,9 @@ def _compute(
         "effective_leads": round(effective_leads, 2),
         "raw_cpl_ils": (round(raw_cpl, 2) if raw_cpl is not None else None),
         "quality_adjusted_cpl_ils": (
-            round(quality_adjusted_cpl, 2)
-            if quality_adjusted_cpl is not None
-            else None
+            round(quality_adjusted_cpl, 2) if quality_adjusted_cpl is not None else None
         ),
-        "quality_multiplier": (
-            round(multiplier, 2) if multiplier is not None else None
-        ),
+        "quality_multiplier": (round(multiplier, 2) if multiplier is not None else None),
         "conversions": conversions,
         "conversion_value_ils": round(conv_value, 2),
         "weights": {"grades": GRADE_WEIGHTS, "ungraded": UNGRADED_WEIGHT},
@@ -233,9 +217,7 @@ def _compute(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Quality-adjusted CPL using operator lead grades."
-    )
+    p = argparse.ArgumentParser(description="Quality-adjusted CPL using operator lead grades.")
     p.add_argument("--business-id", required=True)
     p.add_argument(
         "--campaign-id",

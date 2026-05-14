@@ -66,9 +66,7 @@ def _validate_service_tag(business_id: str, service_tag: str) -> None:
         )
     norm = service_tag.strip().lower()
     if not any(
-        isinstance(p, dict)
-        and isinstance(p.get("name"), str)
-        and p["name"].strip().lower() == norm
+        isinstance(p, dict) and isinstance(p.get("name"), str) and p["name"].strip().lower() == norm
         for p in products
     ):
         emit_validation_error(
@@ -94,9 +92,7 @@ def _validate_custom_audience(args: argparse.Namespace) -> dict:
             "CUSTOM (customer-file PII) is deferred to Phase 2."
         )
     if args.retention_days < 1 or args.retention_days > 180:
-        emit_validation_error(
-            f"--retention-days must be in [1, 180] (got {args.retention_days})"
-        )
+        emit_validation_error(f"--retention-days must be in [1, 180] (got {args.retention_days})")
 
     rule = parse_json_arg(args.rule, "rule")
     if rule is not None and not isinstance(rule, dict):
@@ -159,21 +155,13 @@ def _validate_lookalike(args: argparse.Namespace, business_id: str) -> dict:
     rejection later.
     """
     if not args.origin_audience_id:
-        emit_validation_error(
-            "create_lookalike requires --origin-audience-id (the seed's Meta ID)"
-        )
+        emit_validation_error("create_lookalike requires --origin-audience-id (the seed's Meta ID)")
     if not (0.01 <= args.ratio <= 0.10):
-        emit_validation_error(
-            f"--ratio must be in [0.01, 0.10] (got {args.ratio})"
-        )
+        emit_validation_error(f"--ratio must be in [0.01, 0.10] (got {args.ratio})")
     if args.country and len(args.country) != 2:
-        emit_validation_error(
-            f"--country must be a 2-letter ISO code (got {args.country!r})"
-        )
+        emit_validation_error(f"--country must be a 2-letter ISO code (got {args.country!r})")
     if args.type and args.type not in LOOKALIKE_TYPES:
-        emit_validation_error(
-            f"--type must be one of {list(LOOKALIKE_TYPES)} (got {args.type!r})"
-        )
+        emit_validation_error(f"--type must be one of {list(LOOKALIKE_TYPES)} (got {args.type!r})")
 
     seed = fetch_one(
         "SELECT name, approximate_count_upper_bound AS up "
@@ -299,9 +287,7 @@ def main() -> None:
     )
     p.add_argument("--retention-days", type=int, default=180)
     p.add_argument("--rule", help="WEBSITE rule as JSON (Meta inclusions/exclusions spec).")
-    p.add_argument(
-        "--pixel-id", help="Optional pixel override for WEBSITE audiences."
-    )
+    p.add_argument("--pixel-id", help="Optional pixel override for WEBSITE audiences.")
 
     # create_saved_audience
     p.add_argument(
@@ -318,7 +304,9 @@ def main() -> None:
         default=0.01,
         help="Lookalike size: 0.01 to 0.10 (1%% to 10%%; default 0.01).",
     )
-    p.add_argument("--type", choices=LOOKALIKE_TYPES, help="Lookalike type (default: Meta default).")
+    p.add_argument(
+        "--type", choices=LOOKALIKE_TYPES, help="Lookalike type (default: Meta default)."
+    )
 
     # Approval-row metadata (passthrough to propose_task semantics)
     p.add_argument("--urgency", choices=VALID_URGENCIES, default="medium")
@@ -349,9 +337,7 @@ def main() -> None:
     scheduled_for_dt: datetime | None = None
     if args.scheduled_for:
         try:
-            scheduled_for_dt = datetime.fromisoformat(
-                args.scheduled_for.replace("Z", "+00:00")
-            )
+            scheduled_for_dt = datetime.fromisoformat(args.scheduled_for.replace("Z", "+00:00"))
         except ValueError as e:
             emit_validation_error(
                 f"--scheduled-for must be ISO-8601 with TZ (got {args.scheduled_for!r}): {e}"

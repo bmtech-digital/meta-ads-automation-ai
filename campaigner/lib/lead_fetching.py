@@ -67,9 +67,7 @@ def _get(url: str, params: dict[str, Any]) -> dict[str, Any]:
     with httpx.Client(timeout=20.0) as client:
         r = client.get(url, params=params)
     if r.status_code != 200:
-        raise LeadFetchError(
-            f"GET {url} returned {r.status_code}: {r.text[:500]}"
-        )
+        raise LeadFetchError(f"GET {url} returned {r.status_code}: {r.text[:500]}")
     return r.json()
 
 

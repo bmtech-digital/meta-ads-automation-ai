@@ -48,7 +48,14 @@ from campaigner.tools._contract import (
 # as the legal options for the objective; picking outside the list is a
 # §38 violation at propose-time.
 _CTA_FOR_OBJECTIVE: dict[str, list[str]] = {
-    "OUTCOME_LEADS": ["MESSAGE_PAGE", "SIGN_UP", "LEARN_MORE", "GET_QUOTE", "CONTACT_US", "SUBSCRIBE"],
+    "OUTCOME_LEADS": [
+        "MESSAGE_PAGE",
+        "SIGN_UP",
+        "LEARN_MORE",
+        "GET_QUOTE",
+        "CONTACT_US",
+        "SUBSCRIBE",
+    ],
     "OUTCOME_SALES": ["SHOP_NOW", "GET_OFFER", "ORDER_NOW", "BUY_NOW", "ADD_TO_CART"],
     "OUTCOME_ENGAGEMENT": ["MESSAGE_PAGE", "SEND_MESSAGE", "LIKE_PAGE", "LEARN_MORE"],
     "OUTCOME_TRAFFIC": ["LEARN_MORE", "WATCH_MORE", "DOWNLOAD", "VIEW_INSTAGRAM_PROFILE"],
@@ -198,8 +205,7 @@ def main() -> None:
                 service = p_item
     if args.service_tag and not service and available_tags:
         emit_validation_error(
-            f"service_tag={args.service_tag!r} not found. "
-            f"Available: {sorted(available_tags)}"
+            f"service_tag={args.service_tag!r} not found. Available: {sorted(available_tags)}"
         )
         return
 
@@ -255,10 +261,12 @@ def main() -> None:
         },
         # ─── voice rules ───
         "voice": {
-            "formality": brand_voice.get("formality") or "ידידותי-מקצועי (Option A — singular את/אתה)",
+            "formality": brand_voice.get("formality")
+            or "ידידותי-מקצועי (Option A — singular את/אתה)",
             "energy": brand_voice.get("energy") or "calm / advisory — מומחה שמסביר",
             "humor": brand_voice.get("humor") or "straight-faced, no humor (B2B IL)",
-            "register": brand_voice.get("technical_register") or "plain Hebrew, no acronyms in customer copy",
+            "register": brand_voice.get("technical_register")
+            or "plain Hebrew, no acronyms in customer copy",
         },
         # ─── constraints ───
         "length_rules": _LENGTH_RULES,
@@ -290,11 +298,13 @@ def main() -> None:
         ),
     }
 
-    emit_success({
-        "business_id": args.business_id,
-        "brief": brief,
-        "ready_for_agent": True,
-    })
+    emit_success(
+        {
+            "business_id": args.business_id,
+            "brief": brief,
+            "ready_for_agent": True,
+        }
+    )
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import get_connection
@@ -47,7 +47,7 @@ def _parse_meta_ts(v) -> datetime | None:
     if v is None:
         return None
     if isinstance(v, (int, float)):
-        return datetime.fromtimestamp(v, tz=timezone.utc)
+        return datetime.fromtimestamp(v, tz=UTC)
     if isinstance(v, str):
         try:
             return datetime.fromisoformat(v.replace("Z", "+00:00"))

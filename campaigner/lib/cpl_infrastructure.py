@@ -26,10 +26,9 @@ is the token-saving lever the operator asked for on 2026-05-13.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from enum import Enum
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Literal
-
 
 # ─────────────────────────────────────────────────────────────────────
 # Types
@@ -40,7 +39,7 @@ Vertical = Literal["ecommerce", "leads", "b2b_saas", "awareness", "app", "other"
 Confidence = Literal["high", "medium", "low"]
 
 
-class SubVertical(str, Enum):
+class SubVertical(StrEnum):
     # leads (B2C services)
     REAL_ESTATE_RESIDENTIAL = "real_estate_residential"
     REAL_ESTATE_COMMERCIAL = "real_estate_commercial"
@@ -81,7 +80,7 @@ class SubVertical(str, Enum):
     OTHER = "other"
 
 
-class GeoTier(str, Enum):
+class GeoTier(StrEnum):
     IL_TEL_AVIV_CENTER = "il_tel_aviv_center"
     IL_SHARON = "il_sharon"
     IL_JERUSALEM = "il_jerusalem"
@@ -93,7 +92,7 @@ class GeoTier(str, Enum):
     GLOBAL = "global"
 
 
-class FunnelStage(str, Enum):
+class FunnelStage(StrEnum):
     COLD = "cold"
     WARM_ENGAGEMENT = "warm_engagement"
     WARM_VISIT = "warm_visit"
@@ -101,7 +100,7 @@ class FunnelStage(str, Enum):
     RETARGETING_FORM_OPENER = "retargeting_form_opener"
 
 
-class OfferType(str, Enum):
+class OfferType(StrEnum):
     CONSULTATION_FREE = "consultation_free"
     QUOTE_REQUEST = "quote_request"
     DEMO_REQUEST = "demo_request"
@@ -112,7 +111,7 @@ class OfferType(str, Enum):
     PURCHASE = "purchase"
 
 
-class Channel(str, Enum):
+class Channel(StrEnum):
     LEAD_FORM = "lead_form"
     CLICK_TO_WHATSAPP = "click_to_whatsapp"
     CLICK_TO_MESSENGER = "click_to_messenger"
@@ -121,14 +120,25 @@ class Channel(str, Enum):
 
 
 CalendarMonth = Literal[
-    "jan", "feb", "mar", "apr", "may", "jun",
-    "jul", "aug", "sep", "oct", "nov", "dec",
+    "jan",
+    "feb",
+    "mar",
+    "apr",
+    "may",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "oct",
+    "nov",
+    "dec",
 ]
 
 
 # ─────────────────────────────────────────────────────────────────────
 # Primary sources
 # ─────────────────────────────────────────────────────────────────────
+
 
 @dataclass(frozen=True)
 class PrimarySource:
@@ -262,6 +272,7 @@ PRIMARY_SOURCES: dict[str, PrimarySource] = {
 # Sub-vertical cells
 # ─────────────────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class SubVerticalCell:
     parent: Vertical
@@ -276,123 +287,232 @@ class SubVerticalCell:
 SUBVERTICALS: dict[SubVertical, SubVerticalCell] = {
     # ─── leads ───
     SubVertical.REAL_ESTATE_RESIDENTIAL: SubVerticalCell(
-        parent="leads", base_ils=280, band_ils=(180, 450), confidence="medium",
-        match_terms=("נדל\"ן מגורים", "דירה", "מתווך", "מתווכת", "יזם דירות", "real estate"),
+        parent="leads",
+        base_ils=280,
+        band_ils=(180, 450),
+        confidence="medium",
+        match_terms=('נדל"ן מגורים', "דירה", "מתווך", "מתווכת", "יזם דירות", "real estate"),
         primary_source_ids=("adamigo-cpl-industry-2026", "stape-realestate-2026"),
     ),
     SubVertical.REAL_ESTATE_COMMERCIAL: SubVerticalCell(
-        parent="leads", base_ils=550, band_ils=(350, 900), confidence="low",
-        match_terms=("נדל\"ן מסחרי", "משרדים להשכרה", "נכס מסחרי", "commercial real estate"),
+        parent="leads",
+        base_ils=550,
+        band_ils=(350, 900),
+        confidence="low",
+        match_terms=('נדל"ן מסחרי', "משרדים להשכרה", "נכס מסחרי", "commercial real estate"),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.HOME_SERVICES: SubVerticalCell(
-        parent="leads", base_ils=120, band_ils=(70, 200), confidence="high",
+        parent="leads",
+        base_ils=120,
+        band_ils=(70, 200),
+        confidence="high",
         match_terms=(
-            "אינסטלטור", "חשמלאי", "מזגנים", "מנעולן", "פורץ דלתות", "ניקיון בית",
-            "plumber", "electrician", "HVAC", "locksmith",
+            "אינסטלטור",
+            "חשמלאי",
+            "מזגנים",
+            "מנעולן",
+            "פורץ דלתות",
+            "ניקיון בית",
+            "plumber",
+            "electrician",
+            "HVAC",
+            "locksmith",
         ),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.RENOVATION_CONTRACTOR: SubVerticalCell(
-        parent="leads", base_ils=180, band_ils=(100, 320), confidence="medium",
+        parent="leads",
+        base_ils=180,
+        band_ils=(100, 320),
+        confidence="medium",
         match_terms=("קבלן שיפוצים", "שיפוצים", "ריצוף", "גבס", "צבעי", "renovation", "contractor"),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.INSURANCE_AGENT: SubVerticalCell(
-        parent="leads", base_ils=240, band_ils=(130, 400), confidence="medium",
+        parent="leads",
+        base_ils=240,
+        band_ils=(130, 400),
+        confidence="medium",
         match_terms=("סוכן ביטוח", "ביטוח חיים", "ביטוח רכב", "ביטוח בריאות", "פנסיה", "insurance"),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.AUTOMOTIVE_DEALER: SubVerticalCell(
-        parent="leads", base_ils=200, band_ils=(110, 340), confidence="medium",
+        parent="leads",
+        base_ils=200,
+        band_ils=(110, 340),
+        confidence="medium",
         match_terms=("סוכנות רכב", "רכבים חדשים", "רכב יד שנייה", "car dealer"),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.AUTOMOTIVE_SERVICE: SubVerticalCell(
-        parent="leads", base_ils=75, band_ils=(40, 140), confidence="medium",
+        parent="leads",
+        base_ils=75,
+        band_ils=(40, 140),
+        confidence="medium",
         match_terms=("מוסך", "חשמלאי רכב", "פנצ'רייה", "חלפים", "auto service"),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.BEAUTY_AESTHETIC: SubVerticalCell(
-        parent="leads", base_ils=130, band_ils=(70, 230), confidence="high",
+        parent="leads",
+        base_ils=130,
+        band_ils=(70, 230),
+        confidence="high",
         match_terms=(
-            "בוטוקס", "חומצה היאלורונית", "הסרת שיער בלייזר", "אסתטיקה", "רפואה אסתטית",
-            "botox", "filler", "laser hair", "aesthetic",
+            "בוטוקס",
+            "חומצה היאלורונית",
+            "הסרת שיער בלייזר",
+            "אסתטיקה",
+            "רפואה אסתטית",
+            "botox",
+            "filler",
+            "laser hair",
+            "aesthetic",
         ),
         primary_source_ids=("adamigo-cpl-industry-2026", "webfx-healthcare-2026"),
     ),
     SubVertical.WELLNESS_ALT: SubVerticalCell(
-        parent="leads", base_ils=80, band_ils=(40, 160), confidence="medium",
+        parent="leads",
+        base_ils=80,
+        band_ils=(40, 160),
+        confidence="medium",
         match_terms=("רפלקסולוגיה", "שיאצו", "רפואה משלימה", "יוגה תרפיה", "מיינדפולנס"),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.FITNESS_STUDIO: SubVerticalCell(
-        parent="leads", base_ils=75, band_ils=(35, 150), confidence="high",
+        parent="leads",
+        base_ils=75,
+        band_ils=(35, 150),
+        confidence="high",
         match_terms=(
-            "חדר כושר", "פילאטיס", "קרוספיט", "סטודיו", "אימון אישי",
-            "gym", "crossfit", "pilates",
+            "חדר כושר",
+            "פילאטיס",
+            "קרוספיט",
+            "סטודיו",
+            "אימון אישי",
+            "gym",
+            "crossfit",
+            "pilates",
         ),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.DENTAL_CLINIC: SubVerticalCell(
-        parent="leads", base_ils=150, band_ils=(80, 280), confidence="medium",
+        parent="leads",
+        base_ils=150,
+        band_ils=(80, 280),
+        confidence="medium",
         match_terms=("רופא שיניים", "מרפאת שיניים", "יישור שיניים", "השתלות שיניים", "dental"),
         primary_source_ids=("adamigo-cpl-industry-2026", "webfx-healthcare-2026"),
     ),
     SubVertical.PRIVATE_CLINIC: SubVerticalCell(
-        parent="leads", base_ils=200, band_ils=(100, 380), confidence="low",
+        parent="leads",
+        base_ils=200,
+        band_ils=(100, 380),
+        confidence="low",
         match_terms=("רופא פרטי", "מרפאה פרטית", "רופא משפחה", "רופא מומחה"),
         primary_source_ids=("webfx-healthcare-2026",),
     ),
     SubVertical.LEGAL_PERSONAL: SubVerticalCell(
-        parent="leads", base_ils=380, band_ils=(200, 700), confidence="medium",
-        match_terms=("עורך דין", "גירושין", "פלילי", "נזיקין", "תאונות דרכים", "lawyer", "attorney"),
+        parent="leads",
+        base_ils=380,
+        band_ils=(200, 700),
+        confidence="medium",
+        match_terms=(
+            "עורך דין",
+            "גירושין",
+            "פלילי",
+            "נזיקין",
+            "תאונות דרכים",
+            "lawyer",
+            "attorney",
+        ),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.LEGAL_CORPORATE: SubVerticalCell(
-        parent="leads", base_ils=700, band_ils=(400, 1300), confidence="low",
-        match_terms=("עו\"ד מסחרי", "חברות", "הסכמים", "נדל\"ן עו\"ד", "corporate law"),
+        parent="leads",
+        base_ils=700,
+        band_ils=(400, 1300),
+        confidence="low",
+        match_terms=('עו"ד מסחרי', "חברות", "הסכמים", 'נדל"ן עו"ד', "corporate law"),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.ACCOUNTING_TAX: SubVerticalCell(
-        parent="leads", base_ils=250, band_ils=(140, 450), confidence="medium",
+        parent="leads",
+        base_ils=250,
+        band_ils=(140, 450),
+        confidence="medium",
         match_terms=("רואה חשבון", "יועץ מס", "הנהלת חשבונות", "הקמת חברה", "accounting"),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.EDUCATION_PRIVATE: SubVerticalCell(
-        parent="leads", base_ils=110, band_ils=(50, 200), confidence="medium",
+        parent="leads",
+        base_ils=110,
+        band_ils=(50, 200),
+        confidence="medium",
         match_terms=("מורה פרטי", "שיעורי עזר", "פסיכומטרי", "קורסים פרטיים", "tutor"),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     SubVertical.EDUCATION_UNIVERSITY: SubVerticalCell(
-        parent="leads", base_ils=180, band_ils=(90, 340), confidence="medium",
-        match_terms=("תואר ראשון", "MBA", "מכללה", "אוניברסיטה", "לימודי המשך", "degree", "university"),
+        parent="leads",
+        base_ils=180,
+        band_ils=(90, 340),
+        confidence="medium",
+        match_terms=(
+            "תואר ראשון",
+            "MBA",
+            "מכללה",
+            "אוניברסיטה",
+            "לימודי המשך",
+            "degree",
+            "university",
+        ),
         primary_source_ids=("adamigo-cpl-industry-2026",),
     ),
     # ─── b2b_saas ───
     SubVertical.SAAS_HORIZONTAL: SubVerticalCell(
-        parent="b2b_saas", base_ils=320, band_ils=(180, 600), confidence="medium",
+        parent="b2b_saas",
+        base_ils=320,
+        band_ils=(180, 600),
+        confidence="medium",
         match_terms=("SaaS", "platform", "dashboard"),
         primary_source_ids=("aimers-saas-2026", "growthspree-saas-2026"),
     ),
     SubVertical.SAAS_MARKETING_TECH: SubVerticalCell(
-        parent="b2b_saas", base_ils=420, band_ils=(250, 800), confidence="high",
+        parent="b2b_saas",
+        base_ils=420,
+        band_ils=(250, 800),
+        confidence="high",
         match_terms=(
-            "analytics", "ad tech", "influencer marketing", "marketing platform",
-            "מערכת שיווק", "פלטפורמת שיווק", "פלטפורמת משפיענים",
+            "analytics",
+            "ad tech",
+            "influencer marketing",
+            "marketing platform",
+            "מערכת שיווק",
+            "פלטפורמת שיווק",
+            "פלטפורמת משפיענים",
             # Influencer-marketing operator-facing names (Aiweon, weon, etc.)
-            "משפיעות", "משפיענים", "influencer", "creator marketing",
-            "מיתוג משפיעות", "influencer branding",
+            "משפיעות",
+            "משפיענים",
+            "influencer",
+            "creator marketing",
+            "מיתוג משפיעות",
+            "influencer branding",
         ),
         primary_source_ids=("aimers-saas-2026", "growthspree-saas-2026", "manus-il-cpl-2026"),
     ),
     SubVertical.SAAS_DEV_TECH: SubVerticalCell(
-        parent="b2b_saas", base_ils=500, band_ils=(300, 950), confidence="low",
+        parent="b2b_saas",
+        base_ils=500,
+        band_ils=(300, 950),
+        confidence="low",
         match_terms=("DevTools", "API", "infrastructure", "observability"),
         primary_source_ids=("aimers-saas-2026",),
     ),
     SubVertical.AGENCY_SERVICES: SubVerticalCell(
-        parent="b2b_saas", base_ils=280, band_ils=(160, 520), confidence="medium",
+        parent="b2b_saas",
+        base_ils=280,
+        band_ils=(160, 520),
+        confidence="medium",
         match_terms=("סוכנות שיווק", "סוכנות פרסום", "סוכנות דיגיטל", "agency"),
         primary_source_ids=("aimers-saas-2026",),
     ),
@@ -404,70 +524,116 @@ SUBVERTICALS: dict[SubVertical, SubVerticalCell] = {
     # satisfies guardrail §26 without WebSearch round-trip.
     SubVertical.AI_CHATBOT_SERVICES: SubVerticalCell(
         parent="b2b_saas",
-        base_ils=480,       # demo-required, high-friction enterprise sale
+        base_ils=480,  # demo-required, high-friction enterprise sale
         band_ils=(280, 900),
         confidence="medium",
         match_terms=(
-            "סוכני AI", "סוכן AI", "AI agent", "AI agents", "chatbot",
-            "AI chatbot", "צ'אט AI", "צאט בוט", "voice agent", "voice AI",
-            "AI sales agent", "סוכן מכירות AI", "conversational AI",
+            "סוכני AI",
+            "סוכן AI",
+            "AI agent",
+            "AI agents",
+            "chatbot",
+            "AI chatbot",
+            "צ'אט AI",
+            "צאט בוט",
+            "voice agent",
+            "voice AI",
+            "AI sales agent",
+            "סוכן מכירות AI",
+            "conversational AI",
         ),
         primary_source_ids=("aimers-saas-2026", "growthspree-saas-2026", "manus-il-cpl-2026"),
     ),
     SubVertical.AI_VIDEO_PRODUCTION: SubVerticalCell(
         parent="b2b_saas",
-        base_ils=380,       # mid-friction; AOV ₪4500-18000 per video drives serious buyers
+        base_ils=380,  # mid-friction; AOV ₪4500-18000 per video drives serious buyers
         band_ils=(220, 720),
         confidence="medium",
         match_terms=(
-            "סרטוני AI", "סרטון AI", "AI video", "AI videos", "video AI",
-            "AI video production", "video branding", "voice cloning",
-            "סרטוני שיווק AI", "הפקת סרטוני AI",
+            "סרטוני AI",
+            "סרטון AI",
+            "AI video",
+            "AI videos",
+            "video AI",
+            "AI video production",
+            "video branding",
+            "voice cloning",
+            "סרטוני שיווק AI",
+            "הפקת סרטוני AI",
         ),
         primary_source_ids=("aimers-saas-2026", "manus-il-cpl-2026"),
     ),
     SubVertical.AI_CAMPAIGN_MANAGEMENT: SubVerticalCell(
         parent="b2b_saas",
-        base_ils=520,       # highest friction — ongoing retainer, ≥₪15k/mo commitment
+        base_ils=520,  # highest friction — ongoing retainer, ≥₪15k/mo commitment
         band_ils=(300, 1000),
         confidence="medium",
         match_terms=(
-            "קמפיינים AI", "קמפיין AI", "AI campaigner", "AI campaigns",
-            "managed ads AI", "ניהול קמפיינים AI", "AI ad management",
+            "קמפיינים AI",
+            "קמפיין AI",
+            "AI campaigner",
+            "AI campaigns",
+            "managed ads AI",
+            "ניהול קמפיינים AI",
+            "AI ad management",
             "performance marketing AI",
         ),
         primary_source_ids=("aimers-saas-2026", "growthspree-saas-2026", "adamigo-country-2026"),
     ),
     # ─── ecommerce (CPA, not CPL) ───
     SubVertical.ECOM_FASHION: SubVerticalCell(
-        parent="ecommerce", base_ils=55, band_ils=(30, 110), confidence="high", is_cpa=True,
+        parent="ecommerce",
+        base_ils=55,
+        band_ils=(30, 110),
+        confidence="high",
+        is_cpa=True,
         match_terms=("אופנה", "בגדים", "שמלות", "גרבי גוף", "fashion", "clothing"),
         primary_source_ids=("wordstream-fb-2025",),
     ),
     SubVertical.ECOM_BEAUTY_PRODUCTS: SubVerticalCell(
-        parent="ecommerce", base_ils=60, band_ils=(35, 120), confidence="high", is_cpa=True,
+        parent="ecommerce",
+        base_ils=60,
+        band_ils=(35, 120),
+        confidence="high",
+        is_cpa=True,
         match_terms=("טיפוח", "איפור", "פנים", "שיער", "מוצרי קוסמטיקה", "cosmetics", "skincare"),
         primary_source_ids=("wordstream-fb-2025",),
     ),
     SubVertical.ECOM_ELECTRONICS: SubVerticalCell(
-        parent="ecommerce", base_ils=75, band_ils=(40, 170), confidence="medium", is_cpa=True,
+        parent="ecommerce",
+        base_ils=75,
+        band_ils=(40, 170),
+        confidence="medium",
+        is_cpa=True,
         match_terms=("אלקטרוניקה", "גאדג'טים", "מסכים", "אוזניות", "electronics"),
         primary_source_ids=("wordstream-fb-2025",),
     ),
     SubVertical.ECOM_HOME_GOODS: SubVerticalCell(
-        parent="ecommerce", base_ils=70, band_ils=(35, 140), confidence="medium", is_cpa=True,
+        parent="ecommerce",
+        base_ils=70,
+        band_ils=(35, 140),
+        confidence="medium",
+        is_cpa=True,
         match_terms=("מטבח", "רהיטים", "כריות", "מצעים", "עיצוב הבית", "home goods"),
         primary_source_ids=("wordstream-fb-2025",),
     ),
     SubVertical.ECOM_FOOD_SUPPLEMENTS: SubVerticalCell(
-        parent="ecommerce", base_ils=50, band_ils=(25, 110), confidence="medium", is_cpa=True,
+        parent="ecommerce",
+        base_ils=50,
+        band_ils=(25, 110),
+        confidence="medium",
+        is_cpa=True,
         match_terms=("תוספי תזונה", "ויטמינים", "חלבון", "מזון בריאות", "supplements"),
         primary_source_ids=("wordstream-fb-2025",),
     ),
     # ─── unmapped ───
     SubVertical.OTHER: SubVerticalCell(
-        parent="other", base_ils=200, band_ils=(100, 400), confidence="low",
-        match_terms=(), primary_source_ids=(),
+        parent="other",
+        base_ils=200,
+        band_ils=(100, 400),
+        confidence="low",
+        match_terms=(),
+        primary_source_ids=(),
     ),
 }
 
@@ -516,8 +682,18 @@ CHANNEL_MODIFIER: dict[Channel, float] = {
 }
 
 SEASON_MODIFIER: dict[str, float] = {
-    "jan": 0.95, "feb": 0.95, "mar": 1.00, "apr": 1.10, "may": 0.95, "jun": 0.90,
-    "jul": 0.85, "aug": 0.85, "sep": 1.20, "oct": 1.05, "nov": 1.15, "dec": 1.10,
+    "jan": 0.95,
+    "feb": 0.95,
+    "mar": 1.00,
+    "apr": 1.10,
+    "may": 0.95,
+    "jun": 0.90,
+    "jul": 0.85,
+    "aug": 0.85,
+    "sep": 1.20,
+    "oct": 1.05,
+    "nov": 1.15,
+    "dec": 1.10,
 }
 
 SECURITY_EVENT_MULTIPLIER: float = 2.00
@@ -576,6 +752,7 @@ def pick_geo_tier(service_regions: list[str] | None) -> GeoTier:
 # Sub-vertical matching
 # ─────────────────────────────────────────────────────────────────────
 
+
 @dataclass(frozen=True)
 class SubVerticalMatch:
     sub: SubVertical
@@ -610,7 +787,9 @@ def match_sub_vertical(
     has_business_text = bool(parts)
     has_campaign = bool(campaign_name and campaign_name.strip())
     if not has_business_text and not has_campaign:
-        return SubVerticalMatch(sub=SubVertical.OTHER, matched_terms=(), confidence_of_match="fallback")
+        return SubVerticalMatch(
+            sub=SubVertical.OTHER, matched_terms=(), confidence_of_match="fallback"
+        )
     business_haystack = "  ".join(parts).lower() if has_business_text else ""
     campaign_haystack = (campaign_name or "").strip().lower()
 
@@ -633,7 +812,9 @@ def match_sub_vertical(
             scored.append((sub, score, tuple(hits)))
 
     if not scored:
-        return SubVerticalMatch(sub=SubVertical.OTHER, matched_terms=(), confidence_of_match="fallback")
+        return SubVerticalMatch(
+            sub=SubVertical.OTHER, matched_terms=(), confidence_of_match="fallback"
+        )
 
     scored.sort(key=lambda r: r[1], reverse=True)
     best_sub, best_score, best_hits = scored[0]
@@ -648,6 +829,7 @@ def match_sub_vertical(
 # ─────────────────────────────────────────────────────────────────────
 # Estimation
 # ─────────────────────────────────────────────────────────────────────
+
 
 @dataclass(frozen=True)
 class TraceStep:
@@ -693,8 +875,7 @@ class EstimateResult:
             "band_high": self.band_ils[1],
             "confidence": self.confidence,
             "sources": [
-                {"title": s.title, "url": s.url, "extracted": s.extracted}
-                for s in self.citations
+                {"title": s.title, "url": s.url, "extracted": s.extracted} for s in self.citations
             ],
             "sources_count": len(self.citations),
             "context_used": context_used,
@@ -708,13 +889,33 @@ class EstimateResult:
 
 
 CalendarMonthLiteral = Literal[
-    "jan", "feb", "mar", "apr", "may", "jun",
-    "jul", "aug", "sep", "oct", "nov", "dec",
+    "jan",
+    "feb",
+    "mar",
+    "apr",
+    "may",
+    "jun",
+    "jul",
+    "aug",
+    "sep",
+    "oct",
+    "nov",
+    "dec",
 ]
 
 _MONTH_INDEX_TO_NAME: dict[int, CalendarMonthLiteral] = {
-    1: "jan", 2: "feb", 3: "mar", 4: "apr", 5: "may", 6: "jun",
-    7: "jul", 8: "aug", 9: "sep", 10: "oct", 11: "nov", 12: "dec",
+    1: "jan",
+    2: "feb",
+    3: "mar",
+    4: "apr",
+    5: "may",
+    6: "jun",
+    7: "jul",
+    8: "aug",
+    9: "sep",
+    10: "oct",
+    11: "nov",
+    12: "dec",
 }
 
 
@@ -726,7 +927,7 @@ def month_of(month_index: int) -> CalendarMonthLiteral:
 # Patterns the operator's Meta campaign names should NOT look like — when
 # any match, the matcher has no information to anchor with and the agent
 # should propose an `alert` asking to rename. See §T-2 + decision-tree.md.
-import re as _re
+import re as _re  # noqa: E402  # intentional: keep matcher patterns next to usage below
 
 _GENERIC_CAMPAIGN_NAME_PATTERNS = [
     _re.compile(r"^\s*campaign(?:\s*\d*)?\s*$", _re.IGNORECASE),

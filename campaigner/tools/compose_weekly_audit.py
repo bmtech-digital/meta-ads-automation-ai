@@ -77,9 +77,10 @@ def main() -> None:
 
     try:
         # All approvals created in the window — for proposals funnel.
-        created = with_db_retry(
-            lambda: fetch_all(
-                """
+        created = (
+            with_db_retry(
+                lambda: fetch_all(
+                    """
                 SELECT id, task_type, urgency, status, target_kind, target_id,
                        created_at, approved_at, executed_at, rejection_reason
                   FROM approvals
@@ -87,14 +88,17 @@ def main() -> None:
                    AND created_at > %s
                  ORDER BY created_at DESC
                 """,
-                (args.business_id, since_iso),
+                    (args.business_id, since_iso),
+                )
             )
-        ) or []
+            or []
+        )
 
         # Approvals executed in window (regardless of when proposed) — for outcomes-context.
-        executed_in_window = with_db_retry(
-            lambda: fetch_all(
-                """
+        executed_in_window = (
+            with_db_retry(
+                lambda: fetch_all(
+                    """
                 SELECT id, task_type, target_kind, target_id, executed_at
                   FROM approvals
                  WHERE business_id = %s
@@ -102,14 +106,17 @@ def main() -> None:
                    AND executed_at > %s
                  ORDER BY executed_at DESC
                 """,
-                (args.business_id, since_iso),
+                    (args.business_id, since_iso),
+                )
             )
-        ) or []
+            or []
+        )
 
         # Open plans — extract from prior 21d of approved/executed approvals.
-        active_plan_rows = with_db_retry(
-            lambda: fetch_all(
-                """
+        active_plan_rows = (
+            with_db_retry(
+                lambda: fetch_all(
+                    """
                 SELECT id, task_type, target_id, target_kind, rationale,
                        coalesce(executed_at, approved_at) AS committed_on
                   FROM approvals
@@ -117,30 +124,38 @@ def main() -> None:
                    AND status IN ('approved', 'executed')
                    AND coalesce(executed_at, approved_at) > now() - interval '21 days'
                 """,
-                (args.business_id,),
+                    (args.business_id,),
+                )
             )
-        ) or []
+            or []
+        )
 
         # Budget pacing snapshot.
-        biz = with_db_retry(
-            lambda: fetch_one(
-                "SELECT monthly_budget_ils, daily_budget_ils, target_cpl_ils FROM businesses WHERE id = %s",
-                (args.business_id,),
+        biz = (
+            with_db_retry(
+                lambda: fetch_one(
+                    "SELECT monthly_budget_ils, daily_budget_ils, target_cpl_ils FROM businesses WHERE id = %s",
+                    (args.business_id,),
+                )
             )
-        ) or {}
+            or {}
+        )
 
         # Tracking health snapshot.
-        bk = with_db_retry(
-            lambda: fetch_one(
-                """
+        bk = (
+            with_db_retry(
+                lambda: fetch_one(
+                    """
                 SELECT tracking_verified, tracking_pixel_id, tracking_capi_configured,
                        tracking_aem_priority_events, tracking_domain_verified
                   FROM business_knowledge
                  WHERE business_id = %s
                 """,
-                (args.business_id,),
+                    (args.business_id,),
+                )
             )
-        ) or {}
+            or {}
+        )
 
     except Exception as e:
         emit_runtime_error(f"weekly audit DB fetch failed: {e}", exc=e)
@@ -192,7 +207,7 @@ def main() -> None:
     # ───── active plans count (rough — full extraction left to load_active_plans) ─────
     plan_count = 0
     for r in active_plan_rows:
-        rationale = (r.get("rationale") or "")
+        rationale = r.get("rationale") or ""
         if "תוכנית" in rationale and ("אם" in rationale or "צעד" in rationale):
             plan_count += 1
 
@@ -230,14 +245,16 @@ def main() -> None:
             "still_pending": pending,
             "approval_rate_pct": approval_rate_pct,
         },
-        "rejection_patterns": [
-            {"reason_head": k, "count": v} for k, v in top_rejections
-        ],
+        "rejection_patterns": [{"reason_head": k, "count": v} for k, v in top_rejections],
         "outcomes_summary": outcomes_by_status,
         "active_plans_count": plan_count,
         "budget_snapshot": {
-            "monthly_budget_ils": float(biz["monthly_budget_ils"]) if biz.get("monthly_budget_ils") else None,
-            "daily_budget_ils": float(biz["daily_budget_ils"]) if biz.get("daily_budget_ils") else None,
+            "monthly_budget_ils": float(biz["monthly_budget_ils"])
+            if biz.get("monthly_budget_ils")
+            else None,
+            "daily_budget_ils": float(biz["daily_budget_ils"])
+            if biz.get("daily_budget_ils")
+            else None,
             "target_cpl_ils": float(biz["target_cpl_ils"]) if biz.get("target_cpl_ils") else None,
         },
         "tracking": {
@@ -266,22 +283,34 @@ def _narrative_hints(
     narrative. The agent decides what to elevate."""
     hints: list[str] = []
     if proposed == 0:
-        hints.append("Quiet week — no proposals queued. The agent should explain WHY (tracking gate? hands_off?).")
+        hints.append(
+            "Quiet week — no proposals queued. The agent should explain WHY (tracking gate? hands_off?)."
+        )
     elif approved == 0 and rejected > 0:
-        hints.append("All proposals rejected — operator pushback signal. Address themes in the digest.")
+        hints.append(
+            "All proposals rejected — operator pushback signal. Address themes in the digest."
+        )
     elif approved and proposed:
         rate = approved / proposed * 100
         if rate > 80:
-            hints.append("High approval rate — agent suggestions are landing. Reinforce what worked.")
+            hints.append(
+                "High approval rate — agent suggestions are landing. Reinforce what worked."
+            )
         elif rate < 30:
-            hints.append("Low approval rate — agent suggestions are missing the mark. Self-critique tone.")
+            hints.append(
+                "Low approval rate — agent suggestions are missing the mark. Self-critique tone."
+            )
     if top_rejections:
         top = top_rejections[0]
-        hints.append(f"Most common rejection theme: '{top[0][:50]}' ({top[1]}x). Acknowledge + adjust.")
+        hints.append(
+            f"Most common rejection theme: '{top[0][:50]}' ({top[1]}x). Acknowledge + adjust."
+        )
     if tracking_status != "healthy":
         hints.append(f"Tracking is {tracking_status} — repeat the unblock walkthrough.")
     if plan_count > 0:
-        hints.append(f"{plan_count} active forward-plan commitment(s) — name which are due this week.")
+        hints.append(
+            f"{plan_count} active forward-plan commitment(s) — name which are due this week."
+        )
     return hints
 
 

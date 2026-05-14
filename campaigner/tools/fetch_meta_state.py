@@ -56,7 +56,11 @@ def main() -> None:
         "(status, updated_time, daily_budget, objective) — fields the "
         "insights endpoint doesn't expose.",
     )
-    p.add_argument("--business-id", required=True, help="UUID of the businesses row (for logging context only — not used in the Meta call).")
+    p.add_argument(
+        "--business-id",
+        required=True,
+        help="UUID of the businesses row (for logging context only — not used in the Meta call).",
+    )
     p.add_argument(
         "--object-type",
         required=True,
@@ -75,9 +79,7 @@ def main() -> None:
     )
     args = p.parse_args()
 
-    extra = (
-        [f.strip() for f in args.extra_fields.split(",")] if args.extra_fields else None
-    )
+    extra = [f.strip() for f in args.extra_fields.split(",")] if args.extra_fields else None
 
     try:
         config = Config.load()

@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import argparse
 
+from campaigner.lib import plans as _plans
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import get_connection
-from campaigner.lib import plans as _plans
 from campaigner.tools._contract import (
     emit_runtime_error,
     emit_success,
@@ -49,10 +49,12 @@ def main() -> None:
         emit_runtime_error(f"expire_plans failed: {e}", exc=e)
         return
 
-    emit_success({
-        "business_id": args.business_id,
-        "expired_count": updated,
-    })
+    emit_success(
+        {
+            "business_id": args.business_id,
+            "expired_count": updated,
+        }
+    )
 
 
 if __name__ == "__main__":

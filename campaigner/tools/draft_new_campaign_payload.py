@@ -236,12 +236,20 @@ def main() -> None:
             "LOWEST_COST_WITH_MIN_ROAS",
         ],
     )
-    p.add_argument("--optimization-goal", default=None, help="Override the default for this objective.")
+    p.add_argument(
+        "--optimization-goal", default=None, help="Override the default for this objective."
+    )
     p.add_argument("--billing-event", default="IMPRESSIONS")
     p.add_argument(
         "--special-ad-category",
         default=None,
-        choices=["HOUSING", "EMPLOYMENT", "CREDIT", "ISSUES_ELECTIONS_POLITICS", "ONLINE_GAMBLING_AND_GAMING"],
+        choices=[
+            "HOUSING",
+            "EMPLOYMENT",
+            "CREDIT",
+            "ISSUES_ELECTIONS_POLITICS",
+            "ONLINE_GAMBLING_AND_GAMING",
+        ],
         help="Add a single restricted category (rare for Aiweon — usually omit, payload gets []).",
     )
     p.add_argument(
@@ -339,9 +347,7 @@ def main() -> None:
         "geo_locations": geo_locations,
         "age_min": args.age_min,
         "age_max": args.age_max,
-        "targeting_automation": {
-            "advantage_audience": 0 if args.no_advantage_audience else 1
-        },
+        "targeting_automation": {"advantage_audience": 0 if args.no_advantage_audience else 1},
         "publisher_platforms": ["facebook", "instagram"],
         # Hebrew locale (28) — for an Israeli account this filters out non-Hebrew speakers.
         "locales": [28],
@@ -355,13 +361,15 @@ def main() -> None:
         promoted_object["page_id"] = str(page_id)
     if args.objective in _OBJECTIVES_NEEDING_PIXEL and pixel_id:
         promoted_object["pixel_id"] = str(pixel_id)
-        promoted_object["custom_event_type"] = "PURCHASE"  # default; agent can override at propose time
+        promoted_object["custom_event_type"] = (
+            "PURCHASE"  # default; agent can override at propose time
+        )
     if args.objective == "OUTCOME_LEADS" and pixel_id:
         # On-website Lead events benefit from pixel reference too (Meta uses both).
         promoted_object["pixel_id"] = str(pixel_id)
         promoted_object["custom_event_type"] = "LEAD"
 
-    creative_source: dict = {k: v for k, v in set_sources}
+    creative_source: dict = dict(set_sources)
 
     # Compose copy.
     copy_block: dict = {
@@ -381,8 +389,7 @@ def main() -> None:
     # Compose tracking — UTM template that Meta substitutes per ad.
     tracking_block: dict = {
         "url_tags": (
-            f"utm_source=meta&utm_medium=paid&utm_campaign={{{{campaign.name}}}}&"
-            f"utm_content={{{{ad.name}}}}"
+            "utm_source=meta&utm_medium=paid&utm_campaign={{campaign.name}}&utm_content={{ad.name}}"
         ),
     }
     if pixel_id:
@@ -423,12 +430,14 @@ def main() -> None:
         "hypothesis": args.hypothesis,
     }
 
-    emit_success({
-        "business_id": args.business_id,
-        "drafted_at": "now",
-        "payload": payload,
-        "validation_notes": _validation_notes(args, biz, payload),
-    })
+    emit_success(
+        {
+            "business_id": args.business_id,
+            "drafted_at": "now",
+            "payload": payload,
+            "validation_notes": _validation_notes(args, biz, payload),
+        }
+    )
 
 
 def _validation_notes(args, biz: dict, payload: dict) -> list[str]:

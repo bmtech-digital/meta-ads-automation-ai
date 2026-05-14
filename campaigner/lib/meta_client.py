@@ -15,6 +15,7 @@ if something is missing, add a method here.
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from pathlib import Path
 from typing import Any, Literal
@@ -31,7 +32,6 @@ from facebook_business.adobjects.campaign import Campaign  # noqa: E402
 # chain pulls in dozens of facebook-business adobjects (~15s in v25), which
 # slows every tool startup. Tools that don't touch audiences shouldn't pay
 # that cost.
-
 from meta_ads_manager import MetaAdsManager  # noqa: E402
 
 from .config import Config  # noqa: E402
@@ -45,6 +45,7 @@ _OBJECT_CLASS: dict[str, type] = {
     "adset": AdSet,
     "ad": Ad,
 }
+
 
 def _safe_float(v: Any) -> float | None:
     """Convert a Meta insights value to float; return None on missing/garbage.
@@ -353,8 +354,17 @@ class MetaClient:
         Returns JSON-safe dicts via `export_all_data()`.
         """
         self._m()  # ensure FacebookAdsApi.init() has run
-        fields = ["id", "name", "status", "effective_status", "objective",
-                  "daily_budget", "lifetime_budget", "updated_time", "created_time"]
+        fields = [
+            "id",
+            "name",
+            "status",
+            "effective_status",
+            "objective",
+            "daily_budget",
+            "lifetime_budget",
+            "updated_time",
+            "created_time",
+        ]
         if extra_fields:
             fields.extend(extra_fields)
         params: dict[str, Any] = {}
@@ -473,12 +483,24 @@ class MetaClient:
             filtering=filtering,
         )
 
-        id_field = {"account": "account_id", "campaign": "campaign_id",
-                    "adset": "adset_id", "ad": "ad_id"}[level]
+        id_field = {
+            "account": "account_id",
+            "campaign": "campaign_id",
+            "adset": "adset_id",
+            "ad": "ad_id",
+        }[level]
         prior_by_id = {r.get(id_field): r for r in prior_rows if r.get(id_field)}
 
-        comparable_metrics = ("spend", "impressions", "clicks", "cpm", "cpc",
-                              "ctr", "frequency", "reach")
+        comparable_metrics = (
+            "spend",
+            "impressions",
+            "clicks",
+            "cpm",
+            "cpc",
+            "ctr",
+            "frequency",
+            "reach",
+        )
         merged: list[dict] = []
         for row in current_rows:
             key = row.get(id_field)
@@ -497,9 +519,7 @@ class MetaClient:
                 if cur_v is None or pri_v is None or pri_v == 0:
                     out[f"delta_{m}_pct"] = None
                 else:
-                    out[f"delta_{m}_pct"] = round(
-                        (cur_v - pri_v) / pri_v * 100, 2
-                    )
+                    out[f"delta_{m}_pct"] = round((cur_v - pri_v) / pri_v * 100, 2)
             merged.append(out)
         return merged
 
@@ -689,8 +709,6 @@ class MetaClient:
         """
         self._m()  # ensure init
         try:
-            from facebook_business.adobjects.adaccount import AdAccount  # noqa: E402
-
             cursor = self._m().ad_account.get_saved_audiences(
                 params={"limit": min(limit, 200)},
                 fields=[
@@ -755,9 +773,7 @@ class MetaClient:
 
         result = self._m().ad_account.create_custom_audience(params=params)
         # Meta returns just `{id}`; re-fetch to capture the full payload.
-        fetched = CustomAudience(result.get_id()).api_get(
-            fields=self._CUSTOM_AUDIENCE_FIELDS
-        )
+        fetched = CustomAudience(result.get_id()).api_get(fields=self._CUSTOM_AUDIENCE_FIELDS)
         return fetched.export_all_data()
 
     def create_lookalike_audience(
@@ -791,9 +807,7 @@ class MetaClient:
             CustomAudience.Field.lookalike_spec: lookalike_spec,
         }
         result = self._m().ad_account.create_custom_audience(params=params)
-        fetched = CustomAudience(result.get_id()).api_get(
-            fields=self._CUSTOM_AUDIENCE_FIELDS
-        )
+        fetched = CustomAudience(result.get_id()).api_get(fields=self._CUSTOM_AUDIENCE_FIELDS)
         return fetched.export_all_data()
 
     # =================================================================
@@ -827,7 +841,6 @@ class MetaClient:
         step is already paused.
         """
         from facebook_business.adobjects.adcreative import AdCreative  # noqa: E402
-        from facebook_business.adobjects.adimage import AdImage  # noqa: E402
 
         self._m()  # ensure init
 
@@ -835,9 +848,7 @@ class MetaClient:
         required = ["campaign_name", "objective", "adset_name", "targeting", "ad_name"]
         missing = [f for f in required if not payload.get(f)]
         if missing:
-            raise ValueError(
-                f"create_campaign_chain payload missing required fields: {missing}"
-            )
+            raise ValueError(f"create_campaign_chain payload missing required fields: {missing}")
 
         budget_keys = (
             payload.get("daily_budget_ils"),
@@ -853,10 +864,7 @@ class MetaClient:
             Campaign.Field.name: payload["campaign_name"],
             Campaign.Field.objective: payload["objective"],
             Campaign.Field.status: "PAUSED",
-            Campaign.Field.special_ad_categories: payload.get(
-                "special_ad_categories"
-            )
-            or [],
+            Campaign.Field.special_ad_categories: payload.get("special_ad_categories") or [],
         }
         if payload.get("buying_type"):
             campaign_params[Campaign.Field.buying_type] = payload["buying_type"]
@@ -872,9 +880,7 @@ class MetaClient:
                 float(payload["lifetime_budget_ils"]) * 100
             )
         if payload.get("spend_cap_ils"):
-            campaign_params[Campaign.Field.spend_cap] = int(
-                float(payload["spend_cap_ils"]) * 100
-            )
+            campaign_params[Campaign.Field.spend_cap] = int(float(payload["spend_cap_ils"]) * 100)
         if payload.get("start_time_iso"):
             campaign_params["start_time"] = payload["start_time_iso"]
         if payload.get("stop_time_iso"):
@@ -913,9 +919,7 @@ class MetaClient:
             # Fallback: caller should set one of the two. Default to a 30 ILS
             # adset budget so the create doesn't 400. The propose layer
             # should have caught this — fail loud.
-            raise RuntimeError(
-                "no budget set on campaign — refusing to create unbudgeted adset"
-            )
+            raise RuntimeError("no budget set on campaign — refusing to create unbudgeted adset")
         if payload.get("adset_daily_budget_ils"):
             adset_params[AdSet.Field.daily_budget] = int(
                 float(payload["adset_daily_budget_ils"]) * 100
@@ -933,13 +937,9 @@ class MetaClient:
             adset_id = ad_set.get_id()
         except Exception as e:
             # Roll back: pause the campaign so it doesn't sit "draft" on Meta.
-            try:
+            with contextlib.suppress(Exception):
                 self.update_status("campaign", campaign_id, "PAUSED")
-            except Exception:
-                pass
-            raise RuntimeError(
-                f"adset create failed (campaign {campaign_id} paused): {e}"
-            ) from e
+            raise RuntimeError(f"adset create failed (campaign {campaign_id} paused): {e}") from e
 
         # ---- Step 3: Creative -------------------------------------------
         creative_source = payload.get("creative_source") or {}
@@ -985,16 +985,14 @@ class MetaClient:
                     },
                 }
                 if identity.get("instagram_actor_id"):
-                    creative_params[AdCreative.Field.object_story_spec][
-                        "instagram_actor_id"
-                    ] = identity["instagram_actor_id"]
+                    creative_params[AdCreative.Field.object_story_spec]["instagram_actor_id"] = (
+                        identity["instagram_actor_id"]
+                    )
                 tracking = payload.get("tracking") or {}
                 if tracking.get("url_tags"):
                     creative_params[AdCreative.Field.url_tags] = tracking["url_tags"]
 
-                creative = self._m().ad_account.create_ad_creative(
-                    params=creative_params
-                )
+                creative = self._m().ad_account.create_ad_creative(params=creative_params)
                 creative_id = creative.get_id()
             else:
                 raise RuntimeError(
@@ -1003,17 +1001,12 @@ class MetaClient:
                 )
         except Exception as e:
             # Roll back: pause adset + campaign.
-            try:
+            with contextlib.suppress(Exception):
                 self.update_status("adset", adset_id, "PAUSED")
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 self.update_status("campaign", campaign_id, "PAUSED")
-            except Exception:
-                pass
             raise RuntimeError(
-                f"creative create failed (campaign {campaign_id}, adset "
-                f"{adset_id} paused): {e}"
+                f"creative create failed (campaign {campaign_id}, adset {adset_id} paused): {e}"
             ) from e
 
         # ---- Step 4: Ad --------------------------------------------------
@@ -1029,14 +1022,10 @@ class MetaClient:
             ad_id = ad.get_id()
         except Exception as e:
             # Roll back: pause everything.
-            try:
+            with contextlib.suppress(Exception):
                 self.update_status("adset", adset_id, "PAUSED")
-            except Exception:
-                pass
-            try:
+            with contextlib.suppress(Exception):
                 self.update_status("campaign", campaign_id, "PAUSED")
-            except Exception:
-                pass
             raise RuntimeError(
                 f"ad create failed (campaign {campaign_id}, adset {adset_id}, "
                 f"creative {creative_id} paused): {e}"
@@ -1058,9 +1047,7 @@ class MetaClient:
         from facebook_business.adobjects.customaudience import CustomAudience
 
         self._m()
-        fetched = CustomAudience(str(audience_id)).api_get(
-            fields=self._CUSTOM_AUDIENCE_FIELDS
-        )
+        fetched = CustomAudience(str(audience_id)).api_get(fields=self._CUSTOM_AUDIENCE_FIELDS)
         return fetched.export_all_data()
 
     def estimate_audience_size(

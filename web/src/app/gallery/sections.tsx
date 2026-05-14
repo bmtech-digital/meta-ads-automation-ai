@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { CreativeAsset } from "@/lib/db/types";
@@ -530,12 +531,12 @@ function PromoteFooter({
           Score {score}
         </span>
         {state === "success" ? (
-          <a
+          <Link
             href="/approvals"
             className="text-[10px] font-medium text-emerald-700 hover:underline"
           >
             ✓ נשלח לאישור — פתח את התור
-          </a>
+          </Link>
         ) : (
           <Button
             type="button"

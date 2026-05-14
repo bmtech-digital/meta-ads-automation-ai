@@ -47,9 +47,7 @@ def test_passes_for_non_new_campaign_task_types():
 
 
 def test_skips_when_business_id_missing():
-    r = _geo_targeting_set_for_new_campaign(
-        {"task_type": "new_campaign"}, {}, {}
-    )
+    r = _geo_targeting_set_for_new_campaign({"task_type": "new_campaign"}, {}, {})
     assert r["passed"] is True
     assert r["skipped"] is True
 
@@ -100,11 +98,7 @@ def test_passes_clean_when_include_has_countries(patch_fetch_one):
 
 def test_passes_clean_when_include_has_cities(patch_fetch_one):
     patch_fetch_one(
-        {
-            "geo_targeting": {
-                "include": {"cities": [{"key": "2643743", "name": "Tel Aviv"}]}
-            }
-        }
+        {"geo_targeting": {"include": {"cities": [{"key": "2643743", "name": "Tel Aviv"}]}}}
     )
     r = _geo_targeting_set_for_new_campaign(
         {"task_type": "new_campaign", "business_id": "biz-1"}, {}, {}
@@ -143,11 +137,7 @@ def test_passes_clean_when_include_has_radius_centers(patch_fetch_one):
 def test_warns_when_only_excludes_set(patch_fetch_one):
     """Exclude-only block doesn't define what to target — still a warning."""
     patch_fetch_one(
-        {
-            "geo_targeting": {
-                "exclude": {"cities": [{"key": "1234", "name": "Bnei Brak"}]}
-            }
-        }
+        {"geo_targeting": {"exclude": {"cities": [{"key": "1234", "name": "Bnei Brak"}]}}}
     )
     r = _geo_targeting_set_for_new_campaign(
         {"task_type": "new_campaign", "business_id": "biz-1"}, {}, {}

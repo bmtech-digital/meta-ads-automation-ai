@@ -15,7 +15,6 @@ from __future__ import annotations
 
 from campaigner.tools.check_guardrails import _verify_tracking_infrastructure
 
-
 # ---------- expanded blocked-task list (was: new_campaign only)
 
 
@@ -64,9 +63,7 @@ def test_passes_unrelated_task_regardless_of_tracking():
             {"tracking_verified": False},
             {},
         )
-        assert r["passed"] is True, (
-            f"task={task} should pass even when tracking unverified"
-        )
+        assert r["passed"] is True, f"task={task} should pass even when tracking unverified"
 
 
 # ---------- tracking_health_status (new in Block 6) preferred over raw flag

@@ -20,7 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import get_connection
@@ -61,21 +61,9 @@ def _upsert_lead(cur, business_id: str, page_id: str, lead: dict) -> str:
 
     # Common field aliases — Meta lets the form designer pick the question key,
     # so we try the standard names plus the Hebrew aliases Aiweon's form uses.
-    full_name = (
-        flat.get("full_name")
-        or flat.get("שם_מלא")
-        or flat.get("name")
-    )
-    email = (
-        flat.get("email")
-        or flat.get("דוא\"ל")
-        or flat.get("דואל")
-    )
-    phone = (
-        flat.get("phone_number")
-        or flat.get("phone")
-        or flat.get("מספר_טלפון")
-    )
+    full_name = flat.get("full_name") or flat.get("שם_מלא") or flat.get("name")
+    email = flat.get("email") or flat.get('דוא"ל') or flat.get("דואל")
+    phone = flat.get("phone_number") or flat.get("phone") or flat.get("מספר_טלפון")
     city = flat.get("city") or flat.get("עיר")
 
     cur.execute(
@@ -169,9 +157,7 @@ def _sync(business_id: str, since_days: int, max_leads_per_form: int) -> dict:
                     else:
                         upd += 1
                 except Exception as e:
-                    errors.append(
-                        f"upsert lead {lead.get('id')} failed: {e!r}"
-                    )
+                    errors.append(f"upsert lead {lead.get('id')} failed: {e!r}")
         return ins, upd
 
     for form in forms:
@@ -188,7 +174,7 @@ def _sync(business_id: str, since_days: int, max_leads_per_form: int) -> dict:
             continue
         leads_synced += len(form_leads)
         try:
-            ins, upd = with_db_retry(lambda: _do_writes(form_leads))
+            ins, upd = with_db_retry(lambda fl=form_leads: _do_writes(fl))
         except Exception as e:
             errors.append(f"DB writes for form {form_id} failed: {e!r}")
             continue

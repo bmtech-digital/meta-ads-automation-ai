@@ -320,9 +320,7 @@ def _no_new_creative_when_underspending(prop: dict, state: dict, ctx: dict) -> d
     is below 50% — the bottleneck is delivery, not creative variety."""
     if prop.get("task_type") != "new_creative":
         return _pass("no_new_creative_when_underspending")
-    if (prop.get("payload") or {}).get(
-        "override_no_new_creative_when_underspending"
-    ):
+    if (prop.get("payload") or {}).get("override_no_new_creative_when_underspending"):
         return _pass(
             "no_new_creative_when_underspending",
             note="explicit operator override in payload",
@@ -377,9 +375,7 @@ def _scale_up_cadence_max_1_per_week(prop: dict, state: dict, ctx: dict) -> dict
     return _pass("scale_up_cadence_max_1_per_week", recent_count=count)
 
 
-def _marginal_return_check_before_scale_up(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _marginal_return_check_before_scale_up(prop: dict, state: dict, ctx: dict) -> dict:
     """§21. If a prior scale_up didn't lift conversions by ≥10%, block the
     next one. Reads `marginal_return_passed` from state — caller is expected
     to have run `check_marginal_return.py` first."""
@@ -429,9 +425,7 @@ def _scale_down_max_15pct_per_step(prop: dict, state: dict, ctx: dict) -> dict:
             f"steps or pause the campaign and rebuild instead",
             drop_pct=round(drop_pct * 100, 2),
         )
-    return _pass(
-        "scale_down_max_15pct_per_step", drop_pct=round(drop_pct * 100, 2)
-    )
+    return _pass("scale_down_max_15pct_per_step", drop_pct=round(drop_pct * 100, 2))
 
 
 def _no_consecutive_scale_down_14d(prop: dict, state: dict, ctx: dict) -> dict:
@@ -450,8 +444,8 @@ def _no_consecutive_scale_down_14d(prop: dict, state: dict, ctx: dict) -> dict:
     if count >= 1:
         return _fail(
             "no_consecutive_scale_down_14d",
-            f"a scale_down was already executed on this campaign within 14 days — "
-            f"if it didn't help, the issue isn't budget pacing",
+            "a scale_down was already executed on this campaign within 14 days — "
+            "if it didn't help, the issue isn't budget pacing",
             recent_count=count,
         )
     return _pass("no_consecutive_scale_down_14d", recent_count=count)
@@ -474,9 +468,7 @@ def _no_scale_down_in_learning(prop: dict, state: dict, ctx: dict) -> dict:
     return _pass("no_scale_down_in_learning", learning_status=ls)
 
 
-def _set_kpi_target_requires_research(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _set_kpi_target_requires_research(prop: dict, state: dict, ctx: dict) -> dict:
     """§26. `set_kpi_target` proposals MUST include a populated `research`
     block — the agent's live WebSearch findings shaped by business_knowledge,
     not the static fallback band. The contract is in propose_task.py:
@@ -553,9 +545,7 @@ def _set_kpi_target_requires_research(
     # phrase "לא זוהה שירות ספציפי".
     match_block = research.get("match") or {}
     matched_terms = (
-        match_block.get("matched_terms")
-        if isinstance(match_block, dict)
-        else None
+        match_block.get("matched_terms") if isinstance(match_block, dict) else None
     ) or research.get("matched_terms")
     NO_SERVICE_FALLBACK = "לא זוהה שירות ספציפי"
     if isinstance(matched_terms, list) and matched_terms:
@@ -577,20 +567,19 @@ def _set_kpi_target_requires_research(
             )
 
     # Check 2: campaign_name in rationale (when present).
-    campaign_name = (
-        match_block.get("campaign_name")
-        if isinstance(match_block, dict)
-        else None
-    )
-    if isinstance(campaign_name, str) and campaign_name.strip():
-        if campaign_name.strip() not in rationale:
-            return _fail(
-                "set_kpi_target_requires_research",
-                f"research.match.campaign_name={campaign_name!r} is set but "
-                f"the campaign name doesn't appear in the rationale — "
-                f"operator can't tell that the research was scoped to this "
-                f"specific campaign.",
-            )
+    campaign_name = match_block.get("campaign_name") if isinstance(match_block, dict) else None
+    if (
+        isinstance(campaign_name, str)
+        and campaign_name.strip()
+        and campaign_name.strip() not in rationale
+    ):
+        return _fail(
+            "set_kpi_target_requires_research",
+            f"research.match.campaign_name={campaign_name!r} is set but "
+            f"the campaign name doesn't appear in the rationale — "
+            f"operator can't tell that the research was scoped to this "
+            f"specific campaign.",
+        )
 
     # Check 3: competitor citation OR explicit "אין מתחרים מוגדרים".
     # Fetch business_knowledge.competitors directly (small extra query —
@@ -611,25 +600,26 @@ def _set_kpi_target_requires_research(
             # phrase-only check below.
             competitors = []
     if competitors:
-        if not any(c in rationale for c in competitors):
-            if NO_COMPETITORS_FALLBACK not in rationale:
-                return _fail(
-                    "set_kpi_target_requires_research",
-                    f"business_knowledge.competitors has {len(competitors)} "
-                    f"entries but none appear in rationale (and the fallback "
-                    f"phrase '{NO_COMPETITORS_FALLBACK}' is also absent). "
-                    f"Either cite at least one competitor by name, or "
-                    f"explicitly note 'אין מתחרים מוגדרים' if you ignored them.",
-                )
-    else:
-        if NO_COMPETITORS_FALLBACK not in rationale:
+        if (
+            not any(c in rationale for c in competitors)
+            and NO_COMPETITORS_FALLBACK not in rationale
+        ):
             return _fail(
                 "set_kpi_target_requires_research",
-                f"competitors list is empty AND rationale doesn't include "
-                f"'{NO_COMPETITORS_FALLBACK}'. State explicitly that no "
-                f"competitors were defined so the operator knows the "
-                f"comparison is to industry-average, not competitor-specific.",
+                f"business_knowledge.competitors has {len(competitors)} "
+                f"entries but none appear in rationale (and the fallback "
+                f"phrase '{NO_COMPETITORS_FALLBACK}' is also absent). "
+                f"Either cite at least one competitor by name, or "
+                f"explicitly note 'אין מתחרים מוגדרים' if you ignored them.",
             )
+    elif NO_COMPETITORS_FALLBACK not in rationale:
+        return _fail(
+            "set_kpi_target_requires_research",
+            f"competitors list is empty AND rationale doesn't include "
+            f"'{NO_COMPETITORS_FALLBACK}'. State explicitly that no "
+            f"competitors were defined so the operator knows the "
+            f"comparison is to industry-average, not competitor-specific.",
+        )
 
     return _pass(
         "set_kpi_target_requires_research",
@@ -641,9 +631,7 @@ def _set_kpi_target_requires_research(
     )
 
 
-def _no_competitor_hallucinations(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _no_competitor_hallucinations(prop: dict, state: dict, ctx: dict) -> dict:
     """§27. Flow D competitive-research alerts must have `payload.research`
     with ≥2 sources (each with title+url+extracted) and non-empty
     `context_used`. Any `alert` whose `alert_type` indicates competitive
@@ -665,9 +653,7 @@ def _no_competitor_hallucinations(
         "trending_angle",
         "new_format",
     )
-    if alert_type not in competitive_alert_types and not alert_type.startswith(
-        "competitive_"
-    ):
+    if alert_type not in competitive_alert_types and not alert_type.startswith("competitive_"):
         return _pass(
             "no_competitor_hallucinations",
             note=f"alert_type={alert_type!r} is not competitive — rule doesn't apply",
@@ -714,9 +700,7 @@ def _no_competitor_hallucinations(
     )
 
 
-def _ab_test_requires_min_creatives(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _ab_test_requires_min_creatives(prop: dict, state: dict, ctx: dict) -> dict:
     """§29. ab_test_setup payload must contain 2-4 creatives. Block 11
     (2026-05-13)."""
     if prop.get("task_type") != "ab_test_setup":
@@ -823,9 +807,7 @@ def _ab_test_min_window_7d(prop: dict, state: dict, ctx: dict) -> dict:
     return _pass("ab_test_min_window_7d", days_elapsed=days_elapsed)
 
 
-def _prefer_gallery_over_generation(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _prefer_gallery_over_generation(prop: dict, state: dict, ctx: dict) -> dict:
     """§28. Block `new_creative` proposals when ≥3 viable unused gallery
     assets exist for the same channel/aspect. Operator can override by
     passing `source_preference: 'generate_new'` in the payload, which they
@@ -981,19 +963,40 @@ _FORBIDDEN_PARA1: list[tuple[re.Pattern[str], str]] = [
     # Meta engine / feature names
     (re.compile(r"\b(Andromeda|Advantage\+|Advantage Plus|Dynamic Creative)\b"), "מנועי Meta"),
     # Meta state strings
-    (re.compile(r"\b(LEARNING_LIMITED|LEARNING LIMITED|CAMPAIGN_LIMITED|LEARNING|ACTIVE|INACTIVE|PAUSED|LIMITED)\b"), "מצבי Meta"),
+    (
+        re.compile(
+            r"\b(LEARNING_LIMITED|LEARNING LIMITED|CAMPAIGN_LIMITED|LEARNING|ACTIVE|INACTIVE|PAUSED|LIMITED)\b"
+        ),
+        "מצבי Meta",
+    ),
     # English placement names (סטוריז / ריילז / פיד בעברית מותרים)
-    (re.compile(r"\b(Stories|Reels|Feed|Right Column|Audience Network)\b"), "שמות פלייסמנט באנגלית"),
+    (
+        re.compile(r"\b(Stories|Reels|Feed|Right Column|Audience Network)\b"),
+        "שמות פלייסמנט באנגלית",
+    ),
     # Meta CTA enum tokens
-    (re.compile(r"\b(MESSAGE_PAGE|LEARN_MORE|SIGN_UP|SHOP_NOW|GET_OFFER|CONTACT_US|SEND_MESSAGE)\b"), "אסימוני CTA"),
+    (
+        re.compile(
+            r"\b(MESSAGE_PAGE|LEARN_MORE|SIGN_UP|SHOP_NOW|GET_OFFER|CONTACT_US|SEND_MESSAGE)\b"
+        ),
+        "אסימוני CTA",
+    ),
     # Agent-internal jargon
     (re.compile(r"\bFlow\s+[A-D]\b"), "מסלולי סוכן (Flow A/B/C/D)"),
-    (re.compile(r"\b(dispatcher|tracking gate|tracking health|task_type|business_knowledge|monthly_brief|propose_task|execute_task|verify_pixel_capi|agent_decisions)\b"),
-     "אסימוני סוכן פנימיים"),
+    (
+        re.compile(
+            r"\b(dispatcher|tracking gate|tracking health|task_type|business_knowledge|monthly_brief|propose_task|execute_task|verify_pixel_capi|agent_decisions)\b"
+        ),
+        "אסימוני סוכן פנימיים",
+    ),
     (re.compile(r"\b\w+\.(py|sql|md)(:\d+)?\b"), "הפניות לקבצי קוד"),
     # Meta engineering jargon
-    (re.compile(r"\b(AEM|CAPI|Conversions API|Aggregated Event Measurement|Events Manager|Business Manager|Graph API|Marketing API|Pixel ID)\b"),
-     "מונחים הנדסיים של Meta"),
+    (
+        re.compile(
+            r"\b(AEM|CAPI|Conversions API|Aggregated Event Measurement|Events Manager|Business Manager|Graph API|Marketing API|Pixel ID)\b"
+        ),
+        "מונחים הנדסיים של Meta",
+    ),
 ]
 
 
@@ -1048,9 +1051,7 @@ def _audience_size_min_for_lookalike(prop: dict, state: dict, ctx: dict) -> dict
     seed truly cannot spawn a Lookalike.
     """
     if prop.get("task_type") != "create_lookalike":
-        return _pass(
-            "audience_size_min_for_lookalike", note="not a create_lookalike task"
-        )
+        return _pass("audience_size_min_for_lookalike", note="not a create_lookalike task")
     pay = prop.get("payload") or {}
     origin = pay.get("origin_audience_id")
     business_id = prop.get("business_id") or ctx.get("business_id")
@@ -1092,9 +1093,7 @@ def _audience_size_min_for_lookalike(prop: dict, state: dict, ctx: dict) -> dict
     )
 
 
-def _audience_targeting_not_double_narrowed(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _audience_targeting_not_double_narrowed(prop: dict, state: dict, ctx: dict) -> dict:
     """§36 — Don't stack a custom audience ID together with narrow interest
     targeting on the same ad set.
 
@@ -1114,11 +1113,7 @@ def _audience_targeting_not_double_narrowed(
     pay = prop.get("payload") or {}
     # Audience IDs can arrive as the dedicated Phase-1 payload keys OR baked
     # into a raw Meta targeting spec under new_targeting.custom_audiences.
-    ca_ids = (
-        pay.get("custom_audience_ids")
-        or pay.get("lookalike_audience_ids")
-        or []
-    )
+    ca_ids = pay.get("custom_audience_ids") or pay.get("lookalike_audience_ids") or []
     targeting = pay.get("new_targeting") or pay.get("targeting") or {}
     if isinstance(targeting, dict):
         for entry in targeting.get("custom_audiences") or []:
@@ -1199,7 +1194,7 @@ def _respect_prior_rejections(prop: dict, state: dict, ctx: dict) -> dict:
                 "respect_prior_rejections",
                 note="ack-only alert is exempt — informational, not actionable",
             )
-    rationale = (prop.get("rationale") or "")
+    rationale = prop.get("rationale") or ""
     if _PRIOR_REJECTION_ACK_RX.search(rationale):
         return _pass(
             "respect_prior_rejections",
@@ -1337,10 +1332,11 @@ def _new_campaign_payload_completeness(prop: dict, state: dict, ctx: dict) -> di
         if not promoted.get("pixel_id"):
             missing.append("promoted_object.pixel_id (required for OUTCOME_SALES)")
         if not promoted.get("custom_event_type"):
-            missing.append("promoted_object.custom_event_type (required for OUTCOME_SALES — e.g. PURCHASE)")
-    if objective in _OBJECTIVES_REQUIRING_PAGE:
-        if not promoted.get("page_id"):
-            missing.append(f"promoted_object.page_id (required for {objective})")
+            missing.append(
+                "promoted_object.custom_event_type (required for OUTCOME_SALES — e.g. PURCHASE)"
+            )
+    if objective in _OBJECTIVES_REQUIRING_PAGE and not promoted.get("page_id"):
+        missing.append(f"promoted_object.page_id (required for {objective})")
 
     # Ad fields
     for f in _NEW_CAMPAIGN_AD_FIELDS:
@@ -1407,23 +1403,13 @@ def _winner_requires_quality_grade(prop: dict, state: dict, ctx: dict) -> dict:
     task = prop.get("task_type")
     SCALING_TASKS = {"scale_up", "budget_change", "new_creative", "expand_audience"}
     if task not in SCALING_TASKS:
-        return _pass(
-            "winner_requires_quality_grade", note="not a scaling task_type"
-        )
+        return _pass("winner_requires_quality_grade", note="not a scaling task_type")
 
     # For budget_change, only enforce on increases.
     if task == "budget_change":
         pay = prop.get("payload") or {}
-        old = (
-            pay.get("old_daily_budget_cents")
-            or pay.get("old_daily_budget_ils")
-            or 0
-        )
-        new = (
-            pay.get("new_daily_budget_cents")
-            or pay.get("new_daily_budget_ils")
-            or 0
-        )
+        old = pay.get("old_daily_budget_cents") or pay.get("old_daily_budget_ils") or 0
+        new = pay.get("new_daily_budget_cents") or pay.get("new_daily_budget_ils") or 0
         try:
             if float(new) <= float(old):
                 return _pass(
@@ -1450,8 +1436,7 @@ def _winner_requires_quality_grade(prop: dict, state: dict, ctx: dict) -> dict:
         # agent should know. Pass with a heads-up note.
         return _pass(
             "winner_requires_quality_grade",
-            note="no leads from this campaign yet — quality unknown but "
-            "rule does not apply",
+            note="no leads from this campaign yet — quality unknown but rule does not apply",
             leads_total=leads_total,
         )
 
@@ -1508,9 +1493,7 @@ _KPI_OBJECTIVE_FIT: dict[str, set[str]] = {
 }
 
 
-def _campaign_objective_aligned_with_kpi(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _campaign_objective_aligned_with_kpi(prop: dict, state: dict, ctx: dict) -> dict:
     """§41 — A new_campaign's objective must produce signal for the business
     KPI. Otherwise the proposal builds a Meta campaign that can't be evaluated.
 
@@ -1586,9 +1569,7 @@ def _campaign_objective_aligned_with_kpi(
 # --------------------------------------------------------------------------
 
 
-def _geo_targeting_set_for_new_campaign(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _geo_targeting_set_for_new_campaign(prop: dict, state: dict, ctx: dict) -> dict:
     """§42 — Warn (do not block) when a new_campaign is proposed and the
     business has no `geo_targeting` configured in business_knowledge.
 
@@ -1627,8 +1608,7 @@ def _geo_targeting_set_for_new_campaign(
     if isinstance(geo, dict):
         include = geo.get("include")
         if isinstance(include, dict) and any(
-            include.get(k)
-            for k in ("countries", "regions", "cities", "radius_centers", "zips")
+            include.get(k) for k in ("countries", "regions", "cities", "radius_centers", "zips")
         ):
             has_geo = True
 
@@ -1743,14 +1723,18 @@ def _copy_must_match_brief_voice(prop: dict, state: dict, ctx: dict) -> dict:
                 hits.append({"field": field, "token": token, "category": "aiweon_forbidden"})
         # Specific-ROI claims (regex)
         for m in _RX_SPECIFIC_ROI_CLAIM.finditer(text):
-            hits.append({"field": field, "token": m.group(0), "category": "specific_roi_without_data"})
+            hits.append(
+                {"field": field, "token": m.group(0), "category": "specific_roi_without_data"}
+            )
         ai_total += len(_RX_AI_MENTIONS.findall(text))
     if ai_total > 1:
-        hits.append({
-            "field": "(combined copy fields)",
-            "token": f"AI mentioned {ai_total} times",
-            "category": "ai_overuse_max_one",
-        })
+        hits.append(
+            {
+                "field": "(combined copy fields)",
+                "token": f"AI mentioned {ai_total} times",
+                "category": "ai_overuse_max_one",
+            }
+        )
     if not hits:
         return _pass("copy_must_match_brief_voice")
     # Dedup
@@ -1940,9 +1924,7 @@ def _fetch_context(
             """,
             (business_id, target_id),
         )
-        ctx["scale_downs_last_14d_on_target"] = (
-            (scale_down_row or {}).get("n", 0) or 0
-        )
+        ctx["scale_downs_last_14d_on_target"] = (scale_down_row or {}).get("n", 0) or 0
 
     # Block 8 (2026-05-13): gallery census for §28
     # prefer_gallery_over_generation. Mirror the SQL of
@@ -1982,9 +1964,7 @@ def _fetch_context(
                 """,
                 (business_id, aspects, business_id),
             )
-            ctx["viable_unused_gallery_count_for_channel"] = (
-                (viable_row or {}).get("n", 0) or 0
-            )
+            ctx["viable_unused_gallery_count_for_channel"] = (viable_row or {}).get("n", 0) or 0
             ctx["proposal_channel"] = proposal_channel
 
     # §37 prior_rejections_60d — feed _respect_prior_rejections (2026-05-13 PM).
@@ -2104,9 +2084,7 @@ def _fetch_context(
                 avg_grade = q_row.get("avg_grade")
                 weighted = float(q_row.get("weighted_sum") or 0)
                 effective = weighted + (leads_total - leads_graded) * 0.5
-                effective_ratio = (
-                    effective / leads_total if leads_total > 0 else None
-                )
+                effective_ratio = effective / leads_total if leads_total > 0 else None
                 if leads_total == 0:
                     status = "no_leads"
                 elif effective == 0:
@@ -2126,9 +2104,7 @@ def _fetch_context(
                     round(avg_grade, 2) if avg_grade is not None else None
                 )
                 ctx["lead_quality_effective_ratio"] = (
-                    round(effective_ratio, 2)
-                    if effective_ratio is not None
-                    else None
+                    round(effective_ratio, 2) if effective_ratio is not None else None
                 )
 
     # §39 active_plans_for_target — feed _respect_active_plans (2026-05-13 PM).
@@ -2152,15 +2128,21 @@ def _fetch_context(
                 (business_id, target_id),
             )
             for pr in carry_rows or []:
-                active_plans.append({
-                    "plan_id": str(pr["id"]),
-                    "source_approval_id": str(pr["source_approval_id"]) if pr.get("source_approval_id") else None,
-                    "step_order": pr["step_order"],
-                    "action_text": pr["action_text"],
-                    "trigger_condition": pr.get("trigger_condition"),
-                    "committed_on": pr["committed_at"].date().isoformat() if pr.get("committed_at") else None,
-                    "source": "plans_carryover",
-                })
+                active_plans.append(
+                    {
+                        "plan_id": str(pr["id"]),
+                        "source_approval_id": str(pr["source_approval_id"])
+                        if pr.get("source_approval_id")
+                        else None,
+                        "step_order": pr["step_order"],
+                        "action_text": pr["action_text"],
+                        "trigger_condition": pr.get("trigger_condition"),
+                        "committed_on": pr["committed_at"].date().isoformat()
+                        if pr.get("committed_at")
+                        else None,
+                        "source": "plans_carryover",
+                    }
+                )
         except Exception:
             # plans_carryover table not present (pre-migration env). Continue
             # with regex fallback only.
@@ -2193,9 +2175,9 @@ def _fetch_context(
             m = plan_header_rx.search(rationale)
             if not m:
                 continue
-            after = rationale[m.end():]
+            after = rationale[m.end() :]
             footer_m = footer_rx.search(after)
-            block = after[:footer_m.start()] if footer_m else after
+            block = after[: footer_m.start()] if footer_m else after
             steps: list[str] = []
             for sm in step_rx.finditer(block):
                 t = sm.group(2).strip()
@@ -2208,11 +2190,13 @@ def _fetch_context(
             if not forward:
                 continue
             committed = r.get("executed_at") or r.get("approved_at")
-            active_plans.append({
-                "approval_id": str(r["id"]),
-                "committed_on": committed.date().isoformat() if committed else None,
-                "forward_steps": forward,
-            })
+            active_plans.append(
+                {
+                    "approval_id": str(r["id"]),
+                    "committed_on": committed.date().isoformat() if committed else None,
+                    "forward_steps": forward,
+                }
+            )
         ctx["active_plans_for_target"] = active_plans
 
     return ctx

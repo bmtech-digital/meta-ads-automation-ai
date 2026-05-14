@@ -57,9 +57,9 @@ def extract_steps(rationale: str | None) -> list[dict[str, Any]]:
     m = _PLAN_HEADER_RX.search(rationale)
     if not m:
         return []
-    after = rationale[m.end():]
+    after = rationale[m.end() :]
     footer_m = _FOOTER_RX.search(after)
-    block = after[:footer_m.start()] if footer_m else after
+    block = after[: footer_m.start()] if footer_m else after
     raw: list[str] = []
     for sm in _STEP_LINE_RX.finditer(block):
         text = sm.group(2).strip()
@@ -77,11 +77,13 @@ def extract_steps(rationale: str | None) -> list[dict[str, Any]]:
         trig_m = _TRIGGER_RX.match(text)
         if trig_m:
             trigger = trig_m.group(1).strip()
-        out.append({
-            "step_order": i,
-            "action_text": text,
-            "trigger_condition": trigger,
-        })
+        out.append(
+            {
+                "step_order": i,
+                "action_text": text,
+                "trigger_condition": trigger,
+            }
+        )
     return out
 
 
@@ -96,8 +98,7 @@ def persist_from_approval(conn, approval_id: str) -> int:
     """
     with conn.cursor() as cur:
         cur.execute(
-            "SELECT business_id, target_kind, target_id, rationale "
-            "FROM approvals WHERE id = %s",
+            "SELECT business_id, target_kind, target_id, rationale FROM approvals WHERE id = %s",
             (approval_id,),
         )
         row = cur.fetchone()
@@ -175,28 +176,36 @@ def load_active_for_target(conn, business_id: str, target_id: str | None) -> lis
     out: list[dict[str, Any]] = []
     for r in rows:
         if isinstance(r, dict):
-            out.append({
-                "plan_id": str(r["id"]),
-                "source_approval_id": str(r["source_approval_id"]) if r.get("source_approval_id") else None,
-                "target_kind": r.get("target_kind"),
-                "target_id": r.get("target_id"),
-                "step_order": r["step_order"],
-                "action_text": r["action_text"],
-                "trigger_condition": r.get("trigger_condition"),
-                "committed_on": r["committed_at"].date().isoformat() if r.get("committed_at") else None,
-            })
+            out.append(
+                {
+                    "plan_id": str(r["id"]),
+                    "source_approval_id": str(r["source_approval_id"])
+                    if r.get("source_approval_id")
+                    else None,
+                    "target_kind": r.get("target_kind"),
+                    "target_id": r.get("target_id"),
+                    "step_order": r["step_order"],
+                    "action_text": r["action_text"],
+                    "trigger_condition": r.get("trigger_condition"),
+                    "committed_on": r["committed_at"].date().isoformat()
+                    if r.get("committed_at")
+                    else None,
+                }
+            )
         else:
             (pid, src, tk, ti, so, at, tc, ca, _ea) = r
-            out.append({
-                "plan_id": str(pid),
-                "source_approval_id": str(src) if src else None,
-                "target_kind": tk,
-                "target_id": ti,
-                "step_order": so,
-                "action_text": at,
-                "trigger_condition": tc,
-                "committed_on": ca.date().isoformat() if ca else None,
-            })
+            out.append(
+                {
+                    "plan_id": str(pid),
+                    "source_approval_id": str(src) if src else None,
+                    "target_kind": tk,
+                    "target_id": ti,
+                    "step_order": so,
+                    "action_text": at,
+                    "trigger_condition": tc,
+                    "committed_on": ca.date().isoformat() if ca else None,
+                }
+            )
     return out
 
 

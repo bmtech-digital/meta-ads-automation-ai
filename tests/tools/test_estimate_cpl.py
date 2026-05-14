@@ -17,17 +17,17 @@ for every tool.
 from __future__ import annotations
 
 from campaigner.lib.cpl_infrastructure import (
-    Channel,
-    EstimateInput,
-    FunnelStage,
     GEO_MODIFIER,
-    GeoTier,
     OFFER_MODIFIER,
-    OfferType,
     PRIMARY_SOURCES,
     SECURITY_EVENT_MULTIPLIER,
     STAGE_MODIFIER,
     SUBVERTICALS,
+    Channel,
+    EstimateInput,
+    FunnelStage,
+    GeoTier,
+    OfferType,
     SubVertical,
     estimate_cpl,
     is_generic_campaign_name,
@@ -35,7 +35,6 @@ from campaigner.lib.cpl_infrastructure import (
     month_of,
     pick_geo_tier,
 )
-
 
 # ─────────────────────────────────────────────────────────────────────
 # Pure-function parity with TypeScript
@@ -235,18 +234,18 @@ class TestMatchSubVertical:
         that term in matched_terms (boosted ×3). Different campaign names
         produce matched_terms that show which service the campaign is about.
         """
-        common = dict(
-            vertical=None,
-            products_raw=(
+        common = {
+            "vertical": None,
+            "products_raw": (
                 "סוכני AI — צ'אט שמדבר עברית רהוטה  "
                 "סרטוני AI — סרטוני שיווק קולנועיים  "
                 "קמפיינים AI — אופטימיזציית קמפיינים  "
                 "מיתוג משפיעות — שיתופי פעולה עם משפיעות"
             ),
-            ideal_customer=None,
-            usp=None,
-            main_pain=None,
-        )
+            "ideal_customer": None,
+            "usp": None,
+            "main_pain": None,
+        }
         # Without campaign-name — aggregate match. All 4 AIWEON services
         # route to agency_services. Should not be OTHER now.
         baseline = match_sub_vertical(**common)
@@ -256,20 +255,18 @@ class TestMatchSubVertical:
         )
         # WITH campaign name pointing at a specific service — that term
         # should appear in matched_terms (boosted ×3).
-        agents_campaign = match_sub_vertical(
-            **common, campaign_name="סוכן AI לאתר B2B"
-        )
-        assert "סוכן AI" in agents_campaign.matched_terms or "AI agent" in agents_campaign.matched_terms, (
-            f"campaign 'סוכן AI' should bias matched_terms, got "
-            f"{agents_campaign.matched_terms}"
-        )
-        videos_campaign = match_sub_vertical(
-            **common, campaign_name="סרטון AI להשקה"
-        )
+        agents_campaign = match_sub_vertical(**common, campaign_name="סוכן AI לאתר B2B")
+        assert (
+            "סוכן AI" in agents_campaign.matched_terms
+            or "AI agent" in agents_campaign.matched_terms
+        ), f"campaign 'סוכן AI' should bias matched_terms, got {agents_campaign.matched_terms}"
+        videos_campaign = match_sub_vertical(**common, campaign_name="סרטון AI להשקה")
         # Should find the videos term either as "סרטון AI" or "סרטוני AI"
         # depending on how the matcher tokenizes (we use `in` substring).
         videos_matched = " ".join(videos_campaign.matched_terms)
-        assert ("AI" in videos_matched and ("סרטון" in videos_matched or "video" in videos_matched.lower())), (
+        assert "AI" in videos_matched and (
+            "סרטון" in videos_matched or "video" in videos_matched.lower()
+        ), (
             f"campaign 'סרטון AI' should surface a video-related term, got "
             f"{videos_campaign.matched_terms}"
         )
@@ -370,15 +367,30 @@ class TestIsGenericCampaignName:
         assert ok is True
 
     def test_canonical_garbage_patterns(self):
-        for v in ("Campaign", "Campaign 1", "campaign 42", "test", "test 3",
-                  "Untitled", "untitled", "new campaign", "New Campaign",
-                  "12345", "999"):
+        for v in (
+            "Campaign",
+            "Campaign 1",
+            "campaign 42",
+            "test",
+            "test 3",
+            "Untitled",
+            "untitled",
+            "new campaign",
+            "New Campaign",
+            "12345",
+            "999",
+        ):
             ok, _ = is_generic_campaign_name(v)
             assert ok is True, f"{v!r} should be generic"
 
     def test_descriptive_names_pass(self):
-        for v in ("סוכן AI - שלב 1", "Brand Awareness Q2 2026",
-                  "מיתוג משפיעות - אביב", "סרטון AI דמו", "AIWEON Lead Gen"):
+        for v in (
+            "סוכן AI - שלב 1",
+            "Brand Awareness Q2 2026",
+            "מיתוג משפיעות - אביב",
+            "סרטון AI דמו",
+            "AIWEON Lead Gen",
+        ):
             ok, reason = is_generic_campaign_name(v)
             assert ok is False, f"{v!r} should pass (got reason={reason})"
 

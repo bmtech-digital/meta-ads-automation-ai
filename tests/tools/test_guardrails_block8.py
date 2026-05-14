@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from campaigner.tools.check_guardrails import _prefer_gallery_over_generation
 
-
 # ---------- block when viable unused count crosses the threshold
 
 

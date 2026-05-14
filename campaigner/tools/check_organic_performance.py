@@ -120,9 +120,7 @@ def _resolve_token_cached(business_id: str, network: str, cache: dict) -> tuple[
     return cache[key]
 
 
-def _fetch_post_insights(
-    business_id: str, post_id: str, task_type: str, token_cache: dict
-) -> dict:
+def _fetch_post_insights(business_id: str, post_id: str, task_type: str, token_cache: dict) -> dict:
     """Live Meta read for an organic post — Block 8 (2026-05-13).
 
     Resolves the Page Access Token via `page_tokens.get_publishing_target` (FB
@@ -266,9 +264,7 @@ def main() -> None:
     for row in rows:
         post_id = row["external_post_id"]
         task_type = row["task_type"]
-        insights = _fetch_post_insights(
-            args.business_id, post_id, task_type, token_cache
-        )
+        insights = _fetch_post_insights(args.business_id, post_id, task_type, token_cache)
 
         impressions = _safe_int(insights.get("impressions"))
         reactions = _safe_int(insights.get("reactions"))

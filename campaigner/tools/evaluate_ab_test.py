@@ -278,9 +278,7 @@ def main() -> None:
                 "spend": round(perf.get("spend", 0), 2),
                 "conversions": round(perf.get("conversions", 0), 2),
                 "video_3s_views": int(perf.get("video_3s", 0)),
-                "metric_value": (
-                    None if metric_val is None else round(metric_val, 4)
-                ),
+                "metric_value": (None if metric_val is None else round(metric_val, 4)),
             }
         )
         if metric_val is not None:
@@ -298,9 +296,7 @@ def main() -> None:
         top_label, top_cid, top_val, top_imp = metric_values[0]
         _, _, runner_val, _ = metric_values[1]
         per_variant_imp = [t[3] for t in metric_values]
-        confidence, margin_pct = _classify_confidence(
-            top_val, runner_val, per_variant_imp, metric
-        )
+        confidence, margin_pct = _classify_confidence(top_val, runner_val, per_variant_imp, metric)
         winner_block = {
             "variant_label": top_label,
             "creative_id": top_cid,

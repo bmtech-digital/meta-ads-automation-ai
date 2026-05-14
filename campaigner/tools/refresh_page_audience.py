@@ -107,7 +107,7 @@ def main() -> None:
             continue
 
         try:
-            inserted = with_db_retry(lambda: _upsert_grid(page_id, grid))
+            inserted = with_db_retry(lambda pid=page_id, g=grid: _upsert_grid(pid, g))
         except Exception as e:
             results.append(
                 {
@@ -139,9 +139,7 @@ def _upsert_grid(page_id: str, grid: dict[int, int]) -> int:
     with get_connection() as conn, conn.cursor() as cur:
         # psycopg3 supports COPY but for 168 rows a VALUES is simpler.
         # Build the parameter list and a $1,$2... placeholder string by hand.
-        placeholders = ",".join(
-            ["(%s, %s, %s, now())"] * len(rows)
-        )
+        placeholders = ",".join(["(%s, %s, %s, now())"] * len(rows))
         flat_params: list = []
         for r in rows:
             flat_params.extend(r)

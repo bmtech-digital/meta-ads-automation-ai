@@ -90,7 +90,20 @@ def main() -> None:
     )
     p.add_argument(
         "--month",
-        choices=list("jan feb mar apr may jun jul aug sep oct nov dec".split()),
+        choices=[
+            "jan",
+            "feb",
+            "mar",
+            "apr",
+            "may",
+            "jun",
+            "jul",
+            "aug",
+            "sep",
+            "oct",
+            "nov",
+            "dec",
+        ],
         default=None,
         help="Month key for seasonality. Default: current month in Asia/Jerusalem.",
     )
@@ -169,9 +182,19 @@ def main() -> None:
         return
 
     vertical_raw = knowledge.get("vertical")
-    vertical: Vertical | None = vertical_raw if vertical_raw in (
-        "ecommerce", "leads", "b2b_saas", "awareness", "app", "other",
-    ) else None
+    vertical: Vertical | None = (
+        vertical_raw
+        if vertical_raw
+        in (
+            "ecommerce",
+            "leads",
+            "b2b_saas",
+            "awareness",
+            "app",
+            "other",
+        )
+        else None
+    )
 
     # ── match sub-vertical ──
     products_blob = _products_to_text(knowledge.get("products"))
@@ -220,9 +243,7 @@ def main() -> None:
         cell = SUBVERTICALS[sub]
         # For B2C services (leads), CTWA is the IL default. Everything else
         # defaults to lead_form (the global baseline).
-        channel = (
-            Channel.CLICK_TO_WHATSAPP if cell.parent == "leads" else Channel.LEAD_FORM
-        )
+        channel = Channel.CLICK_TO_WHATSAPP if cell.parent == "leads" else Channel.LEAD_FORM
 
     # ── month ──
     if args.month:
@@ -259,8 +280,7 @@ def main() -> None:
 
     # ── decide whether the agent should still WebSearch on top ──
     needs_live_research = (
-        estimate.confidence == "low"
-        or match_meta["confidence_of_match"] == "fallback"
+        estimate.confidence == "low" or match_meta["confidence_of_match"] == "fallback"
     )
 
     # ── detect generic / uninformative campaign name (F7, 2026-05-13) ──
@@ -312,9 +332,7 @@ def main() -> None:
                 "name": args.campaign_name,
                 "is_generic": bool(is_generic and args.campaign_name),
                 "reason": generic_reason if args.campaign_name else None,
-                "agent_action": (
-                    "propose_alert_rename_campaign" if needs_rename_alert else None
-                ),
+                "agent_action": ("propose_alert_rename_campaign" if needs_rename_alert else None),
             },
         }
     )

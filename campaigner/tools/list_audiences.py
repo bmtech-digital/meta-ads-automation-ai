@@ -20,7 +20,6 @@ import argparse
 from campaigner.lib.db import get_connection
 from campaigner.tools._contract import emit_runtime_error, emit_success, with_db_retry
 
-
 _FIELDS = [
     "id",
     "meta_audience_id",
@@ -90,9 +89,7 @@ def _query(
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description="List audiences from the local meta_audiences mirror."
-    )
+    p = argparse.ArgumentParser(description="List audiences from the local meta_audiences mirror.")
     p.add_argument("--business-id", required=True)
     p.add_argument(
         "--kind",

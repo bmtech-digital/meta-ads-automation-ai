@@ -56,13 +56,13 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from datetime import UTC
 from typing import Any
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import fetch_one, get_connection
 from campaigner.lib.meta_client import MetaClient
 from campaigner.lib.page_publishing import (
-    PagePublishError,
     publish_fb_photo_post,
     publish_fb_text_post,
     publish_ig_carousel_post,
@@ -71,7 +71,6 @@ from campaigner.lib.page_publishing import (
     publish_ig_story,
 )
 from campaigner.lib.page_tokens import (
-    TokenLookupError,
     get_fb_publishing_target,
     get_ig_publishing_target,
 )
@@ -141,6 +140,7 @@ def _persist_success(approval_id: str, meta_result: dict) -> dict:
         # log to stderr and continue.
         try:
             from campaigner.lib import plans as _plans
+
             _plans.persist_from_approval(conn, approval_id)
         except Exception as exc:  # noqa: BLE001
             print(f"plans_carryover persist failed for {approval_id}: {exc}", file=sys.stderr)
@@ -325,17 +325,13 @@ def _dispatch_publish_ig_post(approval: dict, payload: dict) -> dict:
     caption = payload.get("caption")
     image_urls = payload.get("image_urls")
     if image_urls:
-        return publish_ig_carousel_post(
-            ig_user_id, page_token, image_urls, caption=caption
-        )
+        return publish_ig_carousel_post(ig_user_id, page_token, image_urls, caption=caption)
     image_url = payload.get("image_url")
     if not image_url:
         raise ValueError(
             "publish_ig_post payload must include `image_url` or `image_urls` (2..10 for carousel)"
         )
-    return publish_ig_image_post(
-        ig_user_id, page_token, image_url, caption=caption
-    )
+    return publish_ig_image_post(ig_user_id, page_token, image_url, caption=caption)
 
 
 def _dispatch_publish_ig_story(approval: dict, payload: dict) -> dict:
@@ -388,9 +384,7 @@ def _resolve_image_path(business_id: str, payload: dict) -> str:
             )
         storage_url = row.get("storage_url")
         if not storage_url:
-            raise ValueError(
-                f"creative_gallery_id {gallery_id} has no storage_url"
-            )
+            raise ValueError(f"creative_gallery_id {gallery_id} has no storage_url")
         if storage_url.startswith(("/", "file:")):
             return storage_url.replace("file://", "")
         # Remote storage — fall through to URL download with the gallery URL.
@@ -399,8 +393,7 @@ def _resolve_image_path(business_id: str, payload: dict) -> str:
     image_url = payload.get("image_url")
     if not image_url:
         raise ValueError(
-            "new_creative payload requires one of: image_path, "
-            "creative_gallery_id, or image_url"
+            "new_creative payload requires one of: image_path, creative_gallery_id, or image_url"
         )
 
     # Materialize to /tmp. Use the URL's extension; default to .jpg.
@@ -409,19 +402,18 @@ def _resolve_image_path(business_id: str, payload: dict) -> str:
         if image_url.lower().rsplit("?", 1)[0].endswith(ext):
             suffix = ext
             break
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)  # noqa: SIM115
     tmp.close()
     try:
-        with urllib.request.urlopen(image_url, timeout=30) as r, open(tmp.name, "wb") as out:
+        tmp_path = Path(tmp.name)
+        with urllib.request.urlopen(image_url, timeout=30) as r, tmp_path.open("wb") as out:
             out.write(r.read())
     except Exception as e:
         raise ValueError(f"download from image_url failed ({image_url}): {e}") from e
     return tmp.name
 
 
-def _dispatch_new_creative(
-    client: MetaClient, approval: dict, payload: dict
-) -> dict:
+def _dispatch_new_creative(client: MetaClient, approval: dict, payload: dict) -> dict:
     """Add a new ad (image creative) to an existing adset.
 
     Payload contract:
@@ -451,9 +443,7 @@ def _dispatch_new_creative(
 
     target_kind = approval.get("target_kind")
     target_id = approval.get("target_id")
-    adset_id = payload.get("adset_id") or (
-        target_id if target_kind == "adset" else None
-    )
+    adset_id = payload.get("adset_id") or (target_id if target_kind == "adset" else None)
     if not adset_id:
         raise ValueError(
             "new_creative requires adset_id in payload or target_kind='adset' + target_id"
@@ -499,9 +489,7 @@ def _dispatch_new_creative(
     }
 
 
-def _dispatch_boost_post(
-    client: MetaClient, approval: dict, payload: dict
-) -> dict:
+def _dispatch_boost_post(client: MetaClient, approval: dict, payload: dict) -> dict:
     """Promote an existing organic Page post as a paid ad.
 
     Payload contract:
@@ -694,7 +682,6 @@ def _dispatch_ab_test_decide(approval: dict, payload: dict) -> dict:
     inform future creative choices, they don't force allocation moves.
     Operator can emit a follow-up `scale_up` / `pause_adset` if they want.
     """
-    from datetime import UTC, datetime
     import json as _json
 
     ab_test_id = payload.get("ab_test_id")
@@ -771,9 +758,7 @@ def _dispatch_ab_test_decide(approval: dict, payload: dict) -> dict:
     }
 
 
-def _dispatch_redeploy_creative(
-    client: MetaClient, approval: dict, payload: dict
-) -> dict:
+def _dispatch_redeploy_creative(client: MetaClient, approval: dict, payload: dict) -> dict:
     """Deploy an existing creative_gallery asset into an ad set.
 
     Block 8 (2026-05-13) — gallery-first sourcing. Use this INSTEAD of
@@ -842,13 +827,9 @@ def _dispatch_redeploy_creative(
         (gallery_id, business_id),
     )
     if not row:
-        raise ValueError(
-            f"creative_gallery_id {gallery_id} not found for business {business_id}"
-        )
+        raise ValueError(f"creative_gallery_id {gallery_id} not found for business {business_id}")
     if row.get("deleted_at") is not None:
-        raise ValueError(
-            f"creative_gallery_id {gallery_id} is soft-deleted — pick a live asset"
-        )
+        raise ValueError(f"creative_gallery_id {gallery_id} is soft-deleted — pick a live asset")
 
     name = payload.get("name") or f"redeploy-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
     force_reupload = bool(payload.get("force_reupload"))
@@ -958,9 +939,7 @@ def _dispatch_redeploy_creative(
     }
 
 
-def _dispatch_expand_audience(
-    client: MetaClient, approval: dict, payload: dict
-) -> dict:
+def _dispatch_expand_audience(client: MetaClient, approval: dict, payload: dict) -> dict:
     """Replace the targeting of an ad set with a broader spec.
 
     Payload contract:
@@ -982,9 +961,7 @@ def _dispatch_expand_audience(
     """
     target_kind = approval.get("target_kind")
     target_id = approval.get("target_id")
-    adset_id = payload.get("adset_id") or (
-        target_id if target_kind == "adset" else None
-    )
+    adset_id = payload.get("adset_id") or (target_id if target_kind == "adset" else None)
     if not adset_id:
         raise ValueError(
             "expand_audience requires target_kind='adset' + target_id (or adset_id in payload)"
@@ -1015,9 +992,7 @@ def _dispatch_expand_audience(
 
     if excluded_ids:
         existing_excl = list(merged.get("excluded_custom_audiences") or [])
-        seen_excl = {
-            str(e.get("id")) for e in existing_excl if isinstance(e, dict) and e.get("id")
-        }
+        seen_excl = {str(e.get("id")) for e in existing_excl if isinstance(e, dict) and e.get("id")}
         for aid in excluded_ids:
             if aid and str(aid) not in seen_excl:
                 existing_excl.append({"id": str(aid)})
@@ -1034,9 +1009,7 @@ def _dispatch_expand_audience(
     }
 
 
-def _dispatch_new_campaign(
-    client: MetaClient, approval: dict, payload: dict
-) -> dict:
+def _dispatch_new_campaign(client: MetaClient, approval: dict, payload: dict) -> dict:
     """Phase 3 — chain campaign + adset + creative + ad from the rich payload.
 
     Honors the propose_task `new_campaign` contract verbatim. Three responsibilities
@@ -1061,9 +1034,7 @@ def _dispatch_new_campaign(
     creative_gallery_id = cs.get("creative_gallery_id")
     write_back_gallery_id: str | None = None
 
-    if creative_gallery_id and not cs.get("existing_creative_id") and not cs.get(
-        "image_path"
-    ):
+    if creative_gallery_id and not cs.get("existing_creative_id") and not cs.get("image_path"):
         # Look up the gallery row.
         with get_connection() as conn, conn.cursor() as cur:
             cur.execute(
@@ -1076,9 +1047,7 @@ def _dispatch_new_campaign(
             )
             row = cur.fetchone()
         if not row:
-            raise ValueError(
-                f"creative_gallery_id {creative_gallery_id} not found / deleted"
-            )
+            raise ValueError(f"creative_gallery_id {creative_gallery_id} not found / deleted")
         if row.get("meta_creative_id"):
             # Short-circuit: reuse the existing creative.
             cs["existing_creative_id"] = row["meta_creative_id"]
@@ -1087,9 +1056,7 @@ def _dispatch_new_campaign(
             # `/api/gallery/file/<biz>/<key>` — resolve to disk path.
             url = row.get("storage_url") or ""
             if not url:
-                raise ValueError(
-                    f"gallery row {creative_gallery_id} has no storage_url"
-                )
+                raise ValueError(f"gallery row {creative_gallery_id} has no storage_url")
             # Map web-served path to container filesystem (gallery uploads
             # live under /app/web/uploads/<biz>/<key> in dev).
             cs["image_path"] = _resolve_gallery_path(url)
@@ -1115,9 +1082,7 @@ def _dispatch_new_campaign(
                 )
         except Exception as e:
             # Non-fatal: the campaign is up; the gallery just won't auto-link.
-            result.setdefault("warnings", []).append(
-                f"gallery write-back failed: {e!r}"
-            )
+            result.setdefault("warnings", []).append(f"gallery write-back failed: {e!r}")
 
     return {
         "type": "new_campaign",
@@ -1133,7 +1098,7 @@ def _resolve_gallery_path(storage_url: str) -> str:
     """
     prefix = "/api/gallery/file/"
     if storage_url.startswith(prefix):
-        return f"/app/web/uploads/{storage_url[len(prefix):]}"
+        return f"/app/web/uploads/{storage_url[len(prefix) :]}"
     # Already a path or some other form — pass through.
     return storage_url
 
@@ -1164,7 +1129,7 @@ def _persist_audience_row(
     later sync_audiences run can't accidentally clear it via no-op upsert.
     """
     import json as _json
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from campaigner.lib.db import get_connection
 
@@ -1185,7 +1150,7 @@ def _persist_audience_row(
             except ValueError:
                 return None
         if isinstance(v, (int, float)):
-            return datetime.fromtimestamp(v, tz=timezone.utc)
+            return datetime.fromtimestamp(v, tz=UTC)
         return None
 
     def _j(v):
@@ -1237,9 +1202,7 @@ def _persist_audience_row(
         )
 
 
-def _dispatch_create_custom_audience(
-    client: MetaClient, approval: dict, payload: dict
-) -> dict:
+def _dispatch_create_custom_audience(client: MetaClient, approval: dict, payload: dict) -> dict:
     """Create a non-PII Custom Audience on Meta + mirror it locally.
 
     Phase 1 subtypes only: WEBSITE / ENGAGEMENT / VIDEO / LEAD_GENERATION.
@@ -1280,9 +1243,7 @@ def _dispatch_create_custom_audience(
     }
 
 
-def _dispatch_create_lookalike(
-    client: MetaClient, approval: dict, payload: dict
-) -> dict:
+def _dispatch_create_lookalike(client: MetaClient, approval: dict, payload: dict) -> dict:
     """Create a Lookalike Audience from a seed + mirror locally.
 
     Guardrail §29 (audience_size_min) is enforced at the propose layer using
@@ -1292,9 +1253,7 @@ def _dispatch_create_lookalike(
     name = payload.get("name")
     origin = payload.get("origin_audience_id")
     if not name or not origin:
-        raise ValueError(
-            "create_lookalike requires payload.name + payload.origin_audience_id"
-        )
+        raise ValueError("create_lookalike requires payload.name + payload.origin_audience_id")
     ratio = float(payload.get("ratio") or 0.01)
     if not (0.01 <= ratio <= 0.10):
         raise ValueError(f"create_lookalike ratio must be in [0.01, 0.10], got {ratio}")
@@ -1422,7 +1381,7 @@ def main() -> None:
         # Meta call SUCCEEDED but DB update failed — this is the nasty failure mode.
         # Emit runtime error so runner logs and mark_failed records the discrepancy.
         emit_runtime_error(
-            f"meta call succeeded but approval update failed: {e}. " f"meta_result={meta_result}",
+            f"meta call succeeded but approval update failed: {e}. meta_result={meta_result}",
             exc=e,
         )
         return

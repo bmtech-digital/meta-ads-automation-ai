@@ -300,8 +300,7 @@ def test_propose_task_ab_test_decide_accepted(invoke_tool, cleanup_run, business
         "--task-type",
         "ab_test_decide",
         "--payload",
-        '{"ab_test_id":"00000000-0000-0000-0000-000000000000",'
-        '"cancel_instead":true}',
+        '{"ab_test_id":"00000000-0000-0000-0000-000000000000","cancel_instead":true}',
         "--rationale",
         "contract test for ab_test_decide (cancel)",
     )
@@ -546,9 +545,7 @@ def test_propose_audience_custom_website_no_rule_exits_2(invoke_tool, business_i
     assert r.returncode == 2
 
 
-def test_propose_audience_custom_engagement_valid_exits_0(
-    invoke_tool, cleanup_run, business_id
-):
+def test_propose_audience_custom_engagement_valid_exits_0(invoke_tool, cleanup_run, business_id):
     """Happy path — ENGAGEMENT subtype needs no rule, lands as a pending row."""
     r = invoke_tool(
         "propose_audience",
@@ -579,9 +576,7 @@ def test_propose_audience_custom_engagement_valid_exits_0(
 # ---------- Block 13 follow-up: --service-tag validation ----------
 
 
-def test_propose_audience_service_tag_unknown_exits_2(
-    invoke_tool, business_id, run_id
-):
+def test_propose_audience_service_tag_unknown_exits_2(invoke_tool, business_id, run_id):
     """A service_tag that isn't in business_knowledge.products is a validation error.
 
     Prevents the agent from proposing an audience tied to a service that

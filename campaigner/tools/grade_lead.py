@@ -38,8 +38,7 @@ def _grade(args: argparse.Namespace) -> dict:
         with get_connection() as conn, conn.cursor() as cur:
             # Verify lead exists for this business — fail loudly otherwise.
             cur.execute(
-                "SELECT id, business_id, meta_campaign_id, full_name "
-                "FROM leads WHERE id = %s",
+                "SELECT id, business_id, meta_campaign_id, full_name FROM leads WHERE id = %s",
                 (args.lead_id,),
             )
             lead = cur.fetchone()
@@ -93,13 +92,9 @@ def _grade(args: argparse.Namespace) -> dict:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Record an operator quality grade on a lead."
-    )
+    p = argparse.ArgumentParser(description="Record an operator quality grade on a lead.")
     p.add_argument("--business-id", required=True)
-    p.add_argument(
-        "--lead-id", required=True, help="local leads.id (uuid), NOT the Meta lead_id"
-    )
+    p.add_argument("--lead-id", required=True, help="local leads.id (uuid), NOT the Meta lead_id")
     p.add_argument(
         "--grade",
         type=int,
@@ -137,9 +132,7 @@ def main() -> None:
         return
 
     if result.get("error"):
-        emit_validation_error(
-            result["error"], {k: v for k, v in result.items() if k != "error"}
-        )
+        emit_validation_error(result["error"], {k: v for k, v in result.items() if k != "error"})
         return
 
     emit_success(result)

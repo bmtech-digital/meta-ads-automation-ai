@@ -161,8 +161,7 @@ def main() -> None:
         "--lookback-days",
         type=int,
         default=14,
-        help="How far back to look for a prior scale event (default 14, per "
-        "guardrail §21).",
+        help="How far back to look for a prior scale event (default 14, per guardrail §21).",
     )
     p.add_argument(
         "--window-days",

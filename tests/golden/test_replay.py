@@ -116,9 +116,9 @@ def _guardrail_names_from_md() -> set[str]:
 
 def test_exactly_13_fixtures_present():
     fixtures = _fixture_paths()
-    assert (
-        len(fixtures) == 13
-    ), f"expected 13 fixtures, got {len(fixtures)}: {[p.name for p in fixtures]}"
+    assert len(fixtures) == 13, (
+        f"expected 13 fixtures, got {len(fixtures)}: {[p.name for p in fixtures]}"
+    )
 
 
 @pytest.mark.parametrize("path", _fixture_paths(), ids=lambda p: p.stem)
@@ -132,9 +132,9 @@ def test_fixture_parses_and_has_required_keys(path: Path):
 @pytest.mark.parametrize("path", _fixture_paths(), ids=lambda p: p.stem)
 def test_tagged_gate_is_valid(path: Path):
     data = _load(path)
-    assert (
-        data["tagged_gate"] in VALID_TAGGED_GATES
-    ), f"{path.name}: tagged_gate '{data['tagged_gate']}' not in {VALID_TAGGED_GATES}"
+    assert data["tagged_gate"] in VALID_TAGGED_GATES, (
+        f"{path.name}: tagged_gate '{data['tagged_gate']}' not in {VALID_TAGGED_GATES}"
+    )
 
 
 @pytest.mark.parametrize("path", _fixture_paths(), ids=lambda p: p.stem)
@@ -142,9 +142,9 @@ def test_expected_decision_class_is_valid(path: Path):
     data = _load(path)
     cls = data["expected"]["decision_class"]
     # canaries use "skip" as the expected class — the "canary" quality is in tagged_gate.
-    assert (
-        cls in VALID_DECISION_CLASSES
-    ), f"{path.name}: decision_class '{cls}' not in {VALID_DECISION_CLASSES}"
+    assert cls in VALID_DECISION_CLASSES, (
+        f"{path.name}: decision_class '{cls}' not in {VALID_DECISION_CLASSES}"
+    )
 
 
 # --------------------------------------------------------- proposal integrity
@@ -158,14 +158,14 @@ def test_proposal_structure_when_class_is_proposal(path: Path):
         pytest.skip("decision_class is not 'proposal'")
     prop = exp.get("proposal")
     assert prop is not None, f"{path.name}: class=proposal but proposal is null"
-    assert (
-        prop["task_type"] in VALID_TASK_TYPES
-    ), f"{path.name}: task_type '{prop['task_type']}' not in {VALID_TASK_TYPES}"
+    assert prop["task_type"] in VALID_TASK_TYPES, (
+        f"{path.name}: task_type '{prop['task_type']}' not in {VALID_TASK_TYPES}"
+    )
     assert prop["target_kind"] in VALID_TARGET_KINDS
     assert prop["urgency"] in VALID_URGENCIES
-    assert (
-        "rationale_must_contain" in prop and prop["rationale_must_contain"]
-    ), f"{path.name}: rationale_must_contain must be non-empty — 'what good looks like' can't be empty"
+    assert "rationale_must_contain" in prop and prop["rationale_must_contain"], (
+        f"{path.name}: rationale_must_contain must be non-empty — 'what good looks like' can't be empty"
+    )
 
 
 @pytest.mark.parametrize("path", _fixture_paths(), ids=lambda p: p.stem)

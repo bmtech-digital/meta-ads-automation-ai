@@ -152,9 +152,7 @@ def main() -> None:
     args = p.parse_args()
 
     if args.days_back < 1 or args.days_back > 180:
-        emit_validation_error(
-            f"--days-back must be in [1, 180] (got {args.days_back})"
-        )
+        emit_validation_error(f"--days-back must be in [1, 180] (got {args.days_back})")
         return
 
     try:

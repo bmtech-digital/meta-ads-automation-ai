@@ -111,16 +111,18 @@ def main() -> None:
         # target + the operator's reason carries the lesson.
         rationale = r.get("rationale") or ""
         rationale_excerpt = rationale[:200] + ("…" if len(rationale) > 200 else "")
-        meaningful.append({
-            "approval_id": str(r["id"]),
-            "task_type": r["task_type"],
-            "target_kind": r.get("target_kind"),
-            "target_id": r.get("target_id"),
-            "urgency": r.get("urgency"),
-            "rejected_on": r["created_at"].date().isoformat() if r.get("created_at") else None,
-            "rejection_reason": (reason or "").strip(),
-            "rationale_excerpt": rationale_excerpt,
-        })
+        meaningful.append(
+            {
+                "approval_id": str(r["id"]),
+                "task_type": r["task_type"],
+                "target_kind": r.get("target_kind"),
+                "target_id": r.get("target_id"),
+                "urgency": r.get("urgency"),
+                "rejected_on": r["created_at"].date().isoformat() if r.get("created_at") else None,
+                "rejection_reason": (reason or "").strip(),
+                "rationale_excerpt": rationale_excerpt,
+            }
+        )
 
     # Group by (task_type, target_kind, target_id) so the agent sees "you
     # rejected scale_up on campaign 123 twice this month for related reasons"
@@ -137,12 +139,14 @@ def main() -> None:
                 "rejections": [],
             }
         grouped[key]["rejection_count"] += 1
-        grouped[key]["rejections"].append({
-            "approval_id": m["approval_id"],
-            "rejected_on": m["rejected_on"],
-            "rejection_reason": m["rejection_reason"],
-            "rationale_excerpt": m["rationale_excerpt"],
-        })
+        grouped[key]["rejections"].append(
+            {
+                "approval_id": m["approval_id"],
+                "rejected_on": m["rejected_on"],
+                "rejection_reason": m["rejection_reason"],
+                "rationale_excerpt": m["rationale_excerpt"],
+            }
+        )
 
     # Rank groups by recency × count so the agent sees the most actively-rejected
     # patterns first if the list is long.
@@ -152,14 +156,16 @@ def main() -> None:
         reverse=True,
     )
 
-    emit_success({
-        "business_id": args.business_id,
-        "lookback_days": args.days,
-        "total_rejections_in_window": len(rows),
-        "meaningful_rejection_count": len(meaningful),
-        "bulk_filtered_count": bulk_filtered,
-        "groups": groups_sorted,
-    })
+    emit_success(
+        {
+            "business_id": args.business_id,
+            "lookback_days": args.days,
+            "total_rejections_in_window": len(rows),
+            "meaningful_rejection_count": len(meaningful),
+            "bulk_filtered_count": bulk_filtered,
+            "groups": groups_sorted,
+        }
+    )
 
 
 if __name__ == "__main__":

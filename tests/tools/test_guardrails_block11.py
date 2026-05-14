@@ -14,10 +14,9 @@ Pure-function tests — no DB, no Meta. Run via Docker per tests/CLAUDE.md.
 from __future__ import annotations
 
 from campaigner.tools.check_guardrails import (
-    _ab_test_requires_min_creatives,
     _ab_test_min_window_7d,
+    _ab_test_requires_min_creatives,
 )
-
 
 # ============================== §29 ===========================================
 
@@ -37,10 +36,12 @@ def _setup_payload(creatives, **kwargs):
 
 def test_min_creatives_passes_with_2():
     r = _ab_test_requires_min_creatives(
-        _setup_payload([
-            {"creative_id": "x", "variant_label": "A"},
-            {"creative_id": "y", "variant_label": "B"},
-        ]),
+        _setup_payload(
+            [
+                {"creative_id": "x", "variant_label": "A"},
+                {"creative_id": "y", "variant_label": "B"},
+            ]
+        ),
         {},
         {},
     )
@@ -50,12 +51,14 @@ def test_min_creatives_passes_with_2():
 
 def test_min_creatives_passes_with_4():
     r = _ab_test_requires_min_creatives(
-        _setup_payload([
-            {"creative_id": "w", "variant_label": "A"},
-            {"creative_id": "x", "variant_label": "B"},
-            {"creative_id": "y", "variant_label": "C"},
-            {"creative_id": "z", "variant_label": "D"},
-        ]),
+        _setup_payload(
+            [
+                {"creative_id": "w", "variant_label": "A"},
+                {"creative_id": "x", "variant_label": "B"},
+                {"creative_id": "y", "variant_label": "C"},
+                {"creative_id": "z", "variant_label": "D"},
+            ]
+        ),
         {},
         {},
     )
@@ -75,10 +78,9 @@ def test_min_creatives_fails_with_1():
 
 def test_min_creatives_fails_with_5():
     r = _ab_test_requires_min_creatives(
-        _setup_payload([
-            {"creative_id": f"c{i}", "variant_label": chr(ord("A") + i)}
-            for i in range(5)
-        ]),
+        _setup_payload(
+            [{"creative_id": f"c{i}", "variant_label": chr(ord("A") + i)} for i in range(5)]
+        ),
         {},
         {},
     )
@@ -88,10 +90,12 @@ def test_min_creatives_fails_with_5():
 
 def test_min_creatives_fails_with_duplicate_labels():
     r = _ab_test_requires_min_creatives(
-        _setup_payload([
-            {"creative_id": "x", "variant_label": "A"},
-            {"creative_id": "y", "variant_label": "A"},
-        ]),
+        _setup_payload(
+            [
+                {"creative_id": "x", "variant_label": "A"},
+                {"creative_id": "y", "variant_label": "A"},
+            ]
+        ),
         {},
         {},
     )
@@ -101,10 +105,12 @@ def test_min_creatives_fails_with_duplicate_labels():
 
 def test_min_creatives_fails_with_lowercase_label():
     r = _ab_test_requires_min_creatives(
-        _setup_payload([
-            {"creative_id": "x", "variant_label": "a"},
-            {"creative_id": "y", "variant_label": "B"},
-        ]),
+        _setup_payload(
+            [
+                {"creative_id": "x", "variant_label": "a"},
+                {"creative_id": "y", "variant_label": "B"},
+            ]
+        ),
         {},
         {},
     )

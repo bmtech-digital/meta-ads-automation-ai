@@ -59,16 +59,12 @@ def _well_formed_research_payload() -> dict:
 
 
 def test_no_new_creative_when_underspending_pass_other_task():
-    r = _no_new_creative_when_underspending(
-        {"task_type": "scale_up"}, {}, {}
-    )
+    r = _no_new_creative_when_underspending({"task_type": "scale_up"}, {}, {})
     assert r["passed"] is True
 
 
 def test_no_new_creative_when_underspending_skip_when_util_missing():
-    r = _no_new_creative_when_underspending(
-        {"task_type": "new_creative"}, {}, {}
-    )
+    r = _no_new_creative_when_underspending({"task_type": "new_creative"}, {}, {})
     assert r["passed"] is True
     assert r.get("skipped") is True
 
@@ -104,16 +100,12 @@ def test_no_new_creative_when_underspending_explicit_override():
 
 
 def test_scale_up_cadence_pass_other_task():
-    r = _scale_up_cadence_max_1_per_week(
-        {"task_type": "pause_campaign"}, {}, {}
-    )
+    r = _scale_up_cadence_max_1_per_week({"task_type": "pause_campaign"}, {}, {})
     assert r["passed"] is True
 
 
 def test_scale_up_cadence_skip_when_no_target():
-    r = _scale_up_cadence_max_1_per_week(
-        {"task_type": "scale_up", "payload": {}}, {}, {}
-    )
+    r = _scale_up_cadence_max_1_per_week({"task_type": "scale_up", "payload": {}}, {}, {})
     assert r["passed"] is True
     assert r.get("skipped") is True
 
@@ -172,9 +164,7 @@ def test_scale_up_cadence_pass_when_budget_change_is_decrease():
 
 
 def test_marginal_return_pass_other_task():
-    r = _marginal_return_check_before_scale_up(
-        {"task_type": "pause_campaign"}, {}, {}
-    )
+    r = _marginal_return_check_before_scale_up({"task_type": "pause_campaign"}, {}, {})
     assert r["passed"] is True
 
 
@@ -261,9 +251,7 @@ def test_scale_down_max_fail_at_20pct():
 
 
 def test_scale_down_max_pass_other_task():
-    r = _scale_down_max_15pct_per_step(
-        {"task_type": "scale_up", "payload": {}}, {}, {}
-    )
+    r = _scale_down_max_15pct_per_step({"task_type": "scale_up", "payload": {}}, {}, {})
     assert r["passed"] is True
 
 
@@ -418,9 +406,7 @@ def test_respect_hands_off_skip_when_no_brief():
 
 
 def test_set_kpi_target_research_pass_other_task():
-    r = _set_kpi_target_requires_research(
-        {"task_type": "scale_up", "payload": {}}, {}, {}
-    )
+    r = _set_kpi_target_requires_research({"task_type": "scale_up", "payload": {}}, {}, {})
     assert r["passed"] is True
 
 
@@ -492,6 +478,9 @@ def test_set_kpi_target_research_pass_when_fully_formed():
         {
             "task_type": "set_kpi_target",
             "payload": _well_formed_research_payload(),
+            # §26 rationale-content checks need the explicit fallback phrases
+            # since the fixture has no matched_terms / no competitors.
+            "rationale": ("לא זוהה שירות ספציפי; אין מתחרים מוגדרים — מבוסס על מחקר חיצוני."),
         },
         {},
         {},
@@ -532,9 +521,7 @@ def _well_formed_competitive_alert_payload(alert_type: str = "trending_angle") -
 
 
 def test_no_competitor_hallucinations_pass_other_task():
-    r = _no_competitor_hallucinations(
-        {"task_type": "scale_up", "payload": {}}, {}, {}
-    )
+    r = _no_competitor_hallucinations({"task_type": "scale_up", "payload": {}}, {}, {})
     assert r["passed"] is True
 
 
@@ -567,9 +554,7 @@ def test_no_competitor_hallucinations_fail_when_research_missing():
 def test_no_competitor_hallucinations_fail_when_single_source():
     payload = _well_formed_competitive_alert_payload()
     payload["research"]["sources"] = payload["research"]["sources"][:1]
-    r = _no_competitor_hallucinations(
-        {"task_type": "alert", "payload": payload}, {}, {}
-    )
+    r = _no_competitor_hallucinations({"task_type": "alert", "payload": payload}, {}, {})
     assert r["passed"] is False
     assert "≥2" in r["reason"]
 
@@ -577,9 +562,7 @@ def test_no_competitor_hallucinations_fail_when_single_source():
 def test_no_competitor_hallucinations_fail_when_source_missing_url():
     payload = _well_formed_competitive_alert_payload()
     payload["research"]["sources"][0] = {"title": "x", "extracted": "y"}
-    r = _no_competitor_hallucinations(
-        {"task_type": "alert", "payload": payload}, {}, {}
-    )
+    r = _no_competitor_hallucinations({"task_type": "alert", "payload": payload}, {}, {})
     assert r["passed"] is False
     assert "url" in r["reason"]
 
@@ -587,9 +570,7 @@ def test_no_competitor_hallucinations_fail_when_source_missing_url():
 def test_no_competitor_hallucinations_fail_when_context_used_empty():
     payload = _well_formed_competitive_alert_payload()
     payload["research"]["context_used"] = []
-    r = _no_competitor_hallucinations(
-        {"task_type": "alert", "payload": payload}, {}, {}
-    )
+    r = _no_competitor_hallucinations({"task_type": "alert", "payload": payload}, {}, {})
     assert r["passed"] is False
     assert "context_used" in r["reason"]
 
@@ -597,19 +578,13 @@ def test_no_competitor_hallucinations_fail_when_context_used_empty():
 def test_no_competitor_hallucinations_pass_for_each_competitive_alert_type():
     for alert_type in ("target_drift", "trending_angle", "new_format"):
         payload = _well_formed_competitive_alert_payload(alert_type=alert_type)
-        r = _no_competitor_hallucinations(
-            {"task_type": "alert", "payload": payload}, {}, {}
-        )
+        r = _no_competitor_hallucinations({"task_type": "alert", "payload": payload}, {}, {})
         assert r["passed"] is True, f"alert_type={alert_type} should pass: {r}"
         assert r["alert_type"] == alert_type
 
 
 def test_no_competitor_hallucinations_pass_for_competitive_prefix():
     """alert_type='competitive_*' (future variant naming) also triggers the rule."""
-    payload = _well_formed_competitive_alert_payload(
-        alert_type="competitive_pricing_shift"
-    )
-    r = _no_competitor_hallucinations(
-        {"task_type": "alert", "payload": payload}, {}, {}
-    )
+    payload = _well_formed_competitive_alert_payload(alert_type="competitive_pricing_shift")
+    r = _no_competitor_hallucinations({"task_type": "alert", "payload": payload}, {}, {})
     assert r["passed"] is True

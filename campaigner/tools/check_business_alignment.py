@@ -38,7 +38,6 @@ from campaigner.tools._contract import (
     with_db_retry,
 )
 
-
 # Hebrew-aware tokenization: words = sequences of Hebrew or Latin letters
 # (with niqqud / cantillation stripped). Min length 2 to drop noise like
 # "ה" / "ל" (Hebrew articles + prepositions).
@@ -48,16 +47,85 @@ _NIQQUD_RE = re.compile(r"[֑-ֽֿ-ׇ]")
 # Hebrew + English stopwords — operator-facing copy is full of these and they
 # inflate Jaccard scores meaninglessly.
 _STOPWORDS_HE = {
-    "של", "את", "על", "עם", "כל", "הזה", "הזאת", "אנחנו", "אתם", "אתה", "אני",
-    "הוא", "היא", "הם", "הן", "זה", "זאת", "אלה", "כאן", "שם", "אם", "כי",
-    "כדי", "אבל", "רק", "גם", "לא", "כן", "יש", "אין", "היה", "להיות", "להיותם",
-    "תרצו", "שלך", "שלכם", "שלנו", "שלהם", "וכל", "מאד", "מאוד", "יותר", "פחות",
-    "הם", "הזה", "הזו", "ההוא", "ההיא", "מה", "מי", "איך", "אבל", "ולא", "וגם",
-    "לכל", "לכן", "מכל", "וכן", "אז",
+    "של",
+    "את",
+    "על",
+    "עם",
+    "כל",
+    "הזה",
+    "הזאת",
+    "אנחנו",
+    "אתם",
+    "אתה",
+    "אני",
+    "הוא",
+    "היא",
+    "הם",
+    "הן",
+    "זה",
+    "זאת",
+    "אלה",
+    "כאן",
+    "שם",
+    "אם",
+    "כי",
+    "כדי",
+    "אבל",
+    "רק",
+    "גם",
+    "לא",
+    "כן",
+    "יש",
+    "אין",
+    "היה",
+    "להיות",
+    "להיותם",
+    "תרצו",
+    "שלך",
+    "שלכם",
+    "שלנו",
+    "שלהם",
+    "וכל",
+    "מאד",
+    "מאוד",
+    "יותר",
+    "פחות",
+    "הזו",
+    "ההוא",
+    "ההיא",
+    "מה",
+    "מי",
+    "איך",
+    "ולא",
+    "וגם",
+    "לכל",
+    "לכן",
+    "מכל",
+    "וכן",
+    "אז",
 }
 _STOPWORDS_EN = {
-    "the", "and", "for", "are", "you", "your", "our", "with", "this", "that",
-    "is", "of", "to", "in", "on", "at", "by", "as", "be", "an", "or",
+    "the",
+    "and",
+    "for",
+    "are",
+    "you",
+    "your",
+    "our",
+    "with",
+    "this",
+    "that",
+    "is",
+    "of",
+    "to",
+    "in",
+    "on",
+    "at",
+    "by",
+    "as",
+    "be",
+    "an",
+    "or",
 }
 
 
@@ -174,10 +242,7 @@ def _check(business_id: str, days: int) -> dict:
     aligned = mixed = drifted = 0
 
     for r in rows:
-        creative_text = " ".join(
-            str(x or "")
-            for x in (r.get("headline"), r.get("primary_text"))
-        )
+        creative_text = " ".join(str(x or "") for x in (r.get("headline"), r.get("primary_text")))
         c_terms = _tokenize(creative_text)
         if not c_terms:
             continue

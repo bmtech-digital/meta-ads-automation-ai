@@ -87,6 +87,22 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - name: Apply migrations
         run: python scripts/migrate.py
+      - name: Seed test business (FK target for approvals/decisions)
+        env:
+          PGPASSWORD: campaigner_test_pass
+        run: |
+          psql -h localhost -U campaigner -d campaigner_test -v ON_ERROR_STOP=1 -c "
+            INSERT INTO businesses (
+              id, name, meta_ad_account_id, meta_page_id,
+              meta_access_token_encrypted, gcp_project_id
+            ) VALUES (
+              '${BUSINESS_ID}',
+              'CI Test Business',
+              'act_0000000000',
+              '0000000000',
+              'ci-test-token',
+              'bemtech-478413'
+            ) ON CONFLICT (id) DO NOTHING;"
       - name: Run pytest
         run: pytest -v
 
@@ -145,7 +161,7 @@ jobs:
         with:
           version: 9
       - run: pnpm install --frozen-lockfile
-      - run: pnpm test --run
+      - run: pnpm test
 
   ci-summary:
     name: CI summary

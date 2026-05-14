@@ -56,7 +56,7 @@ _METRIC_FOR_TASK: dict[str, str] = {
     "redeploy_creative": "ctr",
     "expand_audience": "cpm",
     "boost_post": "ctr",
-    "pause_campaign": "spend",   # negative-only — confirm pause held
+    "pause_campaign": "spend",  # negative-only — confirm pause held
     "resume_campaign": "spend",
 }
 
@@ -138,8 +138,12 @@ def main() -> None:
     )
     p.add_argument("--business-id", required=True)
     p.add_argument("--days", type=int, default=30)
-    p.add_argument("--window-days", type=int, default=7,
-                   help="Half-window for before/after comparison. Default 7.")
+    p.add_argument(
+        "--window-days",
+        type=int,
+        default=7,
+        help="Half-window for before/after comparison. Default 7.",
+    )
     args = p.parse_args()
 
     try:
@@ -180,19 +184,21 @@ def main() -> None:
             # before/after — they have no campaign-scoped insights to diff.
             # Still log them so the agent sees "I did publish_fb_post on
             # 2026-05-08" without numbers.
-            outcomes.append({
-                "approval_id": str(r["id"]),
-                "task_type": task_type,
-                "target_kind": target_kind,
-                "target_id": target_id,
-                "executed_on": executed_at.date().isoformat(),
-                "metric": None,
-                "before": None,
-                "after": None,
-                "delta_pct": None,
-                "outcome": "no_paid_delta_applicable",
-                "note": "task type or target_kind doesn't map to campaign-level insights diff",
-            })
+            outcomes.append(
+                {
+                    "approval_id": str(r["id"]),
+                    "task_type": task_type,
+                    "target_kind": target_kind,
+                    "target_id": target_id,
+                    "executed_on": executed_at.date().isoformat(),
+                    "metric": None,
+                    "before": None,
+                    "after": None,
+                    "delta_pct": None,
+                    "outcome": "no_paid_delta_applicable",
+                    "note": "task type or target_kind doesn't map to campaign-level insights diff",
+                }
+            )
             continue
 
         # Build the two windows. Meta date strings are 'YYYY-MM-DD'.
@@ -203,29 +209,38 @@ def main() -> None:
         now = datetime.now(UTC)
         if after_end > now:
             after_end = now
-        before_tr = {"since": before_start.date().isoformat(), "until": before_end.date().isoformat()}
+        before_tr = {
+            "since": before_start.date().isoformat(),
+            "until": before_end.date().isoformat(),
+        }
         after_tr = {"since": after_start.date().isoformat(), "until": after_end.date().isoformat()}
 
         try:
             before_rows = client.fetch_insights(
-                level="campaign", time_range=before_tr, date_preset=None,
+                level="campaign",
+                time_range=before_tr,
+                date_preset=None,
                 filtering=[{"field": "campaign.id", "operator": "EQUAL", "value": target_id}],
             )
             after_rows = client.fetch_insights(
-                level="campaign", time_range=after_tr, date_preset=None,
+                level="campaign",
+                time_range=after_tr,
+                date_preset=None,
                 filtering=[{"field": "campaign.id", "operator": "EQUAL", "value": target_id}],
             )
         except Exception as e:
-            outcomes.append({
-                "approval_id": str(r["id"]),
-                "task_type": task_type,
-                "target_kind": target_kind,
-                "target_id": target_id,
-                "executed_on": executed_at.date().isoformat(),
-                "metric": metric,
-                "outcome": "meta_fetch_failed",
-                "error": str(e),
-            })
+            outcomes.append(
+                {
+                    "approval_id": str(r["id"]),
+                    "task_type": task_type,
+                    "target_kind": target_kind,
+                    "target_id": target_id,
+                    "executed_on": executed_at.date().isoformat(),
+                    "metric": metric,
+                    "outcome": "meta_fetch_failed",
+                    "error": str(e),
+                }
+            )
             continue
 
         b_row = before_rows[0] if before_rows else {}
@@ -243,8 +258,12 @@ def main() -> None:
         # CPL by 18%" when in fact a new_creative landed the same week.
         interfering: list[dict] = []
         try:
+            _tid = target_id
+            _rid = r["id"]
+            _bs = before_start.isoformat()
+            _ae = after_end.isoformat()
             others = with_db_retry(
-                lambda: fetch_all(
+                lambda _tid=_tid, _rid=_rid, _bs=_bs, _ae=_ae: fetch_all(
                     """
                     SELECT id, task_type, executed_at
                       FROM approvals
@@ -256,17 +275,24 @@ def main() -> None:
                        AND executed_at BETWEEN %s AND %s
                     """,
                     (
-                        args.business_id, target_id, r["id"],
-                        before_start.isoformat(), after_end.isoformat(),
+                        args.business_id,
+                        _tid,
+                        _rid,
+                        _bs,
+                        _ae,
                     ),
                 )
             )
             for o in others or []:
-                interfering.append({
-                    "approval_id": str(o["id"]),
-                    "task_type": o["task_type"],
-                    "executed_on": o["executed_at"].date().isoformat() if o.get("executed_at") else None,
-                })
+                interfering.append(
+                    {
+                        "approval_id": str(o["id"]),
+                        "task_type": o["task_type"],
+                        "executed_on": o["executed_at"].date().isoformat()
+                        if o.get("executed_at")
+                        else None,
+                    }
+                )
         except Exception:
             # Don't fail the whole outcome read because of one DB hiccup —
             # surface the gap as `interference_check_failed` and continue.
@@ -284,37 +310,43 @@ def main() -> None:
         elif outcome_label in ("improved", "regressed"):
             attribution_confidence = "high"
 
-        outcomes.append({
-            "approval_id": str(r["id"]),
-            "task_type": task_type,
-            "target_kind": target_kind,
-            "target_id": target_id,
-            "executed_on": executed_at.date().isoformat(),
-            "metric": metric,
-            "before": before_val,
-            "after": after_val,
-            "delta_pct": delta_pct,
-            "outcome": outcome_label,
-            "attribution_confidence": attribution_confidence,
-            "interfering_actions": interfering,
-            "window_days": args.window_days,
-        })
+        outcomes.append(
+            {
+                "approval_id": str(r["id"]),
+                "task_type": task_type,
+                "target_kind": target_kind,
+                "target_id": target_id,
+                "executed_on": executed_at.date().isoformat(),
+                "metric": metric,
+                "before": before_val,
+                "after": after_val,
+                "delta_pct": delta_pct,
+                "outcome": outcome_label,
+                "attribution_confidence": attribution_confidence,
+                "interfering_actions": interfering,
+                "window_days": args.window_days,
+            }
+        )
 
     summary = {
         "improved": sum(1 for o in outcomes if o.get("outcome") == "improved"),
         "flat": sum(1 for o in outcomes if o.get("outcome") == "flat"),
         "regressed": sum(1 for o in outcomes if o.get("outcome") == "regressed"),
         "insufficient_data": sum(1 for o in outcomes if o.get("outcome") == "insufficient_data"),
-        "no_paid_delta_applicable": sum(1 for o in outcomes if o.get("outcome") == "no_paid_delta_applicable"),
+        "no_paid_delta_applicable": sum(
+            1 for o in outcomes if o.get("outcome") == "no_paid_delta_applicable"
+        ),
         "meta_fetch_failed": sum(1 for o in outcomes if o.get("outcome") == "meta_fetch_failed"),
     }
-    emit_success({
-        "business_id": args.business_id,
-        "lookback_days": args.days,
-        "executed_action_count": len(outcomes),
-        "summary": summary,
-        "outcomes": outcomes,
-    })
+    emit_success(
+        {
+            "business_id": args.business_id,
+            "lookback_days": args.days,
+            "executed_action_count": len(outcomes),
+            "summary": summary,
+            "outcomes": outcomes,
+        }
+    )
 
 
 if __name__ == "__main__":

@@ -127,9 +127,7 @@ def _summarize(business_id: str, days: int) -> dict:
         if cid not in sample_by_campaign:
             sample_by_campaign[cid] = []
         if len(sample_by_campaign[cid]) < 5:
-            sample_by_campaign[cid].append(
-                {"id": r["id"], "full_name": r.get("full_name")}
-            )
+            sample_by_campaign[cid].append({"id": r["id"], "full_name": r.get("full_name")})
 
     campaigns: list[dict[str, Any]] = []
     overall_total = 0
@@ -164,9 +162,7 @@ def _summarize(business_id: str, days: int) -> dict:
                 "conversions": conv,
                 "conversion_value_ils": conv_val,
                 "quality_band": _band(leads_total, avg),
-                "sample_lead_ids": sample_by_campaign.get(
-                    r.get("meta_campaign_id"), []
-                ),
+                "sample_lead_ids": sample_by_campaign.get(r.get("meta_campaign_id"), []),
             }
         )
 
@@ -179,9 +175,7 @@ def _summarize(business_id: str, days: int) -> dict:
         for k, v in dist.items():
             overall_dist[k] += v
 
-    overall_avg = (
-        overall_grade_sum / overall_graded if overall_graded > 0 else None
-    )
+    overall_avg = overall_grade_sum / overall_graded if overall_graded > 0 else None
 
     return {
         "business_id": business_id,
@@ -201,9 +195,7 @@ def _summarize(business_id: str, days: int) -> dict:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(
-        description="Per-campaign lead quality summary (Phase 2)."
-    )
+    p = argparse.ArgumentParser(description="Per-campaign lead quality summary (Phase 2).")
     p.add_argument("--business-id", required=True)
     p.add_argument(
         "--days",
