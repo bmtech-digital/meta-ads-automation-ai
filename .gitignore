@@ -82,3 +82,8 @@ docker-compose.override.yml
 
 # detect-secrets baseline — generated locally on first run, regenerated as needed
 .secrets.baseline
+
+# Claude Code — per-machine local state (hooks point at OS-specific paths)
+.claude/hooks/
+.claude/scheduled_tasks.lock
+.claude/settings.local.json
