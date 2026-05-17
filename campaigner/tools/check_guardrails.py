@@ -1906,6 +1906,79 @@ def _operator_questions_well_formed(prop: dict, state: dict, ctx: dict) -> dict:
     return _pass("operator_questions_well_formed", questions_count=len(questions))
 
 
+def _eom_no_panic_spend(prop: dict, state: dict, ctx: dict) -> dict:
+    """§49. Mastery v2 Phase B. In the last 5 days of the month with severe
+    underrun (pace <0.85), refuse scale_up >+15% and refuse new_campaign.
+    The right move is to log lost_opportunity to monthly_brief and root-cause
+    for next month — never to crash-spend, which jacks CPL 40-100%.
+
+    Reads `state.pace_ratio`, `state.days_left_in_month`. If those aren't
+    populated (e.g. compute_monthly_pace didn't run this turn), skip.
+    """
+    pace_ratio = state.get("pace_ratio")
+    days_left = state.get("days_left_in_month")
+    if pace_ratio is None or days_left is None:
+        return _skip("eom_no_panic_spend", "pace_ratio or days_left_in_month not in state")
+    if days_left > 5 or pace_ratio >= 0.85:
+        return _pass("eom_no_panic_spend")
+    task = prop.get("task_type")
+    payload = prop.get("payload") or {}
+    if task == "new_campaign":
+        return _fail(
+            "eom_no_panic_spend",
+            f"end-of-month brake: {days_left}d left + pace={pace_ratio:.2f} — "
+            f"refuse new_campaign (kicks Learning, won't finish learning before EOM)",
+        )
+    if task in ("scale_up", "budget_change"):
+        new_b = payload.get("new_daily_budget_cents") or payload.get(
+            "new_daily_budget_ils"
+        )
+        old_b = payload.get("old_daily_budget_cents") or payload.get(
+            "old_daily_budget_ils"
+        )
+        if isinstance(new_b, int | float) and isinstance(old_b, int | float) and old_b > 0:
+            jump_pct = (new_b - old_b) / old_b * 100
+            if jump_pct > 15:
+                return _fail(
+                    "eom_no_panic_spend",
+                    f"end-of-month brake: {days_left}d left + pace={pace_ratio:.2f} — "
+                    f"refuse scale_up of +{jump_pct:.0f}% (>15% panic cap). "
+                    f"Log lost_opportunity instead.",
+                )
+    return _pass("eom_no_panic_spend")
+
+
+def _cold_start_front_load_window(prop: dict, state: dict, ctx: dict) -> dict:
+    """§50. Mastery v2 Phase B. In the first 14 days from onboarding_started_at,
+    daily budgets up to 150% of pro-rated monthly are LEGITIMATE (Foxwell:
+    "faster spend = faster signal"). The pacing router shouldn't flag them as
+    overrun, and other guardrails shouldn't refuse new_campaign / scale_up on
+    "pace too aggressive" grounds during this window.
+
+    This rule's job: pass-or-skip with a clear signal so callers (router +
+    other guardrails) know "cold-start mode active." It doesn't fail — it's
+    a positive-signal rule.
+    """
+    days_since_onboarding = state.get("days_since_onboarding")
+    if days_since_onboarding is None:
+        return _skip(
+            "cold_start_front_load_window", "days_since_onboarding not in state"
+        )
+    if days_since_onboarding > 14:
+        return _pass(
+            "cold_start_front_load_window",
+            mode="steady_state",
+            days_since_onboarding=days_since_onboarding,
+        )
+    return _pass(
+        "cold_start_front_load_window",
+        mode="cold_start_active",
+        days_since_onboarding=days_since_onboarding,
+        max_pro_rated_multiplier=1.5,
+        note="front-load up to 150% of pro-rated daily is acceptable",
+    )
+
+
 # Judgment-only: enforced by prompts, not by this tool
 JUDGMENT_ONLY_RULES = [
     "meta_api_rate_limit",
@@ -1918,6 +1991,11 @@ JUDGMENT_ONLY_RULES = [
     # operator's chosen answer. Can't enforce deterministically (would require
     # cross-DB join + free-text NLP); the agent prompt binds this behavior.
     "respect_operator_response",
+    # §48 — Mastery v2 Phase B. Flow A must call route_pacing_action.py as
+    # Step 0.7, BEFORE any §T-lane evaluation. The pacing-router output
+    # (`recommended_lane`) becomes the prior on task_type selection. Can't
+    # enforce here because we only see the proposal, not the run trace.
+    "pacing_router_must_run_first",
 ]
 
 CHECKS: list[Callable[[dict, dict, dict], dict]] = [
@@ -2017,6 +2095,12 @@ CHECKS: list[Callable[[dict, dict, dict], dict]] = [
     # enum, audience_summary_he non-empty, and acknowledgment_only=True (the
     # actual Meta campaign is created via /campaigns/new, not via execute_task).
     _first_campaign_payload_completeness,
+    # Mastery v2 Phase B (Budget Pacing Router, 2026-05-17) — §49 + §50.
+    # §49 blocks panic-spend in the last 5 days when underrun. §50 is a
+    # positive-signal rule that announces "cold-start mode active" so other
+    # guardrails don't false-positive on aggressive day-1 spend.
+    _eom_no_panic_spend,
+    _cold_start_front_load_window,
 ]
 
 
