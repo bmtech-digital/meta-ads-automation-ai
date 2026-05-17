@@ -66,7 +66,7 @@ E2E lives in [`e2e/`](e2e/). Unit tests are colocated as `<file>.test.ts` next t
 
 1. **Hebrew + RTL by default.** `<html lang="he" dir="rtl">` in [`src/app/layout.tsx`](src/app/layout.tsx). Don't add `dir="ltr"` to component containers unless it's a code block or a number-only display.
 2. **Server components by default.** Add `"use client"` only when the component genuinely needs state, effects, or browser APIs. Components without `"use client"` can fetch directly from `src/lib/db/`.
-3. **Heebo as the brand font.** Loaded once in `layout.tsx`. Don't import other fonts ad-hoc.
+3. **Assistant + Geist + Geist Mono as the three brand fonts.** All loaded once in `layout.tsx` via `next/font`. Assistant = Hebrew display/UI, Geist = Latin sans, Geist Mono = numbers/IDs/code. Don't import other fonts ad-hoc. (Heebo was the previous brand font — no longer in use; see [`../docs/DESIGN.md`](../docs/DESIGN.md) Typography.)
 4. **No CSS files outside `globals.css`.** Tailwind for everything. Custom CSS goes into `globals.css` with a comment explaining why a utility class wasn't enough.
 5. **Image uploads** go to `web/uploads/` in dev (gitignored) or to the gallery GCS bucket in prod. The same dual-mode pattern applies — see [`src/lib/storage.ts`](src/lib/storage.ts).
 6. **API routes are thin.** [`src/app/api/`](src/app/api/) handlers should validate with Zod, call into `src/lib/db/`, and return JSON. Business logic doesn't belong in route handlers.

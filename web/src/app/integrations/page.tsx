@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Shell, PageHeader, SectionHeader } from "@/components/shell";
+import { SubNav, SETTINGS_GROUP_ITEMS } from "@/components/sub-nav";
 import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
@@ -285,7 +286,8 @@ export default async function IntegrationsPage({
 
   if (!business) {
     return (
-      <Shell active="/integrations">
+      <Shell active="/settings">
+        <SubNav items={SETTINGS_GROUP_ITEMS} />
         <PageHeader eyebrow="אינטגרציות" title="חיבור Meta" />
         <Card>
           <CardHeader>
@@ -338,7 +340,8 @@ export default async function IntegrationsPage({
   const errMsg = explainError(error ?? null);
 
   return (
-    <Shell active="/integrations">
+    <Shell active="/settings">
+      <SubNav items={SETTINGS_GROUP_ITEMS} />
       <PageHeader
         eyebrow="אינטגרציות"
         title="חיבור Meta"

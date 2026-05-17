@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Shell, PageHeader, SectionHeader } from "@/components/shell";
+import { SubNav, AUDIENCE_GROUP_ITEMS } from "@/components/sub-nav";
 import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
@@ -44,7 +45,8 @@ export default async function LeadsPage({
   const business = await getActiveBusiness();
   if (!business) {
     return (
-      <Shell active="/leads">
+      <Shell active="/audiences">
+        <SubNav items={AUDIENCE_GROUP_ITEMS} />
         <PageHeader eyebrow="לידים" title="לידים" />
         <Card>
           <CardHeader>
@@ -70,7 +72,8 @@ export default async function LeadsPage({
   const lastSync = allLeads[0]?.synced_at ?? null;
 
   return (
-    <Shell active="/leads">
+    <Shell active="/audiences">
+      <SubNav items={AUDIENCE_GROUP_ITEMS} />
       <PageHeader
         eyebrow="לידים"
         title="לידים — דירוג איכות"

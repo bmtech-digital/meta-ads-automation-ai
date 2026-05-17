@@ -11,6 +11,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Shell, PageHeader } from "@/components/shell";
+import { SubNav, CAMPAIGN_GROUP_ITEMS } from "@/components/sub-nav";
+import { Sparkline, synthSpendTrend } from "@/components/sparkline";
 import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
@@ -364,8 +366,21 @@ export default async function CampaignsPage({
             const serviceLabelHe = serviceInference
               ? (SUB_VERTICAL_HE_LOCAL[serviceInference.sub] ?? serviceInference.sub)
               : null;
+            // Decorative spend curve per card — synthesized from the
+            // aggregate spend value (same approach as the dashboard hero).
+            // Real per-day breakdown will replace this when we sample
+            // `budget_health` decisions or daily insights.
+            const cardSpendTrend = synthSpendTrend(
+              Math.round(Number(ins?.spend ?? 0)),
+              30,
+            );
+            const isPaused = c.effective_status !== "ACTIVE";
             return (
-              <Card key={c.id} id={`campaign-${c.id}`} className="scroll-mt-6">
+              <Card
+                key={c.id}
+                id={`campaign-${c.id}`}
+                className={`glass-panel scroll-mt-6 border-0 ${isPaused ? "opacity-70" : ""}`}
+              >
                 <CardHeader>
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="flex flex-col gap-1">
@@ -447,6 +462,20 @@ export default async function CampaignsPage({
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {Number(ins?.spend ?? 0) > 0 ? (
+                    <div className="mb-4 h-[56px]">
+                      <Sparkline
+                        data={cardSpendTrend}
+                        height={56}
+                        color={
+                          isPaused
+                            ? "hsl(var(--muted-foreground))"
+                            : "var(--brand-500, hsl(28 91% 54%))"
+                        }
+                        strokeWidth={1.6}
+                      />
+                    </div>
+                  ) : null}
                   <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
                     <Metric
                       label="הוצאה"
@@ -527,16 +556,37 @@ export default async function CampaignsPage({
 function Page({ children }: { children: React.ReactNode }) {
   return (
     <Shell active="/campaigns">
+      <SubNav items={CAMPAIGN_GROUP_ITEMS} />
       <div className="flex flex-col gap-6">{children}</div>
     </Shell>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
   return (
-    <div className="rounded-md border p-4">
-      <div className="text-xs text-muted-foreground">{label}</div>
-      <div className="mt-1 text-2xl font-bold">{value}</div>
+    <div className="glass-panel group relative overflow-hidden rounded-lg p-4 transition-transform hover:-translate-y-0.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[11.5px] font-medium text-muted-foreground">
+          {label}
+        </span>
+        {accent ? (
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-brand-500 dark:bg-brand-400"
+            aria-hidden
+          />
+        ) : null}
+      </div>
+      <div className="font-tabular mt-2 text-[26px] font-bold leading-none tracking-[-0.02em]">
+        {value}
+      </div>
     </div>
   );
 }

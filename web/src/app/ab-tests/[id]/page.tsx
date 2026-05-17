@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Shell, PageHeader, SectionHeader } from "@/components/shell";
+import { SubNav, CAMPAIGN_GROUP_ITEMS } from "@/components/sub-nav";
 import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
@@ -60,7 +61,8 @@ export default async function AbTestDetailPage({
   const business = await getActiveBusiness();
   if (!business) {
     return (
-      <Shell active="/ab-tests">
+      <Shell active="/campaigns">
+        <SubNav items={CAMPAIGN_GROUP_ITEMS} />
         <PageHeader eyebrow="מבחני A/B" title="—" />
         <Card>
           <CardHeader>
@@ -85,7 +87,8 @@ export default async function AbTestDetailPage({
     test.status === "running" && new Date(test.planned_end_at) <= new Date();
 
   return (
-    <Shell active="/ab-tests">
+    <Shell active="/campaigns">
+      <SubNav items={CAMPAIGN_GROUP_ITEMS} />
       <nav className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
         <Link href="/ab-tests" className="hover:text-foreground">
           מבחני A/B

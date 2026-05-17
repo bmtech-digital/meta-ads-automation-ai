@@ -93,8 +93,19 @@ point is that the warm glow draws the eye.
 
 ## Typography
 
-Heebo for everything (already wired in `layout.tsx`). Aiweon and
-generic_agent both use Heebo — keep the family resemblance.
+Three families, each loaded once in `layout.tsx` via `next/font`:
+
+| Use | Family | CSS variable |
+|---|---|---|
+| Hebrew display + UI | **Assistant** | `var(--font-assistant)` |
+| Latin sans (auto-blends with Assistant per-glyph) | **Geist** | `var(--font-geist)` |
+| Numbers, Meta IDs, code, mono | **Geist Mono** | `var(--font-geist-mono)` |
+
+Heebo was the previous brand font and is no longer used. Assistant has
+contemporary letter shapes that pair cleanly with Geist's Latin grade at
+small sizes — that's the AI-premium voice the brand reads for. Browser
+picks per-glyph; in `tailwind.config.ts` we list Assistant first as the
+default-hint, Geist second.
 
 Display sizes already tightened in `tailwind.config.ts`:
 
@@ -183,13 +194,57 @@ chips.
 2. Does generic_agent solve it differently? Pick the one that *reads better in dark RTL Hebrew at the density we need*. If aiweon wins, take aiweon. If generic_agent wins, take generic_agent. Don't blend.
 3. Neither has it? Add it under `globals.css` with a one-line comment explaining what it's for. If a feature component needs a one-off style, push it into the global layer first so the next reuse is free.
 
+## SubNav pattern
+
+Top Nav consolidated 12 → 8 in the 2026-05-17 redesign. Three of those eight
+items group siblings into a single Top Nav entry, with secondary navigation
+between siblings via `<SubNav>`:
+
+| Top Nav | Group members | SubNav |
+|---|---|---|
+| קמפיינים | `/campaigns` · `/ab-tests` · `/plans` | קמפיינים · מבחני A/B · תוכניות הרצה |
+| קהל ולידים | `/audiences` · `/leads` | קהלים · לידים |
+| הגדרות | `/settings` · `/integrations` | כללי · אינטגרציות |
+
+`<SubNav>` lives in `web/src/components/sub-nav.tsx` with three exported
+group constants (`CAMPAIGN_GROUP_ITEMS`, `AUDIENCE_GROUP_ITEMS`,
+`SETTINGS_GROUP_ITEMS`). Each grouped page sets `<Shell active="/parent">`
+(not its own route) so the Top Nav pill highlights the group; the SubNav
+itself uses `usePathname()` with **exact-match for `/` and
+prefix-with-slash for everything else** (`pathname === href ||
+pathname.startsWith(href + "/")`) to highlight the active sibling.
+
+In-page TABS (filter pills inside `/audiences`, `/leads`, `/ab-tests`,
+`/history`) sit **below** the SubNav and remain orthogonal — SubNav
+switches routes, TABS filter within a route. Don't merge them.
+
+## Learning state for live creatives
+
+A live ad whose Meta insights snapshot hasn't yet accumulated 1,000
+impressions has `ctr`, `hook_rate`, and `spend` all `null` in
+`asset.performance_snapshot`. The naive `(ctr != null || hook_rate != null
+|| spend != null)` metrics row in `asset-tile.tsx` silently disappears
+in that case, leaving the operator no indication of state.
+
+The fix is a brand-orange pill placed where the metrics row would have
+been, shown only when **lifecycle = "live"** AND all three metrics are
+null. Copy: `אוסף נתונים — פחות מ-1,000 חשיפות עדיין`. The dot pulses
+(`animate-pulse-soft`) to mark the asset as actively gathering signal.
+
+This pairs with `PerformanceGrade = "learning"` in
+`web/src/app/gallery/scoring.ts` — both share the same 1,000-impression
+threshold; if you move that threshold, update both.
+
 ## Files this doc binds
 
 - `web/src/app/globals.css` — token + utility source of truth
 - `web/tailwind.config.ts` — type scale, color, shadow, animation extensions
-- `web/src/components/nav.tsx` — header geometry
+- `web/src/components/nav.tsx` — header geometry (8 Top Nav items + right-pill Search/Bell)
+- `web/src/components/sub-nav.tsx` — secondary navigation between sibling routes
 - `web/src/components/brand/logo.tsx` — wordmark contract
 - `web/src/components/shell.tsx` — page shell, max-widths, page-header eyebrow rule
+- `web/src/app/gallery/asset-tile.tsx` — gallery card with learning state pill
+- `web/src/app/gallery/scoring.ts` — Lifecycle and PerformanceGrade contract (shared with the agent)
 
 When any of these drift from this doc, update *the doc* — this file lags
 intentionally so it captures decisions, not in-progress experiments.

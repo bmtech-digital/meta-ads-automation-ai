@@ -11,16 +11,22 @@ import {
 } from "@/components/brand/icons";
 import {
   Menu,
+  Search,
+  Bell,
   Settings as SettingsIcon,
   Images as ImagesIcon,
-  Plug as PlugIcon,
   FileText as ReportIcon,
-  FlaskConical as AbTestIcon,
   Users as AudienceIcon,
-  ClipboardCheck as LeadsIcon,
 } from "lucide-react";
 import { AiweonLogo } from "@/components/brand/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Sheet,
   SheetContent,
@@ -41,18 +47,22 @@ type NavLink = {
   Icon: IconCmp;
 };
 
+/**
+ * Top Nav links — consolidated 12 → 8 in the 2026-05-17 redesign. Each link
+ * may carry sibling routes via SubNav inside the destination page:
+ *   /campaigns  → + /ab-tests, /plans
+ *   /audiences  → + /leads
+ *   /settings   → + /integrations
+ * The /history route is reached via a button on the /approvals page, not nav.
+ */
 const LINKS: NavLink[] = [
   { href: "/", label: "דשבורד", Icon: SignalIcon },
   { href: "/approvals", label: "הצעות", Icon: InboxIcon },
   { href: "/campaigns", label: "קמפיינים", Icon: TargetIcon },
   { href: "/business-knowledge", label: "העסק שלי", Icon: KnowledgeIcon },
-  { href: "/gallery", label: "גלריה", Icon: ImagesIcon as IconCmp },
+  { href: "/gallery", label: "קריאייטיב", Icon: ImagesIcon as IconCmp },
+  { href: "/audiences", label: "קהל ולידים", Icon: AudienceIcon as IconCmp },
   { href: "/reports", label: "דוחות", Icon: ReportIcon as IconCmp },
-  { href: "/plans", label: "תוכניות", Icon: ReportIcon as IconCmp },
-  { href: "/ab-tests", label: "מבחני A/B", Icon: AbTestIcon as IconCmp },
-  { href: "/audiences", label: "קהלים", Icon: AudienceIcon as IconCmp },
-  { href: "/leads", label: "לידים", Icon: LeadsIcon as IconCmp },
-  { href: "/integrations", label: "אינטגרציות", Icon: PlugIcon as IconCmp },
   { href: "/settings", label: "הגדרות", Icon: SettingsIcon as IconCmp },
 ];
 
@@ -92,8 +102,13 @@ export function Nav({ active, right }: { active?: string; right?: ReactNode }) {
           ))}
         </nav>
 
-        {/* Right pill — theme + user menu + mobile hamburger */}
+        {/* Right pill — search + bell + theme + user menu + mobile hamburger.
+            Search is a stub dialog ("v2 בקרוב") and Bell is a static indicator
+            until the notifications endpoint ships — both reserve nav real
+            estate today so the UI doesn't shift when they're wired live. */}
         <div className="glass-surface flex shrink-0 items-center gap-0.5 rounded-full px-1 py-1">
+          <SearchStubButton />
+          <NotificationsButton />
           <ThemeToggle className="h-9 w-9 hover:bg-foreground/5" />
           {right ? (
             <div className="flex items-center gap-0.5">{right}</div>
@@ -128,6 +143,59 @@ function NavPill({ link, active }: { link: NavLink; active?: string }) {
       />
       <span>{label}</span>
     </Link>
+  );
+}
+
+/**
+ * Search trigger — opens a placeholder dialog. Actual indexed search
+ * (approvals, campaigns, creatives, leads) is a v2 follow-up; the trigger
+ * lives in nav today so the layout is final before the backend lands.
+ */
+function SearchStubButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="חיפוש"
+        onClick={() => setOpen(true)}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Search size={16} />
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>חיפוש גלובאלי</DialogTitle>
+            <DialogDescription>
+              בקרוב — חיפוש על פני הצעות, קמפיינים, קריאייטיב ולידים. נחבר את
+              ה-endpoint אחרי שהאינדקס יוכן.
+            </DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/**
+ * Notifications bell — static visual placeholder. The dot is shown
+ * unconditionally for now; once `/api/notifications/pending-count` exists
+ * we'll hide it when count === 0 and add a popover with the list.
+ */
+function NotificationsButton() {
+  return (
+    <button
+      type="button"
+      aria-label="התראות"
+      className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-foreground/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Bell size={16} />
+      <span
+        aria-hidden
+        className="absolute right-1.5 top-1.5 inline-block h-1.5 w-1.5 rounded-full bg-brand-500 ring-2 ring-background"
+      />
+    </button>
   );
 }
 

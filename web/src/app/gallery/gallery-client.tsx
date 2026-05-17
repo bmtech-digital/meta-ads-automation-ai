@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import type { CreativeAsset } from "@/lib/db/types";
 import type {
   AdInsightsRow,
@@ -74,9 +73,31 @@ export function GalleryClient({
     return items;
   }, [fbPosts, igPosts]);
 
+  // Lifecycle filter — hides whole sections that don't carry tiles of the
+  // selected lifecycle. Tile-level filtering inside LiveSection (winning vs
+  // live vs fatiguing) is a v2 feature; today the pills are at the
+  // section-axis: clicking "טיוטות" hides Live + Archive (drafts live in
+  // PrioritySection), "מנצחים/חיים/מתעייפים" hides Priority + Archive.
+  const [lifecycleFilter, setLifecycleFilter] =
+    useState<LifecycleFilter>("all");
+
+  const showLive =
+    lifecycleFilter === "all" ||
+    lifecycleFilter === "winning" ||
+    lifecycleFilter === "live" ||
+    lifecycleFilter === "fatiguing";
+  const showPriority =
+    lifecycleFilter === "all" || lifecycleFilter === "draft";
+  const showArchive = lifecycleFilter === "all";
+
   return (
-    <div className="flex flex-col gap-12">
-      <ActionBar search={search} onSearchChange={setSearch} />
+    <div className="flex flex-col gap-10">
+      <UnifiedToolbar
+        search={search}
+        onSearchChange={setSearch}
+        lifecycleFilter={lifecycleFilter}
+        onLifecycleFilterChange={setLifecycleFilter}
+      />
 
       {fbError || igError ? (
         <div className="flex flex-col gap-2">
@@ -95,40 +116,106 @@ export function GalleryClient({
         </div>
       ) : null}
 
-      <LiveSection
-        assets={assets}
-        usage={creativeUsage}
-        adInsights={adInsights}
-        videoSources={videoSources}
-        metaError={metaError}
-        organicPosts={organicPosts}
-      />
-      <PrioritySection assets={assets} usage={creativeUsage} />
-      <ArchiveSection assets={assets} usage={creativeUsage} search={search} />
+      {showLive ? (
+        <LiveSection
+          assets={assets}
+          usage={creativeUsage}
+          adInsights={adInsights}
+          videoSources={videoSources}
+          metaError={metaError}
+          organicPosts={organicPosts}
+        />
+      ) : null}
+      {showPriority ? (
+        <PrioritySection assets={assets} usage={creativeUsage} />
+      ) : null}
+      {showArchive ? (
+        <ArchiveSection
+          assets={assets}
+          usage={creativeUsage}
+          search={search}
+        />
+      ) : null}
     </div>
   );
 }
 
-function ActionBar({
+type LifecycleFilter =
+  | "all"
+  | "winning"
+  | "live"
+  | "fatiguing"
+  | "draft";
+
+const FILTER_PILLS: Array<{ id: LifecycleFilter; label: string }> = [
+  { id: "all", label: "הכל" },
+  { id: "winning", label: "מנצחים" },
+  { id: "live", label: "חיים" },
+  { id: "fatiguing", label: "מתעייפים" },
+  { id: "draft", label: "טיוטות" },
+];
+
+
+/**
+ * Single unified toolbar — filter pills on one edge, search + upload on the
+ * other. In RTL that puts pills on the right (reading-start) and the action
+ * cluster on the left, mirroring the Campaigner.html mockup layout. Wraps to
+ * multiple rows on small screens; each cluster keeps its glass surface so the
+ * chrome reads as connected layers.
+ */
+function UnifiedToolbar({
   search,
   onSearchChange,
+  lifecycleFilter,
+  onLifecycleFilterChange,
 }: {
   search: string;
   onSearchChange: (v: string) => void;
+  lifecycleFilter: LifecycleFilter;
+  onLifecycleFilterChange: (v: LifecycleFilter) => void;
 }) {
   return (
-    <div className="sticky top-0 z-10 -mx-4 flex items-center gap-3 border-b border-border/60 bg-background/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-      <div className="relative flex-1">
-        <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="חיפוש לפי שם קובץ, headline, angle, service tag, שם קמפיין"
-          dir="auto"
-          className="ps-10"
-        />
+    <div className="sticky top-24 z-30 flex flex-wrap items-center justify-between gap-3">
+      {/* Filter pills — reading-start edge (right in RTL). */}
+      <div className="glass-surface inline-flex w-fit items-center gap-0.5 rounded-full p-1">
+        {FILTER_PILLS.map((p) => {
+          const isActive = lifecycleFilter === p.id;
+          return (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => onLifecycleFilterChange(p.id)}
+              aria-pressed={isActive}
+              className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+                isActive
+                  ? "bg-brand-500/15 text-foreground"
+                  : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+              }`}
+            >
+              {p.label}
+            </button>
+          );
+        })}
       </div>
-      <UploadDialog />
+
+      {/* Action cluster — search input + upload CTA. Same glass-pill shell. */}
+      <div className="glass-surface flex flex-1 items-center gap-1 rounded-full p-1 sm:flex-none sm:min-w-[360px]">
+        <div className="flex flex-1 items-center gap-2 ps-3 pe-1">
+          <Search
+            size={14}
+            className="shrink-0 text-muted-foreground"
+            aria-hidden
+          />
+          <input
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="חיפוש: קובץ, headline, angle, קמפיין"
+            dir="auto"
+            className="h-9 w-full bg-transparent text-[12.5px] outline-none placeholder:text-muted-foreground/70"
+          />
+        </div>
+        <UploadDialog />
+      </div>
     </div>
   );
 }

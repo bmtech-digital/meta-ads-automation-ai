@@ -25,16 +25,25 @@ interface SectionHeaderProps {
 }
 
 function SectionHeader({ title, subtitle, count, right }: SectionHeaderProps) {
+  // Quiet eyebrow — the brief's gallery shows one continuous grid with no
+  // loud section banners. We keep our 3-section structure (live/priority/
+  // archive) but cue each with a small uppercase eyebrow rather than a h2.
   return (
-    <div className="flex items-end justify-between gap-4">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">
+    <div className="flex items-end justify-between gap-4 border-b border-border/40 pb-2">
+      <div className="flex items-baseline gap-2">
+        <span className="text-[10.5px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
           {title}
-          {typeof count === "number" ? (
-            <span className="ms-2 text-base font-normal text-muted-foreground">({count})</span>
-          ) : null}
-        </h2>
-        {subtitle ? <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p> : null}
+        </span>
+        {typeof count === "number" ? (
+          <span className="font-tabular text-[11px] text-muted-foreground/70">
+            ({count})
+          </span>
+        ) : null}
+        {subtitle ? (
+          <span className="hidden text-[11px] text-muted-foreground/70 sm:inline">
+            · {subtitle}
+          </span>
+        ) : null}
       </div>
       {right ? <div>{right}</div> : null}
     </div>
@@ -131,10 +140,16 @@ function SubsectionHeader({
   subtitle: string;
 }) {
   return (
-    <div className="flex items-baseline gap-3 border-b border-border/40 pb-1">
-      <h3 className="text-base font-semibold">{title}</h3>
-      <span className="text-xs text-muted-foreground">({count})</span>
-      <span className="ms-auto text-[11px] text-muted-foreground">{subtitle}</span>
+    <div className="flex items-baseline gap-2 pb-1">
+      <h3 className="text-[13px] font-semibold text-foreground/80">
+        {title}
+      </h3>
+      <span className="font-tabular text-[11px] text-muted-foreground/70">
+        ({count})
+      </span>
+      <span className="ms-auto hidden text-[11px] text-muted-foreground/70 sm:inline">
+        {subtitle}
+      </span>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { PulseDot } from "@/components/brand/icons";
 import { RunNowButton } from "@/components/run-now-button";
 import { BudgetHealthCard } from "@/components/budget-health-card";
 import { CountUp } from "@/components/count-up";
+import { Sparkline, synthSpendTrend } from "@/components/sparkline";
 import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
@@ -833,11 +834,18 @@ function SpendHero({
             }
           : { label: "בקצב", tone: "text-success" };
 
+  // Decorative spend trend until per-day budget_health sampling lands. The
+  // curve's average matches the actual MTD spend so the visual reads
+  // consistent with the headline number even though individual points are
+  // synthetic. See sparkline.tsx for the math.
+  const trend = synthSpendTrend(spend, 30);
+
   return (
     <section className="relative overflow-hidden">
-      <div className="flex flex-col gap-1">
+      <div className="grid grid-cols-1 items-end gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <span className="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+          <span className="page-eyebrow-rule text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
             הוצאה החודש
           </span>
           {isLive ? (
@@ -917,7 +925,7 @@ function SpendHero({
 
         {utilization !== null ? (
           <div
-            className="mt-5 h-[3px] w-full max-w-md overflow-hidden rounded-full bg-foreground/8 dark:bg-foreground/12"
+            className="mt-6 h-1.5 w-full max-w-md overflow-hidden rounded-full bg-foreground/8 dark:bg-foreground/12"
             role="progressbar"
             aria-valuenow={utilization}
             aria-valuemin={0}
@@ -927,13 +935,21 @@ function SpendHero({
             <div
               className={`h-full rounded-full transition-[width] duration-[1100ms] ease-out ${
                 status === "overrun"
-                  ? "bg-destructive"
+                  ? "bg-destructive shadow-[0_0_18px_hsl(0_72%_51%/0.45)]"
                   : status === "underrun"
-                    ? "bg-warning"
-                    : "bg-brand-500 dark:bg-brand-400"
+                    ? "bg-warning shadow-[0_0_18px_hsl(38_92%_48%/0.45)]"
+                    : "bg-gradient-to-r from-brand-500 to-brand-600 shadow-[0_0_18px_hsl(28_91%_54%/0.45)]"
               }`}
               style={{ width: `${utilization}%` }}
             />
+          </div>
+        ) : null}
+        </div>
+        {/* Right column — decorative spend trend. Hidden on small screens
+            where the headline number is already the visual anchor. */}
+        {spend > 0 ? (
+          <div className="hidden h-[180px] lg:block">
+            <Sparkline data={trend} height={180} />
           </div>
         ) : null}
       </div>
@@ -999,44 +1015,48 @@ function ApprovalsInbox({
       <ul className="glass-surface overflow-hidden rounded-lg">
         {preview.map((a, i) => {
           const hrReason = requiresHumanReview(a);
-          const targetLabel = a.target_kind
-            ? TARGET_KIND_LABEL_HE[a.target_kind]
-            : "";
+          // Urgency-keyed vertical stripe — replaces the inline badge. The
+          // glow on urgent/high turns the stripe into a quiet attention
+          // affordance instead of a loud chip; sufficient color contrast
+          // for sighted users + aria-label for screen readers.
+          const stripeCls =
+            a.urgency === "urgent"
+              ? "bg-destructive shadow-[0_0_12px_hsl(0_72%_51%/0.55)]"
+              : a.urgency === "high"
+                ? "bg-brand-500 shadow-[0_0_10px_hsl(28_91%_54%/0.5)] dark:bg-brand-400"
+                : a.urgency === "medium"
+                  ? "bg-warning shadow-[0_0_8px_hsl(38_92%_48%/0.4)]"
+                  : "bg-muted-foreground/50";
           return (
-            <li key={a.id} className={i > 0 ? "border-t border-border" : ""}>
+            <li key={a.id} className={i > 0 ? "border-t border-border/60" : ""}>
               <Link
                 href={`/approvals/${a.id}`}
-                className="group flex flex-col gap-2 p-4 transition-colors hover:bg-muted/40"
+                className="group grid grid-cols-[4px_minmax(0,1fr)_auto] items-center gap-4 px-5 py-[18px] transition-colors hover:bg-foreground/[0.03]"
               >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex h-[22px] items-center rounded-full px-2 text-[11px] font-semibold ${URGENCY_STYLES[a.urgency]}`}
-                  >
-                    {URGENCY_LABEL_HE[a.urgency]}
-                  </span>
-                  <span className="text-[14px] font-semibold">
+                {/* Urgency stripe — vertical bar at row start (right in RTL).
+                    Self-stretches to row height for the full-bleed look. */}
+                <span
+                  className={`h-9 w-1 self-center rounded-full ${stripeCls}`}
+                  aria-label={URGENCY_LABEL_HE[a.urgency]}
+                />
+                <div className="min-w-0">
+                  <div className="text-[14.5px] font-semibold leading-tight">
                     {taskTypeLabel(a.task_type)}
-                  </span>
-                  {targetLabel && a.target_id ? (
-                    <span className="text-[12px] text-muted-foreground">
-                      {targetLabel}:{" "}
-                      <span className="mono-ltr text-[11.5px]">
-                        {a.target_id}
-                      </span>
-                    </span>
-                  ) : null}
+                  </div>
+                  <p className="mt-1 line-clamp-1 text-[12.5px] leading-relaxed text-muted-foreground">
+                    {truncate(a.rationale, 180)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
                   {hrReason ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-[1px] text-[11px] font-semibold text-warning ring-1 ring-warning/30">
+                    <span className="inline-flex items-center rounded-full bg-warning/15 px-2 py-[2px] text-[10.5px] font-semibold text-warning ring-1 ring-warning/30">
                       דורש בדיקה
                     </span>
                   ) : null}
-                  <span className="ms-auto font-tabular text-[11.5px] text-muted-foreground">
+                  <span className="font-tabular text-[11.5px] text-muted-foreground">
                     {relativeHe(a.created_at)}
                   </span>
                 </div>
-                <p className="text-[13px] leading-relaxed text-muted-foreground group-hover:text-foreground/90">
-                  {truncate(a.rationale, 180)}
-                </p>
               </Link>
             </li>
           );

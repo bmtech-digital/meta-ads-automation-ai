@@ -13,6 +13,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Shell, PageHeader } from "@/components/shell";
+import { SubNav, SETTINGS_GROUP_ITEMS } from "@/components/sub-nav";
 import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
@@ -142,6 +143,7 @@ export default async function SettingsPage({
   if (!business) {
     return (
       <Shell active="/settings">
+        <SubNav items={SETTINGS_GROUP_ITEMS} />
         <PageHeader eyebrow="הגדרות" title="פרטי עסק" />
         <Card>
           <CardHeader>
@@ -157,6 +159,7 @@ export default async function SettingsPage({
 
   return (
     <Shell active="/settings">
+      <SubNav items={SETTINGS_GROUP_ITEMS} />
       <PageHeader
         eyebrow="הגדרות"
         title="פרטי עסק"

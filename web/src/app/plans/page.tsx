@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Shell, PageHeader } from "@/components/shell";
+import { SubNav, CAMPAIGN_GROUP_ITEMS } from "@/components/sub-nav";
 import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
@@ -41,7 +42,8 @@ export default async function PlansPage() {
   const business = await getActiveBusiness();
   if (!business) {
     return (
-      <Shell active="/plans">
+      <Shell active="/campaigns">
+        <SubNav items={CAMPAIGN_GROUP_ITEMS} />
         <PageHeader
           eyebrow="תוכניות"
           title="תוכניות פתוחות"
@@ -63,7 +65,8 @@ export default async function PlansPage() {
   const groups = Object.entries(byTarget);
 
   return (
-    <Shell active="/plans">
+    <Shell active="/campaigns">
+      <SubNav items={CAMPAIGN_GROUP_ITEMS} />
       <PageHeader
         eyebrow="תוכניות"
         title="תוכניות פתוחות"
