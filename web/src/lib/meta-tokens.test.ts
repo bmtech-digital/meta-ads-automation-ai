@@ -97,6 +97,7 @@ function mkDb(
     unapproveApproval: unused as DataClient["unapproveApproval"],
     answerApproval: unused as DataClient["answerApproval"],
     getOnboardingSnapshot: unused as DataClient["getOnboardingSnapshot"],
+    beginOnboardingIfNeeded: unused as DataClient["beginOnboardingIfNeeded"],
     listHistory: unused as DataClient["listHistory"],
     listAgentActivity: unused as DataClient["listAgentActivity"],
     listGalleryAssets: unused as DataClient["listGalleryAssets"],

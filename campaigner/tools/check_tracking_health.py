@@ -91,7 +91,8 @@ def main() -> None:
                    tracking_pixel_id,
                    COALESCE(tracking_capi_configured, false) AS tracking_capi_configured,
                    tracking_aem_priority_events,
-                   tracking_domain_verified
+                   tracking_domain_verified,
+                   questionnaire_answers
               FROM business_knowledge
              WHERE business_id = %s
              LIMIT 1
@@ -168,14 +169,32 @@ def main() -> None:
     else:
         status = "unverified"
 
-    blocks = [] if status == "healthy" else BLOCKED_TASKS_WHEN_UNHEALTHY
-    recommended = None if status == "healthy" else "verify_pixel_capi"
+    # Operator-attested risk override (added 2026-05-17): when the operator has
+    # explicitly opted out of the tracking-block safeguard via
+    # `questionnaire_answers.operator_attested_tracking_risk=true`, we still
+    # report the true status (partial/unverified) but stop blocking proposals.
+    # The risk is on the operator; the agent's job is to surface it inside every
+    # downstream rationale. Triggered via the UI checkbox on /business-knowledge
+    # under "מצב מעקב — אישור סיכון" — see Roi's 2026-05-17 decision.
+    qa = row.get("questionnaire_answers") or {}
+    risk_override = bool(qa.get("operator_attested_tracking_risk", False))
+
+    if status == "healthy":
+        blocks: list[str] = []
+        recommended = None
+    elif risk_override:
+        blocks = []
+        recommended = None
+    else:
+        blocks = BLOCKED_TASKS_WHEN_UNHEALTHY
+        recommended = "verify_pixel_capi"
 
     emit_success(
         {
             "business_id": args.business_id,
             "status": status,
             "verified": status == "healthy",
+            "risk_override_active": risk_override,
             "checks": checks,
             "checks_passed": passed_count,
             "checks_total": total,
@@ -184,6 +203,13 @@ def main() -> None:
             "note": (
                 "MVP — operator-attested state from business_knowledge. "
                 "v2 adds live Meta Pixel event-rate + match-quality + last-seen."
+                + (
+                    " ⚠ risk_override_active=true: operator opted out of the "
+                    "tracking-block safeguard; structural proposals are allowed "
+                    "but conversion data may be unreliable."
+                    if risk_override
+                    else ""
+                )
             ),
         }
     )

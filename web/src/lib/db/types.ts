@@ -715,6 +715,16 @@ export interface DataClient {
       created_at: string;
     } | null;
   }>;
+  /**
+   * Phase A (Migration 028, 2026-05-17) — flip a pre-v2 business
+   * (status='completed' AND started_at IS NULL) to 'not_started' + record
+   * onboarding_started_at=now(). Idempotent — businesses already in the
+   * chain are unchanged. Called by /api/runners/trigger?flow=onboarding_chain
+   * so the runner has something to advance.
+   */
+  beginOnboardingIfNeeded(
+    businessId: string,
+  ): Promise<{ started: boolean; status: OnboardingStatus }>;
   listHistory(businessId: string, days: number): Promise<Approval[]>;
   /**
    * Surface the agent's "transparent activity" — skip / rejection / route

@@ -28,19 +28,45 @@ If none match, emit an `error` decision via `log_decision.py` and exit 1.
 
 ---
 
-## Before every flow — Load context
+## Before every flow — Load context (flow-conditional — 2026-05-17)
 
-**Always read, in order:**
+**Read only the prompts listed for your flow.** Loading prompts you won't use costs tokens *per turn* (the file stays in the cached context every time you call a tool), and a 76-turn run that re-reads 60k tokens of irrelevant prompt files spends ~$3 of pure cache-read waste. Stay focused.
 
-1. [`prompts/performance-brain.md`](prompts/performance-brain.md) — how to evaluate (§6 two-gate model)
-2. [`prompts/decision-tree.md`](prompts/decision-tree.md) — how to classify (§17)
-3. [`prompts/guardrails.md`](prompts/guardrails.md) — hard rules you never break (§14)
-4. [`prompts/creative-guide.md`](prompts/creative-guide.md) — when you touch creatives (§7)
-5. [`prompts/hebrew-copy-style.md`](prompts/hebrew-copy-style.md) — Hebrew voice rules for every `rationale` field you write
+Always read first: [`prompts/guardrails.md`](prompts/guardrails.md) — applies to every flow that writes to `approvals` or executes against Meta.
 
-**Flow-specific extras** (load only when in that flow — token weight):
-- Flow D only: [`prompts/competitive-research.md`](prompts/competitive-research.md)
-- KPI proposal contexts (any flow, on-demand): [`prompts/kpi-benchmarks.md`](prompts/kpi-benchmarks.md)
+Then read **only the files marked ✅ for your flow**:
+
+| Prompt | A: observe-propose | B: execute | C: creative-firehose | D: competitive-research | E: audiences | F: self-audit | G: ab-decide | H: midday-check |
+|---|---|---|---|---|---|---|---|---|
+| [`performance-brain.md`](prompts/performance-brain.md) | ✅ | — | ✅ | — | — | ✅ | ✅ | — |
+| [`decision-tree.md`](prompts/decision-tree.md) | ✅ | — | — | — | ✅ | — | ✅ | ✅ |
+| [`creative-guide.md`](prompts/creative-guide.md) | — | — | ✅ | — | — | — | — | — |
+| [`hebrew-copy-style.md`](prompts/hebrew-copy-style.md) | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| [`competitive-research.md`](prompts/competitive-research.md) | — | — | — | ✅ | — | — | — | — |
+| [`cpl-infrastructure.md`](prompts/cpl-infrastructure.md) | on-demand* | — | — | on-demand* | — | — | — | — |
+| [`kpi-benchmarks.md`](prompts/kpi-benchmarks.md) | on-demand* | — | — | on-demand* | — | — | — | — |
+
+*On-demand* = read only if you are about to emit a `set_kpi_target` or `alert` that compares to per-vertical bands.
+
+**Why this matters:** [`decision-tree.md`](prompts/decision-tree.md) alone is 1,370 lines (~25k tokens). Flow B (`execute_approvals`) doesn't diagnose — it just executes pre-approved rows — so re-reading decision-tree on every one of its turns is pure waste. Same for `creative-guide.md` in Flow A (no creatives are generated in observe-propose; the agent only references them).
+
+**No silent extras.** Don't open prompts that aren't in your flow's row "just in case". If you find you genuinely need a non-listed prompt, log a `skip` decision noting which file + why, and finish without it — then ping the operator via an `alert` so the matrix gets fixed.
+
+---
+
+## Tool-call discipline (focused-run lever #4 — added 2026-05-17)
+
+**Within a single run, never call the same tool with the same arguments twice.** Each redundant call costs 1-2k tokens of tool result text re-entering the cache for every subsequent turn. A run that calls `load_business_knowledge` three times pays for that decision three times *and* compounds it across the remaining tool turns.
+
+Concrete rules:
+
+1. **`load_business_knowledge` is called once per run, in Step 1.** If a later step needs the products list / vertical / KPI target, re-read your own earlier tool result message — don't re-invoke.
+2. **`fetch_meta_state` is called once per run.** Status / daily_budget / updated_time don't change during a 13-minute diagnosis.
+3. **`fetch_insights` per (level, window) is called once per run.** If Step 3 already pulled `--level campaign --days 30`, Step 6 must not re-pull the same combination.
+4. **`load_baselines`, `load_audiences`, `load_feedback_history`, `load_recent_actions_outcomes`, `load_active_plans`** are each called once per run — they're stable observations, not live signals.
+5. **`check_guardrails` runs per proposal candidate, not per draft.** If you're refining the same proposal's rationale, the guardrails verdict from the previous draft still stands — don't recheck until the proposal's `task_type` / `target_id` / `payload` changes.
+
+If the agent finds itself wanting to re-call a tool, the right move is *almost always* to re-read the prior tool result from the conversation, not to re-invoke. The exception is when an executed action between the two reads could have changed the state — in `execute_approvals` flow only, that's legitimate; in `observe_propose` and the rest, the state is observation-only and is fixed for the run's duration.
 
 **Always record the run start:**
 
@@ -59,6 +85,34 @@ Reuse `$RUN_ID` for every `log_decision` and `propose_task` call in this invocat
 ---
 
 ## Flow A — Observe-Propose
+
+### Step −1: Skip-on-no-change gate (added 2026-05-17 — focused-run lever #3)
+
+**Before everything else.** If yesterday's run hashed the exact same state inputs, today's diagnosis will reach the same conclusions and waste 76 turns producing identical decisions. Compute the fingerprint, compare to the previous run, and exit early when they match.
+
+```bash
+STATE_JSON=$(python -m campaigner.tools.compute_state_hash \
+  --business-id "$BUSINESS_ID" \
+  --flow observe_propose)
+
+python -m campaigner.tools.log_decision \
+  --business-id "$BUSINESS_ID" --run-id "$RUN_ID" \
+  --graph-name observe_propose --node-name state_hash \
+  --decision-type observation \
+  --summary "<state_hash (12 chars) — 'unchanged from yesterday' or 'changed'>" \
+  --outputs "$STATE_JSON"
+```
+
+If `should_skip == true` in the output:
+
+1. Log a `skip` decision (`node_name='state_unchanged'`, `summary="דילגתי על הסריקה — שום דבר לא השתנה מאז $previous_run_at"`).
+2. Exit the flow successfully (heartbeat `end`). **Do not** run Step 0+.
+
+If `should_skip == false` (no previous hash, or hash differs, or previous is too old) — continue to Step 0.
+
+**Why we still log state_hash even when continuing:** the row is the next run's "previous hash" reference. If we don't log it, we can never skip.
+
+The hash deliberately includes only **inputs that drive decisions**: active-campaign count, latest campaign edit time, spend bucket (₪50 granularity), pending-approvals count + last-created-at, tracking_status, health_band. Time-of-day, per-impression CTR jitter, and other noise are excluded — they would force a re-run for nothing.
 
 ### Step 0: Budget health (monthly pace)
 
@@ -124,6 +178,29 @@ python -m campaigner.tools.log_decision \
 - `health_band == "healthy"` → continue normally.
 - `health_band == "watch"` → continue, but every structural proposal (`scale_up` / `new_creative` / `new_campaign`) must echo the relevant `signals` in its rationale so the operator sees the risk.
 - `health_band == "critical"` → propose `alert` (urgency=urgent) per critical signal. Do NOT propose spend-increasing actions until the operator resolves the underlying issue. Triggers include `account_status != ACTIVE`, `disable_reason` set, `spend_cap <5% remaining`, `5+ rejected ads in 30d`.
+
+### Step 0.7: Diagnostic-skip gate (added 2026-05-17 — focused-run lever #2)
+
+**Before Step 1.** When the pre-flight gates have already blocked every structural proposal type, running the full Step 1+ diagnosis is pure cache-read waste — 15+ tool turns producing data the agent can't act on. Short-circuit instead.
+
+**Skip Step 1–6 and go straight to summary** when **all** of the following hold:
+
+- Step 0.5 `tracking_status` is `partial` / `unverified` / `unknown` (blocks `scale_up`, `new_creative`, `expand_audience`, `new_campaign`), **and**
+- Step 0.6 `health_band` is `critical` **or** there are zero `ACTIVE` campaigns on the account, **and**
+- No `pending` approval already covers the blocking issue (avoid re-asking the operator the same question).
+
+When the skip condition fires:
+
+1. Emit the appropriate Step 0.5 / 0.6 alerts (`verify_pixel_capi`, `alert` for critical health) — these are what the operator needs to act on.
+2. Log a `skip` decision with `node_name='diagnostic_skip'`, `summary=`"דילגתי על Step 1+ — אין על מה לפעול עד שהחסם <X> נפתר"`, and `outputs={"reason": "blocked_state", "blocking_gates": [...], "skipped_steps": ["1","2","3","4","5","6"]}`.
+3. Skip directly to **Flow A summary** at the bottom of this section. Do **not** fetch insights, baselines, audiences, feedback history, or active plans — none of them affect what you can propose right now.
+
+**Do NOT skip** (continue normally) if:
+- Tracking is `healthy` (even if other things are bad — the agent can still act on conversions data).
+- Account is `watch` but at least 1 campaign is `ACTIVE` (the agent can still propose `pause_campaign` or `set_kpi_target` based on per-campaign signals).
+- Step 0 returned `overrun` — pace is itself the action; the agent must still locate which campaigns are over-pacing in Step 1.
+
+This gate is a **diagnostic filter, not a guardrail**. It doesn't change what's allowed — it just stops the agent from re-deriving why-nothing-can-happen when the pre-flight checks already determined nothing can happen.
 
 ### Step 1: Pull signals
 
@@ -910,6 +987,92 @@ Print: `"run=$RUN_ID flow_h spikes=N drift_alerts=M"`. Exit 0.
 
 ---
 
+## Mastery v2 integration (added 2026-05-17 — Phases 0/A/B/C/D/E/F/G)
+
+The v2 plan ([docs/plans/campaigner-meta-mastery-v2.md](../docs/plans/campaigner-meta-mastery-v2.md)) added 14 new guardrails (§42-§55) + 14 new tools. The agent's responsibilities expanded — these are the **state fields you MUST populate** before calling `check_guardrails.py` so the new rules don't false-skip with "field not in state":
+
+### Step 0.8: Pacing Router (after Step 0.7 diagnostic-skip, before Step 1)
+
+The "missing brain" between observation and proposal. Compute_monthly_pace already wrote `budget_health` at Step 0; now route it.
+
+```bash
+python -m campaigner.tools.route_pacing_action \
+  --pace-snapshot "$BUDGET_HEALTH_JSON" \
+  --gallery-health <healthy|exhausted|empty> \
+  --active-campaign-count $ACTIVE_COUNT \
+  $([[ "$HAS_QUALITY_WINNER" == "true" ]] && echo --has-quality-winner) \
+  $([[ "$HAS_VIRAL_ORGANIC" == "true" ]] && echo --has-viral-organic)
+```
+
+The output `recommended_lane` becomes the **prior** on task_type selection — not a replacement for §T-lane evaluation. Acceptable lanes:
+
+| `recommended_lane` | What it means | §T-lane to route to |
+|---|---|---|
+| `routine_observation` | pace OK, continue normal flow | §T0r normal routing |
+| `scale_up` | underrun + winner + healthy gallery | §T2+ |
+| `redeploy_creative` | underrun + winner + saturated gallery | §T_PE gallery-first |
+| `alert_content_bottleneck` | underrun + winner + empty gallery | emit `alert` with 2-option MCQ (imagen vs boost_post candidate) |
+| `boost_post` | underrun + no winner + viral organic | §T9.1 Post-Promote (must clear §53 5-thresholds) |
+| `new_campaign` | underrun + no winner | §T_NC |
+| `scale_down` | overrun | §T_SD (use quality-adjusted CPL, not raw) |
+| `log_lost_opportunity` | EOM brake | log to monthly_brief.lost_opportunities; do NOT panic-spend |
+| `set_monthly_budget` | no_budget_set | alert operator |
+
+### Step 1.5: Lead Quality Fetch (after Step 1 signals, before Step 2 diagnose)
+
+Phase C dependency. Populates `state.graded_sample_size_14d` + `state.lead_grading_coverage_30d` for §42 + §45.
+
+```bash
+# Per active campaign
+python -m campaigner.tools.fetch_lead_quality_summary \
+  --business-id $BUSINESS_ID \
+  --campaign-id $META_CAMPAIGN_ID \
+  --window-days 14
+
+# Once per run (business-level)
+python -m campaigner.tools.compute_quality_adjusted_kpi \
+  --business-id $BUSINESS_ID --window-days 14
+```
+
+Carry both outputs in your working memory. When constructing the proposal-state for `check_guardrails`, include:
+
+- `graded_sample_size_14d` — from fetch_lead_quality_summary
+- `lead_grading_coverage_30d` — count(graded leads last 30d) / count(leads last 30d)
+
+§42 hard-blocks scale_up when graded_sample < 20 (the 16.4 structural fix).
+
+### Step 1.7: Israeli Calendar + Cold-Start Window (Phase F)
+
+For §49, §50, §55 (cpm_event_no_pause). Single call per run; outputs go into the shared state blob.
+
+```bash
+python -m campaigner.tools.apply_israeli_calendar  # defaults to today
+```
+
+Then in proposal-state include:
+
+- `days_left_in_month` — from compute_monthly_pace.outputs.days_left
+- `pace_ratio` — from compute_monthly_pace.outputs.pace
+- `days_since_onboarding` — `now - businesses.onboarding_started_at` (NULL → 999 = steady-state)
+- `cpm_event_active` — from apply_israeli_calendar.cpm_event
+- `ctr_trend_pct` / `cpl_trend_pct` — last-7d vs prior-7d (already computed via `fetch_insights --with-prior-window`)
+- `post_created_age_hours` — only when proposing `boost_post`, from the post's `created_time`
+- `master_exclusion_audience_id` — Phase D dependency (`compute_master_exclusion` once the union ≥100 records and a `create_custom_audience` was approved + executed)
+
+### Hebrew rationale rule (§44 judgment-only)
+
+When `quality_adjusted_cpl` diverges from raw Meta CPL by ≥20%, **paragraph 1 of the rationale must lead with the quality-adjusted figure**, raw CPL as secondary. Example:
+
+> "עלות לליד איכותי (אחרי דירוג שלך): ₪140. עלות לליד גולמית של Meta: ₪80 — הפרש ×1.75. זה אומר שאת רוב הלידים הזולים לא תרצה לעבוד."
+
+Never invert the order. The 16.4 trap repeats when the agent leads with cheap raw CPL.
+
+### Onboarding chain trigger
+
+The new Flow F (Onboarding) runs via `runners/onboarding_chain.sh`. The web side triggers it via `POST /api/runners/trigger?flow=onboarding` after Meta OAuth completes. The runner is deterministic — no `claude -p` call — but each step's content (rationale + MCQ + first-campaign cold-start math) IS agent-grade.
+
+---
+
 ## Rules you MUST follow
 
 1. **Every action produces an `agent_decisions` row.** No exceptions. If `log_decision.py` fails, retry (it has built-in retry); if retry exhausts, exit 1. Do not silently continue.
@@ -919,6 +1082,8 @@ Print: `"run=$RUN_ID flow_h spikes=N drift_alerts=M"`. Exit 0.
 5. **Never edit an applied migration.** Schema changes go in new numbered files under [migrations/](../migrations/).
 6. **Idempotency:** re-running the same flow with the same inputs must not double-propose. Check for existing `approvals` rows with matching `(business_id, task_type, target_id, status='pending')` before inserting.
 7. **Token discipline:** load prompts once per invocation. If you need the same JSON twice, keep it in your working memory — don't re-call `fetch_insights.py`.
+8. **Mastery v2 §44** (quality-adjusted CPL leads rationale) is judgment-only — enforce yourself. When raw vs quality-adjusted diverge ≥20%, lead paragraph 1 with the quality-adjusted figure.
+9. **Mastery v2 §46.5** (respect operator MCQ response): when a task descends from an answered approval (inputs.prior_response_ref), the rationale MUST cite the operator's chosen answer and explain how this proposal differs.
 
 ---
 

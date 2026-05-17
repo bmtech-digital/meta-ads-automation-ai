@@ -58,6 +58,8 @@ export const supabaseClient: DataClient = {
   unapproveApproval: async () => notImplemented("unapproveApproval"),
   answerApproval: async () => notImplemented("answerApproval"),
   getOnboardingSnapshot: async () => notImplemented("getOnboardingSnapshot"),
+  beginOnboardingIfNeeded: async () =>
+    notImplemented("beginOnboardingIfNeeded"),
   listHistory: async () => notImplemented("listHistory"),
   listAgentActivity: async () => notImplemented("listAgentActivity"),
   listGalleryAssets: async () => notImplemented("listGalleryAssets"),

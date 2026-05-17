@@ -743,6 +743,58 @@ export const localPostgresClient: DataClient = {
     return { reverted: (rowCount ?? 0) > 0 };
   },
 
+  async beginOnboardingIfNeeded(businessId: string) {
+    // Only flip when the business is in the "pre-v2 completed default" state
+    // (status='completed' AND started_at IS NULL). Anything else (already
+    // in the chain OR a fresh business the OAuth handler already initialized)
+    // we leave untouched — idempotent.
+    const { rows } = await getPool().query<{
+      status: string;
+    }>(
+      `UPDATE businesses
+          SET onboarding_status = 'not_started',
+              onboarding_started_at = now()
+        WHERE id = $1
+          AND onboarding_status = 'completed'
+          AND onboarding_started_at IS NULL
+        RETURNING onboarding_status AS status`,
+      [businessId],
+    );
+    if (rows.length > 0) {
+      return {
+        started: true,
+        status: rows[0].status as
+          | "not_started"
+          | "brief_pending"
+          | "audience_brief_pending"
+          | "scanning"
+          | "first_proposal_pending"
+          | "completed",
+      };
+    }
+    // Otherwise read current status
+    const { rows: cur } = await getPool().query<{
+      onboarding_status: string;
+    }>(
+      `SELECT COALESCE(onboarding_status, 'completed') AS onboarding_status
+         FROM businesses WHERE id = $1`,
+      [businessId],
+    );
+    if (cur.length === 0) {
+      throw new Error(`business ${businessId} not found`);
+    }
+    return {
+      started: false,
+      status: cur[0].onboarding_status as
+        | "not_started"
+        | "brief_pending"
+        | "audience_brief_pending"
+        | "scanning"
+        | "first_proposal_pending"
+        | "completed",
+    };
+  },
+
   async getOnboardingSnapshot(businessId: string) {
     // One round-trip — fetch status + the task_type that's open for the
     // current step. Map: not_started → no approval (chain hasn't run);
