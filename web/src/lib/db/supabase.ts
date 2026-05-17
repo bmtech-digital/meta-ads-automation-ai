@@ -33,6 +33,8 @@ export const supabaseClient: DataClient = {
   updateSeasonalHints: async () => notImplemented("updateSeasonalHints"),
   getLatestBudgetHealthDecision: async () =>
     notImplemented("getLatestBudgetHealthDecision"),
+  recordBudgetHealthSnapshot: async () =>
+    notImplemented("recordBudgetHealthSnapshot"),
   getBusinessKnowledge: async () => notImplemented("getBusinessKnowledge"),
   upsertBusinessKnowledge: async () =>
     notImplemented("upsertBusinessKnowledge"),

@@ -509,6 +509,21 @@ export interface DataClient {
   getLatestBudgetHealthDecision(
     businessId: string,
   ): Promise<AgentDecision | null>;
+  /**
+   * Insert a fresh `budget_health` observation row sourced from a web-side
+   * live Meta fetch (not from the agent's morning runner). Used by the
+   * dashboard's SpendHero to keep the displayed spend in sync with Meta on
+   * every page load.
+   *
+   * Caller has already pulled `spend_this_month` from Meta and recomputed
+   * pace/projection in JS — this method just persists the row. Append-only,
+   * same shape the agent writes.
+   */
+  recordBudgetHealthSnapshot(input: {
+    business_id: string;
+    summary: string;
+    outputs: Record<string, unknown>;
+  }): Promise<AgentDecision>;
 
   getBusinessKnowledge(businessId: string): Promise<BusinessKnowledge | null>;
   upsertBusinessKnowledge(

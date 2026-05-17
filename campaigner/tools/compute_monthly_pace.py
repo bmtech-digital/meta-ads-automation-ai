@@ -43,6 +43,7 @@ from datetime import UTC, date, datetime
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import fetch_one
+from campaigner.lib.fx import convert_to_ils
 from campaigner.lib.meta_client import MetaClient
 from campaigner.lib.seasonal import effective_monthly_budget
 from campaigner.tools._contract import (
@@ -67,6 +68,21 @@ def _sum_spend(rows: list[dict]) -> float:
         except (TypeError, ValueError):
             continue
     return total
+
+
+def _account_currency(rows: list[dict]) -> str | None:
+    """Pick the first `account_currency` we see across insight rows.
+
+    Account-level insights return one row per time window; the currency is
+    constant per ad account so any row carries the same value. Return None
+    when the field wasn't requested (older callers) — caller then assumes
+    ILS for backward compatibility.
+    """
+    for r in rows:
+        cur = r.get("account_currency")
+        if isinstance(cur, str) and cur:
+            return cur
+    return None
 
 
 def _classify(pace: float | None) -> str:
@@ -146,19 +162,27 @@ def main() -> None:
         month_rows = client.fetch_insights(
             level="account",
             time_range={"since": month_start, "until": today.isoformat()},
-            fields=["spend", "date_start", "date_stop"],
+            fields=["spend", "account_currency", "date_start", "date_stop"],
         )
         last7_rows = client.fetch_insights(
             level="account",
             date_preset="last_7d",
-            fields=["spend", "date_start", "date_stop"],
+            fields=["spend", "account_currency", "date_start", "date_stop"],
         )
     except Exception as e:
         emit_runtime_error(f"Meta spend fetch failed: {e}", exc=e)
         return
 
-    spend_month = _sum_spend(month_rows)
-    spend_7d = _sum_spend(last7_rows)
+    spend_month_native = _sum_spend(month_rows)
+    spend_7d_native = _sum_spend(last7_rows)
+    # Meta returns spend in the ad-account's native currency. The monthly
+    # budget + every pace threshold are ILS, so convert before doing the
+    # pace math. Identity transform when the account is already ILS.
+    account_currency = _account_currency(month_rows) or _account_currency(last7_rows)
+    spend_month, fx_rate, fx_source_currency, fx_source = convert_to_ils(
+        spend_month_native, account_currency
+    )
+    spend_7d, _, _, _ = convert_to_ils(spend_7d_native, account_currency)
     avg_daily_7d = spend_7d / 7.0 if spend_7d else 0.0
     projected_month = spend_month + avg_daily_7d * days_left
 
@@ -190,6 +214,19 @@ def main() -> None:
                 "overrun_gt": OVERRUN_THRESHOLD,
                 "underrun_lt": UNDERRUN_THRESHOLD,
             },
+            # FX metadata when the ad account isn't ILS-denominated. Same
+            # shape as web/src/lib/live-spend.ts so the dashboard renders
+            # "מומר מ-$X · שער 3.71" regardless of which side wrote the row.
+            "fx": (
+                {
+                    "source_currency": fx_source_currency,
+                    "native_amount": round(spend_month_native, 2),
+                    "rate_used": round(fx_rate, 4),
+                    "rate_source": fx_source,
+                }
+                if fx_source_currency != "ILS"
+                else None
+            ),
         }
     )
 

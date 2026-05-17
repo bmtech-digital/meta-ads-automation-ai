@@ -340,6 +340,34 @@ export const localPostgresClient: DataClient = {
     return rows[0] ?? null;
   },
 
+  async recordBudgetHealthSnapshot(input: {
+    business_id: string;
+    summary: string;
+    outputs: Record<string, unknown>;
+  }): Promise<AgentDecision> {
+    // graph_name='observe_propose' + node_name='budget_health' matches what
+    // `compute_monthly_pace.py` writes from the agent side. `run_id` is a
+    // fresh UUID per snapshot — each web-side fetch is its own observation
+    // and inherits the same append-only contract as agent rows.
+    const { rows } = await getPool().query<AgentDecision>(
+      `INSERT INTO agent_decisions (
+         business_id, run_id, graph_name, node_name, decision_type,
+         summary, outputs
+       )
+       VALUES (
+         $1, gen_random_uuid(), 'observe_propose', 'budget_health',
+         'observation', $2, $3::jsonb
+       )
+       RETURNING id::text, business_id::text, run_id::text, graph_name,
+                 node_name, created_at::text, decision_type, summary, rationale,
+                 inputs, outputs, related_approval_id::text, campaign_id,
+                 adset_id, ad_id, llm_model, llm_tokens_in, llm_tokens_out,
+                 latency_ms, guardrail_violations, confidence`,
+      [input.business_id, input.summary, JSON.stringify(input.outputs)],
+    );
+    return rows[0];
+  },
+
   async getBusinessKnowledge(
     businessId: string,
   ): Promise<BusinessKnowledge | null> {

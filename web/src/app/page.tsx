@@ -51,6 +51,7 @@ import {
   type EstimateResult,
 } from "@/lib/cpl-infrastructure";
 import { ResearchBenchmarkButton } from "@/components/research-benchmark-button";
+import { fetchLiveSpendAndRecord, type LiveSpendResult } from "@/lib/live-spend";
 
 const INBOX_PREVIEW_LIMIT = 5;
 
@@ -113,9 +114,24 @@ export default async function HomePage() {
     0,
     pendingApprovals.length - inboxPreview.length,
   );
-  const budgetHealth = business
-    ? await db.getLatestBudgetHealthDecision(business.id)
-    : null;
+  // Spend on the hero block must reflect Meta in real-time, not the row the
+  // agent wrote on its last run (which can be 1–4 days stale in local dev
+  // without cron). We fetch live + record a fresh budget_health row in
+  // parallel with the stale-row lookup, then pick whichever is more recent
+  // when handing off to SpendHero / BudgetHealthCard.
+  const [staleBudgetHealth, liveSpend]: [
+    Awaited<ReturnType<typeof db.getLatestBudgetHealthDecision>>,
+    LiveSpendResult | null,
+  ] = business
+    ? await Promise.all([
+        db.getLatestBudgetHealthDecision(business.id),
+        fetchLiveSpendAndRecord(db, business).catch(() => null),
+      ])
+    : [null, null];
+  const budgetHealth =
+    liveSpend?.ok ? liveSpend.decision : staleBudgetHealth;
+  const spendIsLive = !!liveSpend?.ok;
+  const spendFailReason = liveSpend && !liveSpend.ok ? liveSpend.reason : null;
   const knowledge = business
     ? await db.getBusinessKnowledge(business.id)
     : null;
@@ -177,7 +193,12 @@ export default async function HomePage() {
         <div className="flex flex-col gap-10">
           <TokenExpiryBanner business={businessForToken} />
 
-          <SpendHero business={business} budgetHealth={budgetHealth} />
+          <SpendHero
+            business={business}
+            budgetHealth={budgetHealth}
+            isLive={spendIsLive}
+            failReason={spendFailReason}
+          />
 
           <BudgetHealthCard business={business} decision={budgetHealth} />
 
@@ -756,16 +777,38 @@ function EmptyBusinessState() {
 function SpendHero({
   business,
   budgetHealth,
+  isLive,
+  failReason,
 }: {
   business: Business;
   budgetHealth: AgentDecision | null;
+  /** True when `budgetHealth` was just synthesized from a live Meta fetch. */
+  isLive: boolean;
+  /** Reason the live fetch failed — drives reconnect CTA when token is dead. */
+  failReason: "no_token" | "expired_token" | "meta_error" | null;
 }) {
   const outputs = (budgetHealth?.outputs ?? {}) as {
     spend_this_month?: number;
     effective_monthly_budget?: number;
     pace?: number | null;
     status?: "ok" | "overrun" | "underrun" | "no_budget_set";
+    fx?: {
+      source_currency: string;
+      native_amount: number;
+      rate_used: number;
+      rate_source: "live" | "cached" | "fallback" | "none";
+    } | null;
   };
+  // Staleness math drives the "מיושן · N ימים" badge. Only meaningful when
+  // we fell back to the agent's row (live fetch failed); a fresh live snapshot
+  // is by definition not stale.
+  const decisionAgeDays = budgetHealth?.created_at
+    ? Math.floor(
+        (Date.now() - Date.parse(budgetHealth.created_at)) / 86_400_000,
+      )
+    : null;
+  const showStaleBadge =
+    !isLive && decisionAgeDays !== null && decisionAgeDays >= 1;
   const spend = Math.round(outputs.spend_this_month ?? 0);
   const budget =
     outputs.effective_monthly_budget ??
@@ -793,9 +836,32 @@ function SpendHero({
   return (
     <section className="relative overflow-hidden">
       <div className="flex flex-col gap-1">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
-          הוצאה החודש
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10.5px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+            הוצאה החודש
+          </span>
+          {isLive ? (
+            <span className="inline-flex items-center gap-1 rounded-full border border-emerald-300/60 bg-emerald-50/40 px-1.5 py-[1px] text-[9.5px] font-semibold uppercase tracking-wider text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-950/30 dark:text-emerald-300">
+              <span className="h-1 w-1 rounded-full bg-emerald-500 dark:bg-emerald-400" aria-hidden />
+              חי מ-Meta
+            </span>
+          ) : showStaleBadge ? (
+            <span
+              className="inline-flex items-center gap-1 rounded-full border border-amber-300/60 bg-amber-50/40 px-1.5 py-[1px] text-[9.5px] font-semibold uppercase tracking-wider text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300"
+              title={
+                failReason === "expired_token"
+                  ? "הטוקן של Meta פג — לא הצלחנו לקרוא הוצאה חדשה"
+                  : failReason === "no_token"
+                    ? "לא מחובר ל-Meta — לא הצלחנו לקרוא הוצאה חדשה"
+                    : failReason === "meta_error"
+                      ? "Meta החזיר שגיאה — מוצג snapshot ישן"
+                      : undefined
+              }
+            >
+              מיושן · {decisionAgeDays} {decisionAgeDays === 1 ? "יום" : "ימים"}
+            </span>
+          ) : null}
+        </div>
         <div
           className="font-tabular leading-[0.95] tracking-[-0.04em]"
           style={{ fontSize: "clamp(56px, 9vw, 96px)", fontWeight: 700 }}
@@ -823,6 +889,31 @@ function SpendHero({
             </span>
           ) : null}
         </div>
+
+        {outputs.fx ? (
+          <div className="mt-0.5 text-[11.5px] text-muted-foreground">
+            מומר מ-
+            <span className="font-tabular text-foreground">
+              {outputs.fx.source_currency === "USD" ? "$" : ""}
+              {Math.round(outputs.fx.native_amount).toLocaleString("en-US")}
+              {outputs.fx.source_currency !== "USD"
+                ? ` ${outputs.fx.source_currency}`
+                : ""}
+            </span>{" "}
+            · שער{" "}
+            <span className="font-tabular text-foreground">
+              {outputs.fx.rate_used.toFixed(2)}
+            </span>
+            {outputs.fx.rate_source === "fallback" ? (
+              <span
+                className="ms-1 inline-flex items-center rounded border border-amber-300/60 bg-amber-50/40 px-1 py-[1px] text-[9.5px] font-semibold uppercase tracking-wider text-amber-700 dark:border-amber-500/30 dark:bg-amber-950/30 dark:text-amber-300"
+                title="שער מטבע FX לא נטען מ-ECB — מוצג שער ברירת מחדל"
+              >
+                שער ברירת מחדל
+              </span>
+            ) : null}
+          </div>
+        ) : null}
 
         {utilization !== null ? (
           <div

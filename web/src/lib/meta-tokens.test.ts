@@ -79,6 +79,8 @@ function mkDb(
     updateSeasonalHints: unused as DataClient["updateSeasonalHints"],
     getLatestBudgetHealthDecision:
       unused as DataClient["getLatestBudgetHealthDecision"],
+    recordBudgetHealthSnapshot:
+      unused as DataClient["recordBudgetHealthSnapshot"],
     getBusinessKnowledge: unused as DataClient["getBusinessKnowledge"],
     upsertBusinessKnowledge: unused as DataClient["upsertBusinessKnowledge"],
     setPrimaryKpi: unused as DataClient["setPrimaryKpi"],
