@@ -16,13 +16,12 @@ export const dynamic = "force-dynamic";
  * handles the unattended case.
  */
 export async function POST(_req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
-    return NextResponse.json(
-      { error: "disabled_in_production_use_cron" },
-      { status: 403 },
-    );
-  }
-
+  // Auth is the admin gate. We previously also blocked on
+  // NODE_ENV=production, but the local dev container runs `pnpm build &&
+  // pnpm start` for performance, which sets NODE_ENV=production and hid
+  // the button in dev. Real cloud production doesn't mount the docker
+  // socket the spawn below relies on, so the call fails naturally there
+  // rather than firing silently. Same shape as /api/runners/trigger.
   const session = await getAuth().getSession();
   if (!session)
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

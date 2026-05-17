@@ -1010,6 +1010,61 @@ export interface AbTestVariant {
  */
 export type AudienceKind = "custom" | "saved" | "lookalike" | "special_ad";
 
+/**
+ * Geo envelope written by the Python parser (`audience_targeting.parse_targeting`).
+ * Mirrors Meta's `targeting.geo_locations` / `targeting.excluded_geo_locations`
+ * shape after light normalization. Every sub-array is optional — Meta returns
+ * only the keys the operator selected.
+ */
+export interface AudienceGeoEnvelope {
+  countries?: Array<{ key?: string; name?: string } | string>;
+  country_groups?: Array<{ key?: string; name?: string }>;
+  regions?: Array<{ key?: string; name?: string; country?: string }>;
+  cities?: Array<{
+    key?: string;
+    name?: string;
+    country?: string;
+    region?: string;
+    radius?: number;
+    distance_unit?: "kilometer" | "mile" | string;
+  }>;
+  zips?: Array<{ key?: string; name?: string; primary_city_id?: string }>;
+  geo_markets?: Array<{ key?: string; name?: string }>;
+  electoral_districts?: Array<{ key?: string; name?: string }>;
+  neighborhoods?: Array<{ key?: string; name?: string }>;
+  subcities?: Array<{ key?: string; name?: string }>;
+  subneighborhoods?: Array<{ key?: string; name?: string }>;
+  custom_locations?: Array<{
+    name?: string;
+    address_string?: string;
+    latitude?: number;
+    longitude?: number;
+    radius?: number;
+    distance_unit?: "kilometer" | "mile" | string;
+    primary_city_id?: string;
+    country?: string;
+  }>;
+  location_types?: string[];
+}
+
+/**
+ * Single Meta targeting entry — interests / behaviors / industries / etc.
+ * Meta returns {id, name} at minimum; behaviors sometimes add a `category`.
+ */
+export interface AudienceTargetingEntry {
+  id?: string | number;
+  name?: string;
+  category?: string;
+  audience_size_lower_bound?: number;
+  audience_size_upper_bound?: number;
+}
+
+/** Custom-audience reference (included / excluded). */
+export interface AudienceCustomRef {
+  id?: string;
+  name?: string;
+}
+
 export interface AudienceRow {
   id: string;
   business_id: string;
@@ -1037,6 +1092,70 @@ export interface AudienceRow {
   time_updated: string | null;
   synced_at: string;
   archived_at: string | null;
+
+  // --- Migration 030 (2026-05-17) — full saved-audience targeting -----------
+  // Populated only for `kind = 'saved'`; custom + lookalike rows have NULLs.
+  /** Hebrew one-line summary built by the parser. Operator-readable, no jargon. */
+  targeting_summary: string | null;
+  /**
+   * Meta's own human-readable breakdown of the targeting spec. NOT a flat
+   * string array — Meta returns each line as `{content, children}` where
+   * `content` is the label ("מיקום:", "גיל:", "אנשים תואמים:") and
+   * `children` is an array of strings carrying the actual values. Meta
+   * pre-localizes this to the account's language (Hebrew for IL accounts)
+   * which makes it our best "what does this audience actually do?" view.
+   */
+  sentence_lines: Array<{ content?: string; children?: string[] }> | null;
+  /** TRUE = parsed cleanly, FALSE = parse hit unexpected shape, NULL = no targeting. */
+  targeting_parsed: boolean | null;
+
+  // Demographics
+  age_min: number | null;
+  age_max: number | null;
+  /** Normalized to {male, female}. NULL = all genders. */
+  genders: Array<"male" | "female"> | null;
+  /** Meta locale IDs/names — kept opaque, rarely rendered. */
+  locales: unknown | null;
+
+  // Geo
+  geo_locations: AudienceGeoEnvelope | null;
+  excluded_geo_locations: AudienceGeoEnvelope | null;
+
+  // Detailed targeting (the "what they're into / who they are" axis)
+  interests: AudienceTargetingEntry[] | null;
+  behaviors: AudienceTargetingEntry[] | null;
+  life_events: AudienceTargetingEntry[] | null;
+  industries: AudienceTargetingEntry[] | null;
+  work_employers: AudienceTargetingEntry[] | null;
+  work_positions: AudienceTargetingEntry[] | null;
+  education_schools: AudienceTargetingEntry[] | null;
+  education_majors: AudienceTargetingEntry[] | null;
+  family_statuses: AudienceTargetingEntry[] | null;
+  relationship_statuses: AudienceTargetingEntry[] | null;
+  income: AudienceTargetingEntry[] | null;
+  net_worth: AudienceTargetingEntry[] | null;
+  home_ownership: AudienceTargetingEntry[] | null;
+  home_type: AudienceTargetingEntry[] | null;
+  home_value: AudienceTargetingEntry[] | null;
+  ethnic_affinity: AudienceTargetingEntry[] | null;
+  generation: AudienceTargetingEntry[] | null;
+  politics: AudienceTargetingEntry[] | null;
+  /** `interested_in` is Meta's "interested in [men/women]" demographic. */
+  interested_in: number[] | null;
+
+  // Custom-audience refs + OR-clauses + non-geo exclusions
+  custom_audiences_included: AudienceCustomRef[] | null;
+  custom_audiences_excluded: AudienceCustomRef[] | null;
+  flexible_spec: Array<Record<string, unknown>> | null;
+  exclusions: Record<string, unknown> | null;
+
+  // Placements
+  publisher_platforms: string[] | null;
+  facebook_positions: string[] | null;
+  instagram_positions: string[] | null;
+  audience_network_positions: string[] | null;
+  messenger_positions: string[] | null;
+  device_platforms: string[] | null;
 }
 
 /**

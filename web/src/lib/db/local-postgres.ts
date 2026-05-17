@@ -1504,7 +1504,22 @@ export const localPostgresClient: DataClient = {
                time_created::text AS time_created,
                time_updated::text AS time_updated,
                synced_at::text AS synced_at,
-               archived_at::text AS archived_at
+               archived_at::text AS archived_at,
+               -- Migration 030 (2026-05-17) — full saved-audience targeting.
+               -- NULL for custom + lookalike rows (no targeting spec on those).
+               targeting_summary, sentence_lines, targeting_parsed,
+               age_min, age_max, genders, locales,
+               geo_locations, excluded_geo_locations,
+               interests, behaviors, life_events, industries,
+               work_employers, work_positions,
+               education_schools, education_majors,
+               family_statuses, relationship_statuses,
+               income, net_worth, home_ownership, home_type, home_value,
+               ethnic_affinity, generation, politics, interested_in,
+               custom_audiences_included, custom_audiences_excluded,
+               flexible_spec, exclusions,
+               publisher_platforms, facebook_positions, instagram_positions,
+               audience_network_positions, messenger_positions, device_platforms
           FROM meta_audiences
          WHERE business_id = $1 AND ${where}
          ORDER BY kind, name
@@ -1552,7 +1567,20 @@ export const localPostgresClient: DataClient = {
                   time_created::text AS time_created,
                   time_updated::text AS time_updated,
                   synced_at::text AS synced_at,
-                  archived_at::text AS archived_at`,
+                  archived_at::text AS archived_at,
+                  targeting_summary, sentence_lines, targeting_parsed,
+                  age_min, age_max, genders, locales,
+                  geo_locations, excluded_geo_locations,
+                  interests, behaviors, life_events, industries,
+                  work_employers, work_positions,
+                  education_schools, education_majors,
+                  family_statuses, relationship_statuses,
+                  income, net_worth, home_ownership, home_type, home_value,
+                  ethnic_affinity, generation, politics, interested_in,
+                  custom_audiences_included, custom_audiences_excluded,
+                  flexible_spec, exclusions,
+                  publisher_platforms, facebook_positions, instagram_positions,
+                  audience_network_positions, messenger_positions, device_platforms`,
       [audienceId, businessId, serviceTag],
     );
     if (rows.length === 0) return null;

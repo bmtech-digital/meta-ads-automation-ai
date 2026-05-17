@@ -21,6 +21,7 @@ import argparse
 import json
 from datetime import UTC, datetime
 
+from campaigner.lib.audience_targeting import parse_targeting
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import get_connection
 from campaigner.tools._contract import (
@@ -76,6 +77,14 @@ def _upsert_audience(cur, business_id: str, kind: str, row: dict) -> None:
     # — the caller passes kind='lookalike' for those; subtype stays as
     # 'LOOKALIKE' so the UI can show it as a label.
 
+    # Migration 030 (2026-05-17): extract saved-audience `targeting` into
+    # structured columns + Hebrew summary so /audiences can render geo /
+    # age / gender / interests / behaviors / exclusions without parsing
+    # meta_raw. Returns all-None dict for custom + lookalike audiences
+    # (they don't carry a targeting spec — selection lives in `rule` /
+    # `lookalike_spec`).
+    parsed = parse_targeting(row.get("targeting"), row.get("sentence_lines"))
+
     cur.execute(
         """
         INSERT INTO meta_audiences (
@@ -85,6 +94,19 @@ def _upsert_audience(cur, business_id: str, kind: str, row: dict) -> None:
             data_source, rule, lookalike_spec, operation_status, delivery_status,
             permission_for_actions, origin_audience_id,
             time_created, time_updated, meta_raw,
+            targeting, targeting_summary, sentence_lines, targeting_parsed,
+            age_min, age_max, genders, locales,
+            geo_locations, excluded_geo_locations,
+            interests, behaviors, life_events, industries,
+            work_employers, work_positions,
+            education_schools, education_majors,
+            family_statuses, relationship_statuses,
+            income, net_worth, home_ownership, home_type, home_value,
+            ethnic_affinity, generation, politics, interested_in,
+            custom_audiences_included, custom_audiences_excluded,
+            flexible_spec, exclusions,
+            publisher_platforms, facebook_positions, instagram_positions,
+            audience_network_positions, messenger_positions, device_platforms,
             synced_at, archived_at
         )
         VALUES (
@@ -96,6 +118,19 @@ def _upsert_audience(cur, business_id: str, kind: str, row: dict) -> None:
             %(operation_status)s, %(delivery_status)s,
             %(permission_for_actions)s, %(origin_audience_id)s,
             %(time_created)s, %(time_updated)s, %(meta_raw)s,
+            %(targeting)s, %(targeting_summary)s, %(sentence_lines)s, %(targeting_parsed)s,
+            %(age_min)s, %(age_max)s, %(genders)s, %(locales)s,
+            %(geo_locations)s, %(excluded_geo_locations)s,
+            %(interests)s, %(behaviors)s, %(life_events)s, %(industries)s,
+            %(work_employers)s, %(work_positions)s,
+            %(education_schools)s, %(education_majors)s,
+            %(family_statuses)s, %(relationship_statuses)s,
+            %(income)s, %(net_worth)s, %(home_ownership)s, %(home_type)s, %(home_value)s,
+            %(ethnic_affinity)s, %(generation)s, %(politics)s, %(interested_in)s,
+            %(custom_audiences_included)s, %(custom_audiences_excluded)s,
+            %(flexible_spec)s, %(exclusions)s,
+            %(publisher_platforms)s, %(facebook_positions)s, %(instagram_positions)s,
+            %(audience_network_positions)s, %(messenger_positions)s, %(device_platforms)s,
             now(), NULL
         )
         ON CONFLICT (business_id, meta_audience_id) DO UPDATE SET
@@ -116,6 +151,45 @@ def _upsert_audience(cur, business_id: str, kind: str, row: dict) -> None:
             time_created = COALESCE(EXCLUDED.time_created, meta_audiences.time_created),
             time_updated = EXCLUDED.time_updated,
             meta_raw = EXCLUDED.meta_raw,
+            targeting = EXCLUDED.targeting,
+            targeting_summary = EXCLUDED.targeting_summary,
+            sentence_lines = EXCLUDED.sentence_lines,
+            targeting_parsed = EXCLUDED.targeting_parsed,
+            age_min = EXCLUDED.age_min,
+            age_max = EXCLUDED.age_max,
+            genders = EXCLUDED.genders,
+            locales = EXCLUDED.locales,
+            geo_locations = EXCLUDED.geo_locations,
+            excluded_geo_locations = EXCLUDED.excluded_geo_locations,
+            interests = EXCLUDED.interests,
+            behaviors = EXCLUDED.behaviors,
+            life_events = EXCLUDED.life_events,
+            industries = EXCLUDED.industries,
+            work_employers = EXCLUDED.work_employers,
+            work_positions = EXCLUDED.work_positions,
+            education_schools = EXCLUDED.education_schools,
+            education_majors = EXCLUDED.education_majors,
+            family_statuses = EXCLUDED.family_statuses,
+            relationship_statuses = EXCLUDED.relationship_statuses,
+            income = EXCLUDED.income,
+            net_worth = EXCLUDED.net_worth,
+            home_ownership = EXCLUDED.home_ownership,
+            home_type = EXCLUDED.home_type,
+            home_value = EXCLUDED.home_value,
+            ethnic_affinity = EXCLUDED.ethnic_affinity,
+            generation = EXCLUDED.generation,
+            politics = EXCLUDED.politics,
+            interested_in = EXCLUDED.interested_in,
+            custom_audiences_included = EXCLUDED.custom_audiences_included,
+            custom_audiences_excluded = EXCLUDED.custom_audiences_excluded,
+            flexible_spec = EXCLUDED.flexible_spec,
+            exclusions = EXCLUDED.exclusions,
+            publisher_platforms = EXCLUDED.publisher_platforms,
+            facebook_positions = EXCLUDED.facebook_positions,
+            instagram_positions = EXCLUDED.instagram_positions,
+            audience_network_positions = EXCLUDED.audience_network_positions,
+            messenger_positions = EXCLUDED.messenger_positions,
+            device_platforms = EXCLUDED.device_platforms,
             synced_at = now(),
             archived_at = NULL
         """,
@@ -139,6 +213,53 @@ def _upsert_audience(cur, business_id: str, kind: str, row: dict) -> None:
             "time_created": _parse_meta_ts(row.get("time_created")),
             "time_updated": _parse_meta_ts(row.get("time_updated")),
             "meta_raw": _to_jsonb(row),
+            # --- Parsed targeting columns (migration 030) ---
+            "targeting": _to_jsonb(parsed["targeting"]),
+            "targeting_summary": parsed["targeting_summary"],
+            "sentence_lines": _to_jsonb(parsed["sentence_lines"]),
+            "targeting_parsed": parsed["targeting_parsed"],
+            "age_min": parsed["age_min"],
+            "age_max": parsed["age_max"],
+            # text[] column — psycopg adapts a Python list of strings.
+            "genders": parsed["genders"],
+            "locales": _to_jsonb(parsed["locales"]),
+            "geo_locations": _to_jsonb(parsed["geo_locations"]),
+            "excluded_geo_locations": _to_jsonb(parsed["excluded_geo_locations"]),
+            "interests": _to_jsonb(parsed["interests"]),
+            "behaviors": _to_jsonb(parsed["behaviors"]),
+            "life_events": _to_jsonb(parsed["life_events"]),
+            "industries": _to_jsonb(parsed["industries"]),
+            "work_employers": _to_jsonb(parsed["work_employers"]),
+            "work_positions": _to_jsonb(parsed["work_positions"]),
+            "education_schools": _to_jsonb(parsed["education_schools"]),
+            "education_majors": _to_jsonb(parsed["education_majors"]),
+            "family_statuses": _to_jsonb(parsed["family_statuses"]),
+            "relationship_statuses": _to_jsonb(parsed["relationship_statuses"]),
+            "income": _to_jsonb(parsed["income"]),
+            "net_worth": _to_jsonb(parsed["net_worth"]),
+            "home_ownership": _to_jsonb(parsed["home_ownership"]),
+            "home_type": _to_jsonb(parsed["home_type"]),
+            "home_value": _to_jsonb(parsed["home_value"]),
+            "ethnic_affinity": _to_jsonb(parsed["ethnic_affinity"]),
+            "generation": _to_jsonb(parsed["generation"]),
+            "politics": _to_jsonb(parsed["politics"]),
+            "interested_in": _to_jsonb(parsed["interested_in"]),
+            "custom_audiences_included": _to_jsonb(
+                parsed["custom_audiences_included"]
+            ),
+            "custom_audiences_excluded": _to_jsonb(
+                parsed["custom_audiences_excluded"]
+            ),
+            "flexible_spec": _to_jsonb(parsed["flexible_spec"]),
+            "exclusions": _to_jsonb(parsed["exclusions"]),
+            "publisher_platforms": _to_jsonb(parsed["publisher_platforms"]),
+            "facebook_positions": _to_jsonb(parsed["facebook_positions"]),
+            "instagram_positions": _to_jsonb(parsed["instagram_positions"]),
+            "audience_network_positions": _to_jsonb(
+                parsed["audience_network_positions"]
+            ),
+            "messenger_positions": _to_jsonb(parsed["messenger_positions"]),
+            "device_platforms": _to_jsonb(parsed["device_platforms"]),
         },
     )
 

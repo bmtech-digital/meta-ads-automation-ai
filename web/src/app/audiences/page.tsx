@@ -10,12 +10,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Shell, PageHeader, SectionHeader } from "@/components/shell";
+import { SubNav, AUDIENCE_GROUP_ITEMS } from "@/components/sub-nav";
 import { getActiveBusiness } from "@/lib/active-business";
 import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { SyncAudiencesButton } from "./sync-audiences-button";
 import { AudienceServiceTagSelect } from "@/components/audience-service-tag-select";
+import { AudienceTargetingDetail } from "@/components/audience-targeting-detail";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "קהלים" };
@@ -83,6 +85,7 @@ export default async function AudiencesPage({
   if (!business) {
     return (
       <Shell active="/audiences">
+        <SubNav items={AUDIENCE_GROUP_ITEMS} />
         <PageHeader eyebrow="קהלים" title="קהלים" />
         <Card>
           <CardHeader>
@@ -116,6 +119,7 @@ export default async function AudiencesPage({
 
   return (
     <Shell active="/audiences">
+      <SubNav items={AUDIENCE_GROUP_ITEMS} />
       <PageHeader
         eyebrow="קהלים"
         title="קהלים — Custom, Saved & Lookalike"
@@ -197,6 +201,11 @@ export default async function AudiencesPage({
                         {a.retention_days ? ` · נשמר ${a.retention_days} ימים` : ""}
                       </p>
                     ) : null}
+                    {a.targeting_summary ? (
+                      <p className="mt-1 text-xs text-foreground/80 line-clamp-2 sm:hidden">
+                        {a.targeting_summary}
+                      </p>
+                    ) : null}
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1">
                     <span
@@ -262,6 +271,11 @@ export default async function AudiencesPage({
                     </span>
                   ) : null}
                 </div>
+
+                {/* Full saved-audience targeting (migration 030) —
+                    geo / age / gender / interests / behaviors / exclusions.
+                    Renders nothing for custom + lookalike rows. */}
+                <AudienceTargetingDetail row={a} />
               </div>
             );
           })}
