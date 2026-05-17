@@ -1906,6 +1906,53 @@ def _operator_questions_well_formed(prop: dict, state: dict, ctx: dict) -> dict:
     return _pass("operator_questions_well_formed", questions_count=len(questions))
 
 
+def _cpm_event_no_pause(prop: dict, state: dict, ctx: dict) -> dict:
+    """§55. Mastery v2 Phase F. During flagged cpm_event weeks (BFCM IL,
+    election windows, security events), don't pause campaigns on a CPM-only
+    spike. The spike is structural (consumer-brand auction crush) — pausing
+    just hands opportunity to competitors.
+
+    Only refuses pause_campaign/pause_adset when:
+      state.cpm_event_active == True
+      AND payload.reason in {'cpm_spike', 'cpm_only'} OR rationale mentions
+          CPM without falling-CTR / rising-CPL evidence.
+
+    State fields:
+      cpm_event_active : bool — output of apply_israeli_calendar.cpm_event
+      ctr_trend_pct    : float | None — last-7d vs prior-7d CTR delta
+      cpl_trend_pct    : float | None — same
+    """
+    task = prop.get("task_type")
+    if task not in ("pause_campaign", "pause_adset"):
+        return _skip("cpm_event_no_pause", "rule applies to pause_* tasks only")
+    if not state.get("cpm_event_active"):
+        return _skip("cpm_event_no_pause", "no cpm_event window active")
+    payload = prop.get("payload") or {}
+    reason = (payload.get("reason") or "").lower()
+    if "cpm" not in reason and "cpm" not in (
+        prop.get("rationale", "")[:200].lower()
+    ):
+        return _pass("cpm_event_no_pause", note="pause reason not CPM-only")
+    ctr_trend = state.get("ctr_trend_pct")
+    cpl_trend = state.get("cpl_trend_pct")
+    has_falling_ctr = isinstance(ctr_trend, int | float) and ctr_trend < -15
+    has_rising_cpl = isinstance(cpl_trend, int | float) and cpl_trend > 25
+    if has_falling_ctr or has_rising_cpl:
+        return _pass(
+            "cpm_event_no_pause",
+            note="CPM spike + secondary degradation — pause justified",
+        )
+    return _fail(
+        "cpm_event_no_pause",
+        "CPM spike during flagged cpm_event window (BFCM IL or similar) is "
+        "structural — don't pause unless CTR is also falling ≥15% or CPL is "
+        "rising ≥25%. The auction crush is temporary; pausing hands inventory "
+        "to competitors.",
+        ctr_trend_pct=ctr_trend,
+        cpl_trend_pct=cpl_trend,
+    )
+
+
 def _boost_post_requires_five_thresholds(
     prop: dict, state: dict, ctx: dict
 ) -> dict:
@@ -2375,6 +2422,11 @@ CHECKS: list[Callable[[dict, dict, dict], dict]] = [
     # the boost inherits trust + lower CPM).
     _boost_post_requires_five_thresholds,
     _boost_post_wait_window,
+    # Mastery v2 Phase F (Israeli Calendar, 2026-05-17). §55 disables pause-
+    # on-CPM-spike during flagged cpm_event weeks (BFCM IL, etc.) — the
+    # spike is structural (consumer-brand auction crush), not a campaign
+    # problem. Pausing would just hand opportunity to competitors.
+    _cpm_event_no_pause,
 ]
 
 
