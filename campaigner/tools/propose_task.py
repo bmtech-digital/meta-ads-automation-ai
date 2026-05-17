@@ -408,7 +408,7 @@ def main() -> None:
         default=None,
         help=(
             "JSON list of MCQ questions to surface inline with the approval — "
-            'shape [{id, prompt_he, options:[{value,label_he}], multi?, required?}]. '
+            "shape [{id, prompt_he, options:[{value,label_he}], multi?, required?}]. "
             "Max 2 questions per proposal. Hands the operator an answer UI in "
             "the approvals dashboard instead of forcing reject-with-rationale. "
             "Status pending → answered when the operator submits; agent reads "

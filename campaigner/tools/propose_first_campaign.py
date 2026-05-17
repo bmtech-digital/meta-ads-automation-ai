@@ -162,15 +162,11 @@ def main() -> None:
         service_tag = args.service_tag
     elif products and isinstance(products, list) and len(products) > 0:
         first = products[0]
-        service_tag = (
-            first.get("service_tag") if isinstance(first, dict) else None
-        )
+        service_tag = first.get("service_tag") if isinstance(first, dict) else None
     else:
         service_tag = None
 
-    daily_budget, budget_note_he = _cold_start_daily_budget(
-        row.get("monthly_budget_ils")
-    )
+    daily_budget, budget_note_he = _cold_start_daily_budget(row.get("monthly_budget_ils"))
     expectations_he = _expectation_setter_he(daily_budget)
 
     payload = {
@@ -254,9 +250,7 @@ def main() -> None:
         encoding="utf-8",
     )
     if proc.returncode != 0:
-        emit_runtime_error(
-            f"propose_task failed: {proc.stderr.strip() or proc.stdout.strip()}"
-        )
+        emit_runtime_error(f"propose_task failed: {proc.stderr.strip() or proc.stdout.strip()}")
         return
 
     try:

@@ -55,9 +55,7 @@ def test_full_saved_audience_parse() -> None:
             "location_types": ["home", "recent"],
         },
         "excluded_geo_locations": {
-            "cities": [
-                {"key": "2459115b", "name": "Bnei Brak", "country": "IL"}
-            ]
+            "cities": [{"key": "2459115b", "name": "Bnei Brak", "country": "IL"}]
         },
         "interests": [
             {"id": "6003020834693", "name": "Cosmetics"},
@@ -93,9 +91,7 @@ def test_full_saved_audience_parse() -> None:
     assert out["interests"] is not None and len(out["interests"]) == 3
     assert {i["name"] for i in out["interests"]} == {"Cosmetics", "Skincare", "y"}
     assert out["behaviors"] is not None and len(out["behaviors"]) == 1
-    assert out["custom_audiences_included"] == [
-        {"id": "23845...", "name": "Site visitors 30d"}
-    ]
+    assert out["custom_audiences_included"] == [{"id": "23845...", "name": "Site visitors 30d"}]
     assert out["publisher_platforms"] == ["facebook", "instagram"]
     assert out["facebook_positions"] == ["feed", "story"]
     assert out["instagram_positions"] == ["feed", "reels"]
@@ -211,7 +207,7 @@ def test_exception_in_sub_parser_marks_unparsed() -> None:
     # it, but if we feed something that breaks a deep .get chain, we want
     # the parser to swallow.
     weird = {
-        "age_min": "not-an-int",   # caught by inner try/except
+        "age_min": "not-an-int",  # caught by inner try/except
         "age_max": None,
         # This is structurally fine — just verifying robustness.
         "geo_locations": "not-a-dict",

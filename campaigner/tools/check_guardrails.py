@@ -1787,9 +1787,7 @@ def _first_campaign_payload_completeness(prop: dict, state: dict, ctx: dict) -> 
         return _skip("first_campaign_payload_completeness", "not a first_campaign task")
     payload = prop.get("payload")
     if not isinstance(payload, dict):
-        return _fail(
-            "first_campaign_payload_completeness", "payload must be a dict"
-        )
+        return _fail("first_campaign_payload_completeness", "payload must be a dict")
     missing: list[str] = []
     if payload.get("step") != "first_campaign":
         missing.append("step (must equal 'first_campaign')")
@@ -1858,9 +1856,7 @@ def _operator_questions_well_formed(prop: dict, state: dict, ctx: dict) -> dict:
                 f"{prefix}.id must be snake_case ASCII (1-40 chars), got {qid!r}",
             )
         if qid in seen_ids:
-            return _fail(
-                "operator_questions_well_formed", f"{prefix}.id={qid!r} duplicated"
-            )
+            return _fail("operator_questions_well_formed", f"{prefix}.id={qid!r} duplicated")
         seen_ids.add(qid)
         prompt = q.get("prompt_he")
         if not isinstance(prompt, str) or not (1 <= len(prompt) <= 200):
@@ -1929,9 +1925,7 @@ def _cpm_event_no_pause(prop: dict, state: dict, ctx: dict) -> dict:
         return _skip("cpm_event_no_pause", "no cpm_event window active")
     payload = prop.get("payload") or {}
     reason = (payload.get("reason") or "").lower()
-    if "cpm" not in reason and "cpm" not in (
-        prop.get("rationale", "")[:200].lower()
-    ):
+    if "cpm" not in reason and "cpm" not in (prop.get("rationale", "")[:200].lower()):
         return _pass("cpm_event_no_pause", note="pause reason not CPM-only")
     ctr_trend = state.get("ctr_trend_pct")
     cpl_trend = state.get("cpl_trend_pct")
@@ -1953,9 +1947,7 @@ def _cpm_event_no_pause(prop: dict, state: dict, ctx: dict) -> dict:
     )
 
 
-def _boost_post_requires_five_thresholds(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _boost_post_requires_five_thresholds(prop: dict, state: dict, ctx: dict) -> dict:
     """§53. Mastery v2 Phase E. boost_post must clear all 5 organic-perf
     thresholds before promotion. Each metric value + threshold must appear in
     payload.boost_signals (set by check_organic_performance --boost-candidates)
@@ -1991,9 +1983,7 @@ def _boost_post_requires_five_thresholds(
     for key, threshold in checks:
         value = signals.get(key)
         if not isinstance(value, int | float) or value < threshold:
-            failures.append(
-                {"signal": key, "value": value, "threshold": threshold}
-            )
+            failures.append({"signal": key, "value": value, "threshold": threshold})
     if failures:
         return _fail(
             "boost_post_requires_five_thresholds",
@@ -2019,9 +2009,7 @@ def _boost_post_wait_window(prop: dict, state: dict, ctx: dict) -> dict:
         return _skip("boost_post_wait_window", "task_type != boost_post")
     age_hours = state.get("post_created_age_hours")
     if age_hours is None:
-        return _skip(
-            "boost_post_wait_window", "post_created_age_hours not in state"
-        )
+        return _skip("boost_post_wait_window", "post_created_age_hours not in state")
     if age_hours < 48:
         return _fail(
             "boost_post_wait_window",
@@ -2041,9 +2029,7 @@ def _boost_post_wait_window(prop: dict, state: dict, ctx: dict) -> dict:
     return _pass("boost_post_wait_window", age_hours=age_hours)
 
 
-def _prospecting_must_apply_master_exclusion(
-    prop: dict, state: dict, ctx: dict
-) -> dict:
+def _prospecting_must_apply_master_exclusion(prop: dict, state: dict, ctx: dict) -> dict:
     """§51. Mastery v2 Phase D. Every new_campaign / expand_audience proposal
     targeting prospecting (cold audience, no retargeting custom_audiences)
     must include the master_exclusion_id in `excluded_custom_audiences`.
@@ -2055,7 +2041,8 @@ def _prospecting_must_apply_master_exclusion(
     task = prop.get("task_type")
     if task not in ("new_campaign", "expand_audience"):
         return _skip(
-            "prospecting_must_apply_master_exclusion", "rule applies to new_campaign / expand_audience only"
+            "prospecting_must_apply_master_exclusion",
+            "rule applies to new_campaign / expand_audience only",
         )
     master_id = state.get("master_exclusion_audience_id")
     if not master_id:
@@ -2065,9 +2052,7 @@ def _prospecting_must_apply_master_exclusion(
         )
     payload = prop.get("payload") or {}
     targeting = payload.get("targeting") or {}
-    excluded = targeting.get("excluded_custom_audiences") or payload.get(
-        "excluded_audience_ids"
-    )
+    excluded = targeting.get("excluded_custom_audiences") or payload.get("excluded_audience_ids")
     excluded_ids: set[str] = set()
     if isinstance(excluded, list):
         for item in excluded:
@@ -2147,9 +2132,7 @@ def _scale_up_requires_graded_sample(prop: dict, state: dict, ctx: dict) -> dict
             "graded_sample_size_14d not in state (Flow A Step 1.5 didn't run?)",
         )
     if graded >= 20:
-        return _pass(
-            "scale_up_requires_graded_sample", graded_sample_size_14d=graded
-        )
+        return _pass("scale_up_requires_graded_sample", graded_sample_size_14d=graded)
     return _fail(
         "scale_up_requires_graded_sample",
         f"need ≥20 graded leads in last 14 days before scaling (have {graded}). "
@@ -2162,12 +2145,8 @@ def _scale_up_requires_graded_sample(prop: dict, state: dict, ctx: dict) -> dict
 
 def _is_budget_increase(payload: dict) -> bool:
     """Helper: does this budget_change payload represent an increase?"""
-    new_b = payload.get("new_daily_budget_cents") or payload.get(
-        "new_daily_budget_ils"
-    )
-    old_b = payload.get("old_daily_budget_cents") or payload.get(
-        "old_daily_budget_ils"
-    )
+    new_b = payload.get("new_daily_budget_cents") or payload.get("new_daily_budget_ils")
+    old_b = payload.get("old_daily_budget_cents") or payload.get("old_daily_budget_ils")
     if isinstance(new_b, int | float) and isinstance(old_b, int | float):
         return new_b > old_b
     return False
@@ -2183,13 +2162,9 @@ def _lead_grading_coverage_minimum(prop: dict, state: dict, ctx: dict) -> dict:
     """
     coverage = state.get("lead_grading_coverage_30d")
     if coverage is None:
-        return _skip(
-            "lead_grading_coverage_minimum", "lead_grading_coverage_30d not in state"
-        )
+        return _skip("lead_grading_coverage_minimum", "lead_grading_coverage_30d not in state")
     if coverage >= 0.6:
-        return _pass(
-            "lead_grading_coverage_minimum", coverage_30d=round(coverage, 3)
-        )
+        return _pass("lead_grading_coverage_minimum", coverage_30d=round(coverage, 3))
     # Don't fail — surface as a soft warning. The agent's job is to notice
     # and emit an alert task; this rule just records the observation.
     return _pass(
@@ -2224,12 +2199,8 @@ def _eom_no_panic_spend(prop: dict, state: dict, ctx: dict) -> dict:
             f"refuse new_campaign (kicks Learning, won't finish learning before EOM)",
         )
     if task in ("scale_up", "budget_change"):
-        new_b = payload.get("new_daily_budget_cents") or payload.get(
-            "new_daily_budget_ils"
-        )
-        old_b = payload.get("old_daily_budget_cents") or payload.get(
-            "old_daily_budget_ils"
-        )
+        new_b = payload.get("new_daily_budget_cents") or payload.get("new_daily_budget_ils")
+        old_b = payload.get("old_daily_budget_cents") or payload.get("old_daily_budget_ils")
         if isinstance(new_b, int | float) and isinstance(old_b, int | float) and old_b > 0:
             jump_pct = (new_b - old_b) / old_b * 100
             if jump_pct > 15:
@@ -2255,9 +2226,7 @@ def _cold_start_front_load_window(prop: dict, state: dict, ctx: dict) -> dict:
     """
     days_since_onboarding = state.get("days_since_onboarding")
     if days_since_onboarding is None:
-        return _skip(
-            "cold_start_front_load_window", "days_since_onboarding not in state"
-        )
+        return _skip("cold_start_front_load_window", "days_since_onboarding not in state")
     if days_since_onboarding > 14:
         return _pass(
             "cold_start_front_load_window",

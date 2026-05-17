@@ -244,20 +244,14 @@ def _upsert_audience(cur, business_id: str, kind: str, row: dict) -> None:
             "generation": _to_jsonb(parsed["generation"]),
             "politics": _to_jsonb(parsed["politics"]),
             "interested_in": _to_jsonb(parsed["interested_in"]),
-            "custom_audiences_included": _to_jsonb(
-                parsed["custom_audiences_included"]
-            ),
-            "custom_audiences_excluded": _to_jsonb(
-                parsed["custom_audiences_excluded"]
-            ),
+            "custom_audiences_included": _to_jsonb(parsed["custom_audiences_included"]),
+            "custom_audiences_excluded": _to_jsonb(parsed["custom_audiences_excluded"]),
             "flexible_spec": _to_jsonb(parsed["flexible_spec"]),
             "exclusions": _to_jsonb(parsed["exclusions"]),
             "publisher_platforms": _to_jsonb(parsed["publisher_platforms"]),
             "facebook_positions": _to_jsonb(parsed["facebook_positions"]),
             "instagram_positions": _to_jsonb(parsed["instagram_positions"]),
-            "audience_network_positions": _to_jsonb(
-                parsed["audience_network_positions"]
-            ),
+            "audience_network_positions": _to_jsonb(parsed["audience_network_positions"]),
             "messenger_positions": _to_jsonb(parsed["messenger_positions"]),
             "device_platforms": _to_jsonb(parsed["device_platforms"]),
         },

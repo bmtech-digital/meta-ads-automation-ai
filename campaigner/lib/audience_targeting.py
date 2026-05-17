@@ -85,7 +85,9 @@ def _norm_genders(raw) -> list[str] | None:
     if not raw:
         return None
     try:
-        names = sorted({_GENDER_MAP.get(g) for g in raw if g in _GENDER_MAP or str(g) in _GENDER_MAP})
+        names = sorted(
+            {_GENDER_MAP.get(g) for g in raw if g in _GENDER_MAP or str(g) in _GENDER_MAP}
+        )
         names = [n for n in names if n]
     except TypeError:
         return None
@@ -227,9 +229,7 @@ def _hebrew_summary(parsed: dict) -> str | None:
         for p in pins[:1]:
             name = p.get("name") or p.get("address_string") or "מיקום"
             radius = p.get("radius")
-            unit_he = {"kilometer": "ק״מ", "mile": "מייל"}.get(
-                p.get("distance_unit"), ""
-            )
+            unit_he = {"kilometer": "ק״מ", "mile": "מייל"}.get(p.get("distance_unit"), "")
             if radius:
                 geo_bits.append(f"{name} + {radius} {unit_he}".strip())
             else:
@@ -343,9 +343,7 @@ def parse_targeting(targeting: dict | None, sentence_lines: Any = None) -> dict[
 
         # Geo
         out["geo_locations"] = _norm_geo(targeting.get("geo_locations"))
-        out["excluded_geo_locations"] = _norm_geo(
-            targeting.get("excluded_geo_locations")
-        )
+        out["excluded_geo_locations"] = _norm_geo(targeting.get("excluded_geo_locations"))
 
         # Detailed targeting buckets — top-level first
         for k in _DETAILED_KEYS:
@@ -354,9 +352,7 @@ def parse_targeting(targeting: dict | None, sentence_lines: Any = None) -> dict[
                 out[k] = list(v) if isinstance(v, list) else v
 
         # Custom audiences (refs)
-        out["custom_audiences_included"] = _norm_custom_audiences(
-            targeting.get("custom_audiences")
-        )
+        out["custom_audiences_included"] = _norm_custom_audiences(targeting.get("custom_audiences"))
         out["custom_audiences_excluded"] = _norm_custom_audiences(
             targeting.get("excluded_custom_audiences")
         )
@@ -424,9 +420,7 @@ def parse_targeting(targeting: dict | None, sentence_lines: Any = None) -> dict[
                         if cid and cid not in seen_ca_in:
                             ca_included.append(c)
                             seen_ca_in.add(cid)
-                bca_out = _norm_custom_audiences(
-                    branch.get("excluded_custom_audiences")
-                )
+                bca_out = _norm_custom_audiences(branch.get("excluded_custom_audiences"))
                 if bca_out:
                     for c in bca_out:
                         cid = str(c.get("id")) if c.get("id") else None

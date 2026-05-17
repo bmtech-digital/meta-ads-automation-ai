@@ -73,8 +73,7 @@ def _build_rationale(business_name: str, classes: dict[str, list[dict]]) -> str:
         )
     if classes.get("decaying"):
         parts.append(
-            f"\n⚠ {len(classes['decaying'])} קהלים מצטמצמים — בודק היסטוריית "
-            f"גודל ב-meta_raw."
+            f"\n⚠ {len(classes['decaying'])} קהלים מצטמצמים — בודק היסטוריית גודל ב-meta_raw."
         )
     parts.append(
         "\n\nתזכורת: בחירת קהלי טרגוט (Interests, Lookalikes, "
@@ -191,9 +190,7 @@ def main() -> None:
         encoding="utf-8",
     )
     if proc.returncode != 0:
-        emit_runtime_error(
-            f"propose_task failed: {proc.stderr.strip() or proc.stdout.strip()}"
-        )
+        emit_runtime_error(f"propose_task failed: {proc.stderr.strip() or proc.stdout.strip()}")
         return
 
     try:

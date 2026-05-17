@@ -94,9 +94,7 @@ def _post_capi_event(
     }
     body = json.dumps(payload).encode("utf-8")
     url = f"{CAPI_GRAPH_URL}/{pixel_id}/events?access_token={access_token}"
-    req = urllib.request.Request(
-        url, data=body, headers={"Content-Type": "application/json"}
-    )
+    req = urllib.request.Request(url, data=body, headers={"Content-Type": "application/json"})
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             status = resp.status
@@ -143,14 +141,10 @@ def main() -> None:
         emit_validation_error(str(e))
         return
 
-    pixel_id = getattr(cfg, "meta_capi_pixel_id", None) or getattr(
-        cfg, "meta_pixel_id", None
-    )
+    pixel_id = getattr(cfg, "meta_capi_pixel_id", None) or getattr(cfg, "meta_pixel_id", None)
     access_token = getattr(cfg, "meta_access_token", None)
     if not pixel_id or not access_token:
-        emit_validation_error(
-            "META_CAPI_PIXEL_ID + META_ACCESS_TOKEN required (env or Config)"
-        )
+        emit_validation_error("META_CAPI_PIXEL_ID + META_ACCESS_TOKEN required (env or Config)")
         return
 
     # Pull graded leads where the events implied by the current grade aren't
@@ -194,9 +188,7 @@ def main() -> None:
         if len(pushed) >= args.limit:
             break
         event_time = int(
-            row.get("meta_created_at").timestamp()
-            if row.get("meta_created_at")
-            else time.time()
+            row.get("meta_created_at").timestamp() if row.get("meta_created_at") else time.time()
         )
         email_hash = _sha256(row.get("email"))
         phone_hash = _sha256(row.get("phone"))

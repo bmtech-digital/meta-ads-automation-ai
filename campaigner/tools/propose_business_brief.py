@@ -67,9 +67,7 @@ def main() -> None:
 
     try:
         biz = with_db_retry(
-            lambda: fetch_one(
-                "SELECT id, name FROM businesses WHERE id = %s", (args.business_id,)
-            )
+            lambda: fetch_one("SELECT id, name FROM businesses WHERE id = %s", (args.business_id,))
         )
     except Exception as e:
         emit_runtime_error(f"business lookup failed: {e}", exc=e)
@@ -113,9 +111,7 @@ def main() -> None:
         encoding="utf-8",
     )
     if proc.returncode != 0:
-        emit_runtime_error(
-            f"propose_task failed: {proc.stderr.strip() or proc.stdout.strip()}"
-        )
+        emit_runtime_error(f"propose_task failed: {proc.stderr.strip() or proc.stdout.strip()}")
         return
 
     try:

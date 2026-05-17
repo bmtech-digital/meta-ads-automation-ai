@@ -38,22 +38,76 @@ from campaigner.tools._contract import emit_success, emit_validation_error
 IL_CALENDAR_DEFAULTS_BY_YEAR: dict[int, list[dict]] = {
     2026: [
         # August vacation slump
-        {"start": "2026-08-01", "end": "2026-08-31", "multiplier": 0.75, "cpm_event": False, "name": "August vacation"},
+        {
+            "start": "2026-08-01",
+            "end": "2026-08-31",
+            "multiplier": 0.75,
+            "cpm_event": False,
+            "name": "August vacation",
+        },
         # Tishrei chag-days (Rosh Hashanah Sep 11-13, Yom Kippur Sep 20-21, Sukkot Sep 25-Oct 3)
-        {"start": "2026-09-11", "end": "2026-09-13", "multiplier": 0.50, "cpm_event": False, "name": "Rosh Hashanah"},
-        {"start": "2026-09-20", "end": "2026-09-21", "multiplier": 0.50, "cpm_event": False, "name": "Yom Kippur"},
-        {"start": "2026-09-25", "end": "2026-10-03", "multiplier": 0.65, "cpm_event": False, "name": "Sukkot"},
+        {
+            "start": "2026-09-11",
+            "end": "2026-09-13",
+            "multiplier": 0.50,
+            "cpm_event": False,
+            "name": "Rosh Hashanah",
+        },
+        {
+            "start": "2026-09-20",
+            "end": "2026-09-21",
+            "multiplier": 0.50,
+            "cpm_event": False,
+            "name": "Yom Kippur",
+        },
+        {
+            "start": "2026-09-25",
+            "end": "2026-10-03",
+            "multiplier": 0.65,
+            "cpm_event": False,
+            "name": "Sukkot",
+        },
         # Surrounding Tishrei
-        {"start": "2026-09-01", "end": "2026-10-10", "multiplier": 0.80, "cpm_event": False, "name": "Tishrei (general)"},
+        {
+            "start": "2026-09-01",
+            "end": "2026-10-10",
+            "multiplier": 0.80,
+            "cpm_event": False,
+            "name": "Tishrei (general)",
+        },
         # Late Oct - early Dec strongest window
-        {"start": "2026-10-15", "end": "2026-12-05", "multiplier": 1.18, "cpm_event": False, "name": "Post-chagim B2B window"},
+        {
+            "start": "2026-10-15",
+            "end": "2026-12-05",
+            "multiplier": 1.18,
+            "cpm_event": False,
+            "name": "Post-chagim B2B window",
+        },
         # BFCM Israel (Nov 23-30 typically; 2026: Nov 27)
-        {"start": "2026-11-25", "end": "2026-12-02", "multiplier": 1.10, "cpm_event": True, "name": "BFCM IL"},
+        {
+            "start": "2026-11-25",
+            "end": "2026-12-02",
+            "multiplier": 1.10,
+            "cpm_event": True,
+            "name": "BFCM IL",
+        },
     ],
     2027: [
         # Approximate — operator should refine
-        {"start": "2027-08-01", "end": "2027-08-31", "multiplier": 0.75, "cpm_event": False, "name": "August vacation"},
-        {"start": "2027-01-01", "end": "2027-03-31", "multiplier": 1.10, "cpm_event": False, "name": "Jan-Mar budget cycle"},
+        {
+            "start": "2027-08-01",
+            "end": "2027-08-31",
+            "multiplier": 0.75,
+            "cpm_event": False,
+            "name": "August vacation",
+        },
+        {
+            "start": "2027-01-01",
+            "end": "2027-03-31",
+            "multiplier": 1.10,
+            "cpm_event": False,
+            "name": "Jan-Mar budget cycle",
+        },
     ],
 }
 
@@ -111,12 +165,8 @@ def main() -> None:
             return
 
     # Override wins on name match; otherwise merge.
-    override_names = {
-        w.get("name") for w in override_windows if isinstance(w, dict)
-    }
-    merged = [
-        w for w in default_windows if w["name"] not in override_names
-    ]
+    override_names = {w.get("name") for w in override_windows if isinstance(w, dict)}
+    merged = [w for w in default_windows if w["name"] not in override_names]
     for w in override_windows:
         if not isinstance(w, dict):
             continue

@@ -216,11 +216,7 @@ def main() -> None:
     # Build the geo block.
     excluded_cities = _detect_exclusions(text)
     excluded_names = {c["name"] for c in excluded_cities}
-    cities = [
-        c
-        for c in _detect_cities(text, excluded_names)
-        if c["name"] not in excluded_names
-    ]
+    cities = [c for c in _detect_cities(text, excluded_names) if c["name"] not in excluded_names]
 
     radius = _detect_radius(text)
     if radius:
@@ -242,22 +238,15 @@ def main() -> None:
     elif any(p in text.lower() for p in IL_ALL_PHRASES):
         geo_locations = {"countries": ["IL"]}
     else:
-        warnings.append(
-            "לא זוהו ערים או מדינה. הסוכן ייפעל בברירת מחדל 'כל ישראל'."
-        )
+        warnings.append("לא זוהו ערים או מדינה. הסוכן ייפעל בברירת מחדל 'כל ישראל'.")
         geo_locations = {"countries": ["IL"]}
 
-    excluded_geo_locations = (
-        {"cities": excluded_cities} if excluded_cities else None
-    )
+    excluded_geo_locations = {"cities": excluded_cities} if excluded_cities else None
 
     age_min, age_max = _detect_age(text)
 
     # Confidence heuristic
-    n_signals = sum(
-        bool(x)
-        for x in (cities, excluded_cities, radius, age_min, age_max)
-    )
+    n_signals = sum(bool(x) for x in (cities, excluded_cities, radius, age_min, age_max))
     if n_signals >= 2 and not warnings:
         confidence = "high"
     elif n_signals >= 1:

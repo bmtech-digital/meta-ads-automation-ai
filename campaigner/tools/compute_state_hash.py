@@ -110,9 +110,7 @@ def _build_components(business_id: str) -> dict:
         if rows:
             out["pending_approvals_count"] = int(rows[0].get("n") or 0)
             last_at = rows[0].get("last_at")
-            out["last_pending_created_at"] = (
-                last_at.isoformat() if last_at else None
-            )
+            out["last_pending_created_at"] = last_at.isoformat() if last_at else None
     except Exception:
         pass
 
@@ -164,14 +162,10 @@ def _build_components(business_id: str) -> dict:
     try:
         config = Config.load()
         client = MetaClient(config)
-        campaigns = client.list_campaigns(
-            status_filter=["ACTIVE"], extra_fields=["updated_time"]
-        )
+        campaigns = client.list_campaigns(status_filter=["ACTIVE"], extra_fields=["updated_time"])
         out["active_campaign_count"] = len(campaigns)
         if campaigns:
-            updated = [
-                c.get("updated_time") for c in campaigns if c.get("updated_time")
-            ]
+            updated = [c.get("updated_time") for c in campaigns if c.get("updated_time")]
             if updated:
                 out["last_campaign_updated_time"] = max(updated)
 

@@ -37,10 +37,7 @@ def _summarize_geo(geo_targeting: dict | None, service_regions: list | None) -> 
         include = geo_targeting.get("include") or {}
         cities = include.get("cities") or []
         if cities:
-            names = [
-                c.get("name") if isinstance(c, dict) else str(c)
-                for c in cities[:5]
-            ]
+            names = [c.get("name") if isinstance(c, dict) else str(c) for c in cities[:5]]
             return f"ערים: {', '.join(filter(None, names))}"
         countries = include.get("countries") or []
         if countries:
@@ -154,9 +151,7 @@ def main() -> None:
         encoding="utf-8",
     )
     if proc.returncode != 0:
-        emit_runtime_error(
-            f"propose_task failed: {proc.stderr.strip() or proc.stdout.strip()}"
-        )
+        emit_runtime_error(f"propose_task failed: {proc.stderr.strip() or proc.stdout.strip()}")
         return
 
     try:

@@ -108,9 +108,7 @@ def main() -> None:
         return
 
     executed = [a for a in approvals if a["status"] == "executed"]
-    approved_pending_exec = [
-        a for a in approvals if a["status"] == "approved"
-    ]
+    approved_pending_exec = [a for a in approvals if a["status"] == "approved"]
     rejected = [a for a in approvals if a["status"] == "rejected"]
     answered = [a for a in approvals if a["status"] == "answered"]
     pending = [a for a in approvals if a["status"] == "pending"]
@@ -125,9 +123,7 @@ def main() -> None:
         # Truncate to first 80 chars as theme proxy
         key = reason[:80]
         reject_themes[key] = reject_themes.get(key, 0) + 1
-    top_rejects = sorted(
-        reject_themes.items(), key=lambda kv: -kv[1]
-    )[:3]
+    top_rejects = sorted(reject_themes.items(), key=lambda kv: -kv[1])[:3]
 
     # Lead-quality summary for the month
     try:
@@ -156,9 +152,7 @@ def main() -> None:
     converted_count = (lq or {}).get("converted_count") or 0
     revenue_ils = (lq or {}).get("revenue_ils") or 0
 
-    grading_coverage = (
-        graded_count / leads_count if leads_count > 0 else None
-    )
+    grading_coverage = graded_count / leads_count if leads_count > 0 else None
 
     # Latest budget_health snapshot for the month
     try:
@@ -204,9 +198,7 @@ def main() -> None:
             "grading_coverage": (
                 round(grading_coverage, 3) if grading_coverage is not None else None
             ),
-            "avg_quality_grade": (
-                round(float(avg_grade), 2) if avg_grade is not None else None
-            ),
+            "avg_quality_grade": (round(float(avg_grade), 2) if avg_grade is not None else None),
             "converted_count": converted_count,
             "revenue_ils": float(revenue_ils),
         },
@@ -222,9 +214,7 @@ def main() -> None:
             {
                 "approval_id": str(a["id"]),
                 "task_type": a["task_type"],
-                "executed_at": (
-                    a["executed_at"].isoformat() if a.get("executed_at") else None
-                ),
+                "executed_at": (a["executed_at"].isoformat() if a.get("executed_at") else None),
                 "rationale_first_paragraph": (a.get("rationale") or "")[:300],
             }
             for a in executed[:20]
@@ -241,9 +231,7 @@ def main() -> None:
                 if total > 0
                 else None
             ),
-            "top_rejection_themes": [
-                {"theme": k, "count": v} for k, v in top_rejects
-            ],
+            "top_rejection_themes": [{"theme": k, "count": v} for k, v in top_rejects],
         },
         "asks_from_operator": _compute_asks(
             grading_coverage=grading_coverage,
@@ -290,9 +278,7 @@ def _compute_asks(
         asks.append(
             {
                 "priority": "high",
-                "ask_he": (
-                    f"יש {pending_count} הצעות ממתינות. עבור עליהן ב-/approvals."
-                ),
+                "ask_he": (f"יש {pending_count} הצעות ממתינות. עבור עליהן ב-/approvals."),
                 "action_url": "/approvals",
             }
         )
@@ -312,8 +298,7 @@ def _compute_asks(
             {
                 "priority": "high",
                 "ask_he": (
-                    "יעד KPI ראשי לא מוגדר. בלי יעד אין למה להשוות. "
-                    "הגדר ב-/business-knowledge."
+                    "יעד KPI ראשי לא מוגדר. בלי יעד אין למה להשוות. הגדר ב-/business-knowledge."
                 ),
                 "action_url": "/business-knowledge",
             }
