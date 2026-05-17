@@ -1906,6 +1906,84 @@ def _operator_questions_well_formed(prop: dict, state: dict, ctx: dict) -> dict:
     return _pass("operator_questions_well_formed", questions_count=len(questions))
 
 
+def _prospecting_must_apply_master_exclusion(
+    prop: dict, state: dict, ctx: dict
+) -> dict:
+    """§51. Mastery v2 Phase D. Every new_campaign / expand_audience proposal
+    targeting prospecting (cold audience, no retargeting custom_audiences)
+    must include the master_exclusion_id in `excluded_custom_audiences`.
+
+    Soft-skip when there's no Master Exclusion built yet (Phase D Pre-step:
+    `compute_master_exclusion` must run + reach Meta-min ≥100 records first).
+    State field: master_exclusion_audience_id : str | None
+    """
+    task = prop.get("task_type")
+    if task not in ("new_campaign", "expand_audience"):
+        return _skip(
+            "prospecting_must_apply_master_exclusion", "rule applies to new_campaign / expand_audience only"
+        )
+    master_id = state.get("master_exclusion_audience_id")
+    if not master_id:
+        return _skip(
+            "prospecting_must_apply_master_exclusion",
+            "no master_exclusion_audience_id in state — run compute_master_exclusion first",
+        )
+    payload = prop.get("payload") or {}
+    targeting = payload.get("targeting") or {}
+    excluded = targeting.get("excluded_custom_audiences") or payload.get(
+        "excluded_audience_ids"
+    )
+    excluded_ids: set[str] = set()
+    if isinstance(excluded, list):
+        for item in excluded:
+            if isinstance(item, dict) and item.get("id"):
+                excluded_ids.add(str(item["id"]))
+            elif isinstance(item, str):
+                excluded_ids.add(item)
+    if master_id in excluded_ids:
+        return _pass(
+            "prospecting_must_apply_master_exclusion",
+            master_exclusion_audience_id=master_id,
+        )
+    return _fail(
+        "prospecting_must_apply_master_exclusion",
+        f"prospecting proposal must exclude master_exclusion_audience_id={master_id} "
+        f"to avoid bidding on existing leads/customers (Wonderful research: -40% CPA). "
+        f"Add it to targeting.excluded_custom_audiences.",
+        master_exclusion_audience_id=master_id,
+    )
+
+
+def _lal_min_ratio_for_il(prop: dict, state: dict, ctx: dict) -> dict:
+    """§52. Mastery v2 Phase D. Israeli Lookalike audiences must have ratio
+    ≥0.02 (2%). At 1% on IL seed (any size), the LAL audience is ~65-95K —
+    below the 50K floor where Meta delivery quality collapses (CPCs spike
+    2-3×). Israeli small-country math demands 2-5%, never 1%.
+    """
+    if prop.get("task_type") != "create_lookalike":
+        return _skip("lal_min_ratio_for_il", "rule applies to create_lookalike only")
+    payload = prop.get("payload") or {}
+    country = (payload.get("country") or "").upper()
+    if country != "IL":
+        return _skip("lal_min_ratio_for_il", f"country={country!r}, not IL")
+    ratio = payload.get("ratio")
+    if not isinstance(ratio, int | float):
+        return _fail(
+            "lal_min_ratio_for_il",
+            f"create_lookalike payload missing valid 'ratio' (got {ratio!r})",
+        )
+    if ratio < 0.02:
+        return _fail(
+            "lal_min_ratio_for_il",
+            f"IL LAL with ratio={ratio} produces an audience below the 50K delivery floor "
+            f"(small-country math: ~6.47M reachable × {ratio} = ~{int(6_470_000 * ratio):,}). "
+            f"Use 2-5% — never 1% for Israel.",
+            ratio_proposed=ratio,
+            min_ratio=0.02,
+        )
+    return _pass("lal_min_ratio_for_il", ratio=ratio)
+
+
 def _scale_up_requires_graded_sample(prop: dict, state: dict, ctx: dict) -> dict:
     """§42. Mastery v2 Phase C. Hard-blocks scale_up / budget_change-increase
     on a campaign whose graded_sample_size_14d < 20. Replaces §40's warn-only
@@ -2194,6 +2272,13 @@ CHECKS: list[Callable[[dict, dict, dict], dict]] = [
     # so the operator gets nudged to grade pending leads.
     _scale_up_requires_graded_sample,
     _lead_grading_coverage_minimum,
+    # Mastery v2 Phase D (Audience Monthly Review + free-text, 2026-05-17).
+    # §51 enforces master_exclusion on every prospecting ad set (Wonderful's
+    # -40% CPA finding). §52 blocks Israeli LAL with ratio <2% — small-country
+    # math: 1% LAL of any IL seed = ~65-95K users, below the 50K delivery
+    # collapse floor.
+    _prospecting_must_apply_master_exclusion,
+    _lal_min_ratio_for_il,
 ]
 
 

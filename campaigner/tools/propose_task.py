@@ -332,6 +332,15 @@ VALID_TASK_TYPES = (
     "fill_business_brief",
     "audience_brief",
     "first_campaign",
+    # Mastery v2 Phase D (Audience Monthly Review, 2026-05-17). Monthly
+    # one-per-business proposal summarizing audience health (healthy/decaying/
+    # stale/oversized) with up to 2 suggested edits in MCQ format. The
+    # operator handles the actual edits via /audiences — agent never edits
+    # targeting autonomously per feedback_targeting_owned_by_user.
+    # Payload contract:
+    #   audience_review: {step, target_url='/audiences',
+    #                     summary: {healthy, decaying, stale, oversized}, acknowledgment_only: True}
+    "audience_review",
 )
 
 VALID_TARGET_KINDS = ("campaign", "adset", "ad", "creative", "account")
