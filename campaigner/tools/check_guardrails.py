@@ -1906,6 +1906,94 @@ def _operator_questions_well_formed(prop: dict, state: dict, ctx: dict) -> dict:
     return _pass("operator_questions_well_formed", questions_count=len(questions))
 
 
+def _boost_post_requires_five_thresholds(
+    prop: dict, state: dict, ctx: dict
+) -> dict:
+    """§53. Mastery v2 Phase E. boost_post must clear all 5 organic-perf
+    thresholds before promotion. Each metric value + threshold must appear in
+    payload.boost_signals (set by check_organic_performance --boost-candidates)
+    so the operator can see the receipts.
+
+    Required signals + thresholds:
+      engagement_rate_vs_page_avg ≥ 1.5
+      save_rate                   ≥ 0.01 (1% of reach)
+      share_rate                  ≥ 0.005 (0.5%)
+      reels_watch_through         ≥ 0.25  (only if format=reels)
+      comment_thread_depth_count  ≥ 3
+    """
+    if prop.get("task_type") != "boost_post":
+        return _skip("boost_post_requires_five_thresholds", "task_type != boost_post")
+    payload = prop.get("payload") or {}
+    signals = payload.get("boost_signals") or {}
+    if not isinstance(signals, dict):
+        return _fail(
+            "boost_post_requires_five_thresholds",
+            "payload.boost_signals missing or not a dict — call check_organic_performance "
+            "--boost-candidates and pass the values through.",
+        )
+    is_reels = (payload.get("format") or "").lower() in ("reels", "reel")
+    checks = [
+        ("engagement_rate_vs_page_avg", 1.5),
+        ("save_rate", 0.01),
+        ("share_rate", 0.005),
+        ("comment_thread_depth_count", 3),
+    ]
+    if is_reels:
+        checks.append(("reels_watch_through", 0.25))
+    failures: list[dict] = []
+    for key, threshold in checks:
+        value = signals.get(key)
+        if not isinstance(value, int | float) or value < threshold:
+            failures.append(
+                {"signal": key, "value": value, "threshold": threshold}
+            )
+    if failures:
+        return _fail(
+            "boost_post_requires_five_thresholds",
+            f"{len(failures)} of {len(checks)} required signal(s) below threshold — "
+            f"don't waste paid spend on marginal organic. Propose new_creative instead.",
+            failures=failures,
+        )
+    return _pass(
+        "boost_post_requires_five_thresholds",
+        signals_checked=len(checks),
+    )
+
+
+def _boost_post_wait_window(prop: dict, state: dict, ctx: dict) -> dict:
+    """§54. Mastery v2 Phase E. Block boost_post if post was created less
+    than 48h ago. Organic signal needs time to accrue so the boosted ad
+    inherits ad-relevance lift + lower CPM. Reading paid traffic on a fresh
+    post = paying for cold-creative performance.
+
+    State field: post_created_age_hours : float
+    """
+    if prop.get("task_type") != "boost_post":
+        return _skip("boost_post_wait_window", "task_type != boost_post")
+    age_hours = state.get("post_created_age_hours")
+    if age_hours is None:
+        return _skip(
+            "boost_post_wait_window", "post_created_age_hours not in state"
+        )
+    if age_hours < 48:
+        return _fail(
+            "boost_post_wait_window",
+            f"post is only {age_hours:.0f}h old — wait until ≥48h so organic "
+            f"signal accrues first (better ad relevance score, lower CPM).",
+            age_hours=age_hours,
+            min_age_hours=48,
+        )
+    if age_hours > 14 * 24:
+        return _fail(
+            "boost_post_wait_window",
+            f"post is {age_hours / 24:.0f}d old — too stale to boost (recency "
+            f"signal lost). Promote a fresher winner instead.",
+            age_hours=age_hours,
+            max_age_hours=14 * 24,
+        )
+    return _pass("boost_post_wait_window", age_hours=age_hours)
+
+
 def _prospecting_must_apply_master_exclusion(
     prop: dict, state: dict, ctx: dict
 ) -> dict:
@@ -2279,6 +2367,14 @@ CHECKS: list[Callable[[dict, dict, dict], dict]] = [
     # collapse floor.
     _prospecting_must_apply_master_exclusion,
     _lal_min_ratio_for_il,
+    # Mastery v2 Phase E (Organic Cadence + boost_post triggers, 2026-05-17).
+    # §53 enforces the 5-threshold gate (engagement ≥1.5× page avg, save ≥1%,
+    # share ≥0.5%, Reels watch ≥25%, ≥3 multi-reply threads) before any
+    # boost_post proposal — closes the "marginal organic gets boosted" trap.
+    # §54 enforces the 48h wait window (let organic signal accrue first so
+    # the boost inherits trust + lower CPM).
+    _boost_post_requires_five_thresholds,
+    _boost_post_wait_window,
 ]
 
 
