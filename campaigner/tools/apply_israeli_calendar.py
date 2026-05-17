@@ -26,7 +26,7 @@ Contract: §11.6 (JSON stdout, exit 0/1/2).
 from __future__ import annotations
 
 import argparse
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 
 from campaigner.tools._contract import emit_success, emit_validation_error
 
@@ -95,7 +95,7 @@ def main() -> None:
     )
     args = p.parse_args()
 
-    on = _parse_date(args.on) or datetime.now(timezone.utc).date()
+    on = _parse_date(args.on) or datetime.now(UTC).date()
 
     default_windows = _windows_for(on)
     override_windows: list[dict] = []

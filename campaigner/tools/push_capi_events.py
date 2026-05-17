@@ -28,6 +28,7 @@ META_ACCESS_TOKEN from env via lib/config.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import time
@@ -101,10 +102,8 @@ def _post_capi_event(
             status = resp.status
             body_text = resp.read().decode("utf-8", "replace")
         parsed = {}
-        try:
+        with contextlib.suppress(json.JSONDecodeError):
             parsed = json.loads(body_text)
-        except json.JSONDecodeError:
-            pass
         return {
             "http_status": status,
             "fbtrace_id": parsed.get("fbtrace_id"),

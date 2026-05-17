@@ -55,6 +55,7 @@ The agent reads `should_skip` and either continues or short-circuits.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import hashlib
 import json
 import math
@@ -187,10 +188,8 @@ def _build_components(business_id: str) -> dict:
             for r in rows:
                 s = r.get("spend")
                 if s is not None:
-                    try:
+                    with contextlib.suppress(TypeError, ValueError):
                         spend_native += float(s)
-                    except (TypeError, ValueError):
-                        pass
                 if currency is None and r.get("account_currency"):
                     currency = r["account_currency"]
             spend_ils, _, _, _ = convert_to_ils(spend_native, currency)

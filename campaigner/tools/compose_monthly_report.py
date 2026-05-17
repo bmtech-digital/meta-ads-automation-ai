@@ -25,7 +25,7 @@ Contract: §11.6 (JSON stdout, exit 0/1/2).
 from __future__ import annotations
 
 import argparse
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import fetch_all, fetch_one
@@ -147,7 +147,7 @@ def main() -> None:
                 (args.business_id, first, last),
             )
         )
-    except Exception as e:
+    except Exception:
         lq = None
         # Tolerate — lead-quality may not be wired yet (Phase C dependency)
     leads_count = (lq or {}).get("leads_count") or 0
@@ -188,7 +188,7 @@ def main() -> None:
             "month": args.month,
             "period_start": first.isoformat(),
             "period_end": last.isoformat(),
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
         },
         "kpi_scorecard": {
             "primary_kpi": biz.get("primary_kpi"),

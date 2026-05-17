@@ -23,7 +23,7 @@ import argparse
 import json
 import subprocess
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import fetch_all, fetch_one
@@ -38,7 +38,7 @@ IL_OVERSIZED_THRESHOLD = 3_000_000
 
 
 def _classify(audience: dict) -> str:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     created = audience.get("time_created")
     synced = audience.get("synced_at")
     size = audience.get("approximate_count") or 0

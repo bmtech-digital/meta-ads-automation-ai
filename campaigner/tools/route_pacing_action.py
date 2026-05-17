@@ -29,7 +29,6 @@ Contract: §11.6 (JSON stdout, exit 0/1/2).
 from __future__ import annotations
 
 import argparse
-import json
 
 from campaigner.tools._contract import (
     emit_success,
@@ -48,7 +47,7 @@ def _route(
     """Pure routing logic. No I/O — easy to test."""
     status = pace.get("status")
     days_left = int(pace.get("days_left", 0))
-    days_elapsed = int(pace.get("days_elapsed", 0))
+    int(pace.get("days_elapsed", 0))
     pace_ratio = pace.get("pace")
     monthly_budget = pace.get("monthly_budget_ils") or 0
     spend_so_far = pace.get("spend_this_month") or 0

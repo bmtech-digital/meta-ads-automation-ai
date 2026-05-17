@@ -18,6 +18,7 @@ UI card, not customer-facing text.
 
 from __future__ import annotations
 
+import contextlib
 from typing import Any
 
 # Meta enum: 1=male, 2=female. Empty/missing = all genders.
@@ -72,8 +73,8 @@ _EMPTY_TARGETING: dict[str, Any] = {
     "flexible_spec": None,
     "exclusions": None,
     "targeting_parsed": None,
-    **{k: None for k in _DETAILED_KEYS},
-    **{k: None for k in _PLACEMENT_KEYS},
+    **dict.fromkeys(_DETAILED_KEYS),
+    **dict.fromkeys(_PLACEMENT_KEYS),
 }
 
 
@@ -108,10 +109,8 @@ def _norm_city(c: dict) -> dict:
     if "region" in c:
         out["region"] = c["region"]
     if "radius" in c and c["radius"] is not None:
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             out["radius"] = int(c["radius"])
-        except (TypeError, ValueError):
-            pass
     if "distance_unit" in c:
         out["distance_unit"] = c["distance_unit"]
     return out
@@ -333,15 +332,11 @@ def parse_targeting(targeting: dict | None, sentence_lines: Any = None) -> dict[
     try:
         # Demographics
         if "age_min" in targeting and targeting["age_min"] is not None:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 out["age_min"] = int(targeting["age_min"])
-            except (TypeError, ValueError):
-                pass
         if "age_max" in targeting and targeting["age_max"] is not None:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 out["age_max"] = int(targeting["age_max"])
-            except (TypeError, ValueError):
-                pass
         out["genders"] = _norm_genders(targeting.get("genders"))
         if targeting.get("locales"):
             out["locales"] = targeting["locales"]
