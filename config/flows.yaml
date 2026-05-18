@@ -1,0 +1,224 @@
+# config/flows.yaml — single source of truth for the campaigner flow registry.
+#
+# Generated artifacts (do NOT edit by hand — CI rejects drift):
+#   - kubefiles/agent_cronjob_<cronjob_name>.yaml  (one per cron flow)
+#   - The "Which flow am I running?" routing table in campaigner/CAMPAIGNER.md
+#   - The "Before every flow — Load context" prompt-load matrix in CAMPAIGNER.md
+#   - The flow index in docs/ARCHITECTURE.md
+#
+# Run `make generate` after editing this file.
+# Run `make verify-generated` to check that generated files are in sync.
+#
+# Adding a flow: add a block to `flows:`, run `make generate`, ship. No
+# CronJob YAML is hand-written.
+
+defaults:
+  timezone: Asia/Jerusalem
+  namespace: campaigner
+  image: us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-agent:latest
+  env:
+    GCP_PROJECT_ID: bemtech-478413
+    GCP_LOCATION: us-central1
+    GOOGLE_APPLICATION_CREDENTIALS: /var/secrets/gcp/credentials.json
+  # The single guardrails prompt is loaded by every flow that writes to
+  # `approvals` or executes against Meta. Listed once here rather than on
+  # every flow.
+  always_loaded_prompt: campaigner/prompts/guardrails.md
+
+# Catalog of available prompt files. The matrix below references them by id.
+prompts:
+  performance-brain: campaigner/prompts/performance-brain.md
+  decision-tree: campaigner/prompts/decision-tree.md
+  creative-guide: campaigner/prompts/creative-guide.md
+  hebrew-copy-style: campaigner/prompts/hebrew-copy-style.md
+  competitive-research: campaigner/prompts/competitive-research.md
+  cpl-infrastructure: campaigner/prompts/cpl-infrastructure.md
+  kpi-benchmarks: campaigner/prompts/kpi-benchmarks.md
+
+flows:
+  - id: A
+    name: daily_observe_propose
+    cronjob_name: daily-observe
+    label: observe-propose
+    description: Pull Meta insights, evaluate via the two-gate model, write proposals to `approvals` and decisions to `agent_decisions`. Never touches Meta.
+    schedule: "0 9 * * *"
+    schedule_human: 09:00 Asia/Jerusalem
+    runner: runners/daily_observe_propose.sh
+    trigger_signals:
+      - daily observe-propose
+      - observe_propose
+    section_anchor: flow-a--observe-propose
+    section_label: "§A below"
+    deployed: true
+    deadlines:
+      starting_seconds: 600
+      active_seconds: 1800
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits: { cpu: 1000m, memory: 1536Mi }
+    prompts:
+      always: [performance-brain, decision-tree, hebrew-copy-style]
+      on_demand: [cpl-infrastructure, kpi-benchmarks]
+
+  - id: B
+    name: execute_approvals
+    cronjob_name: execute-approvals
+    label: execute
+    description: Read approved rows, re-check guardrails, call Meta Marketing API. The only flow that mutates Meta.
+    schedule: "*/15 * * * *"
+    schedule_human: every 15 min
+    runner: runners/execute_approvals.sh
+    trigger_signals:
+      - execute approved
+      - execute_approvals
+    section_anchor: flow-b--execute
+    section_label: "§B below"
+    deployed: true
+    deadlines:
+      starting_seconds: 300
+      active_seconds: 600
+    resources:
+      requests: { cpu: 100m, memory: 384Mi }
+      limits: { cpu: 500m, memory: 1Gi }
+    prompts:
+      always: []
+      on_demand: []
+
+  - id: C
+    name: weekly_creative_firehose
+    cronjob_name: weekly-creative
+    label: creative-firehose
+    description: Generate 3-5 new creatives per active campaign. Andromeda prefers 10-50+ diverse creatives; don't prune manually.
+    schedule: "0 10 * * 1"
+    schedule_human: Mon 10:00 Asia/Jerusalem
+    runner: runners/weekly_creative_firehose.sh
+    trigger_signals:
+      - weekly creative firehose
+      - creative_firehose
+    section_anchor: flow-c--creative-firehose
+    section_label: "§C below"
+    deployed: true
+    deadlines:
+      starting_seconds: 1800
+      active_seconds: 3600
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits: { cpu: 1000m, memory: 2Gi }
+    prompts:
+      always: [performance-brain, creative-guide, hebrew-copy-style]
+      on_demand: []
+
+  - id: D
+    name: weekly_competitive_research
+    cronjob_name: weekly-competitive-research
+    label: competitive-research
+    description: WebSearch on market prices, trending creative angles, and new ad formats. Emits `alert` proposals with source-cited findings.
+    schedule: "0 11 * * 1"
+    schedule_human: Mon 11:00 Asia/Jerusalem
+    runner: runners/weekly_competitive_research.sh
+    trigger_signals:
+      - weekly competitive research
+      - competitive_research
+    section_anchor: flow-d--weekly-competitive-research
+    section_label: "§D below"
+    deployed: true
+    deadlines:
+      starting_seconds: 1800
+      active_seconds: 3600
+    resources:
+      requests: { cpu: 200m, memory: 512Mi }
+      limits: { cpu: 1000m, memory: 2Gi }
+    prompts:
+      always: [competitive-research, hebrew-copy-style]
+      on_demand: [cpl-infrastructure, kpi-benchmarks]
+
+  - id: E
+    name: propose_audiences_for_service
+    label: audiences
+    description: Per-service audience proposals. Triggered from /business-knowledge → service card. Operator-initiated, NOT cron — has no CronJob manifest.
+    schedule: null
+    schedule_human: operator-initiated
+    runner: runners/propose_audiences_for_service.sh
+    trigger_signals:
+      - propose audiences for service
+      - propose_audiences_for_service
+    section_anchor: flow-e--per-service-audience-proposals
+    section_label: "§E below"
+    deployed: false
+    prompts:
+      always: [decision-tree, hebrew-copy-style]
+      on_demand: []
+
+  - id: F
+    name: weekly_self_audit
+    cronjob_name: weekly-self-audit
+    label: self-audit
+    description: 7-day structured audit composed into a ~200-word Hebrew operator-facing digest. The "agency-replacement" weekly status report.
+    schedule: "0 8 * * 0"
+    schedule_human: Sun 08:00 Asia/Jerusalem
+    runner: runners/weekly_self_audit.sh
+    trigger_signals:
+      - weekly self audit
+      - self_audit
+      - Flow F
+    section_anchor: "flow-f--weekly-self-audit-חדש-2026-05-13-pm--agency-replacement-digest"
+    section_label: "§F below"
+    deployed: true
+    deadlines:
+      starting_seconds: 1800
+      active_seconds: 1800
+    resources:
+      requests: { cpu: 150m, memory: 384Mi }
+      limits: { cpu: 750m, memory: 1Gi }
+    prompts:
+      always: [performance-brain, hebrew-copy-style]
+      on_demand: []
+
+  - id: G
+    name: daily_ab_test_decisions
+    cronjob_name: daily-ab-decisions
+    label: ab-decide
+    description: For every A/B test past its `planned_end_at`, emit `ab_test_decide` with the evaluated winner. Runs 30 min after Flow A so insights are fresh.
+    schedule: "30 9 * * *"
+    schedule_human: 09:30 Asia/Jerusalem
+    runner: runners/daily_ab_test_decisions.sh
+    trigger_signals:
+      - daily a/b test decisions
+      - ab_decisions
+      - Flow G
+    section_anchor: "flow-g--daily-ab-test-decisions-חדש-2026-05-13-pm"
+    section_label: "§G below"
+    deployed: true
+    deadlines:
+      starting_seconds: 600
+      active_seconds: 1800
+    resources:
+      requests: { cpu: 150m, memory: 384Mi }
+      limits: { cpu: 750m, memory: 1Gi }
+    prompts:
+      always: [performance-brain, decision-tree, hebrew-copy-style]
+      on_demand: []
+
+  - id: H
+    name: midday_health_check
+    cronjob_name: midday-health-check
+    label: midday-check
+    description: Short midday check. Emergency-pause candidates (CPL > 3x target intra-day) and tracking-health drift only. Does NOT redo Flow A diagnosis.
+    schedule: "0 13 * * *"
+    schedule_human: 13:00 Asia/Jerusalem
+    runner: runners/midday_health_check.sh
+    trigger_signals:
+      - midday health check
+      - Flow H
+    section_anchor: "flow-h--midday-health-check-חדש-2026-05-13-pm"
+    section_label: "§H below"
+    deployed: true
+    deadlines:
+      starting_seconds: 300
+      active_seconds: 900
+    resources:
+      requests: { cpu: 100m, memory: 384Mi }
+      limits: { cpu: 500m, memory: 1Gi }
+    prompts:
+      always: [decision-tree, hebrew-copy-style]
+      on_demand: []

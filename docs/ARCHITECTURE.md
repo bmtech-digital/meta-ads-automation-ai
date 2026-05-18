@@ -8,14 +8,15 @@
 
 Campaigner is a **stateless cron-driven agent** that proposes Meta Ads optimizations and executes only after human approval. It reads campaign performance from Meta, evaluates it against a two-gate model, queues proposals to Postgres, and waits. A human approves; another cron run picks up the approved row and calls Meta.
 
-Three flows. One business (Aiweon, MVP). Hebrew rationale, English ops summaries. ~$25/mo per business.
+Eight flows (seven on cron, one operator-initiated). One business (Aiweon, MVP). Hebrew rationale, English ops summaries. ~$25/mo per business.
 
 ## The big picture
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                       CLOUD SCHEDULER (GKE CronJobs)                        │
-│  daily_observe (09:00 IL) · execute (every 15m) · weekly_creative (Mon 10) │
+│  Flow A (09:00 IL) · B (every 15m) · C/D (Mon 10/11) · F (Sun 08:00)        │
+│  G (09:30 daily) · H (13:00 daily). Wired via config/flows.yaml.            │
 └──────────────────────┬──────────────────────────────────────────────────────┘
                        │ shells to
                        ▼
@@ -27,7 +28,7 @@ Three flows. One business (Aiweon, MVP). Hebrew rationale, English ops summaries
                        ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                  Claude Code CLI (claude -p, Anthropic API)                 │
-│            Reads: campaigner/CAMPAIGNER.md + prompts/*.md (5 files)         │
+│            Reads: campaigner/CAMPAIGNER.md + per-flow prompts (matrix)      │
 │            Calls: campaigner/tools/*.py via Bash                            │
 └──────────────────────┬──────────────────────────────────────────────────────┘
                        │
@@ -75,18 +76,24 @@ Three flows. One business (Aiweon, MVP). Hebrew rationale, English ops summaries
         Human reviewer (Roi / operators)
 ```
 
-## Three flows
+## Flows
 
-| | Flow A — Observe-Propose | Flow B — Execute | Flow C — Creative Firehose |
-|---|---|---|---|
-| **Schedule** | 09:00 IL daily | every 15 min | Mon 10:00 IL |
-| **Trigger** | Cron | Cron | Cron |
-| **Reads** | Meta insights, baselines, business_knowledge | `approvals` rows where `status='approved'` | Active campaigns + creative gallery |
-| **Writes** | `agent_decisions`, `approvals` (pending) | Meta API + `approvals` (executed/failed) | `approvals` (pending: `task_type=new_creative`) |
-| **Touches Meta?** | **No.** Read-only Insights API. | **Yes** — the only flow that mutates Meta. | No. Generates locally; queues for human approval. |
-| **Human in loop?** | After: human reviews queued proposals | Re-checks guardrails, then executes | After: human reviews creatives + ad copy |
+<!-- BEGIN GENERATED:flows:flow-index -->
+| Flow | Name | Schedule | Touches Meta? | Runner |
+| --- | --- | --- | --- | --- |
+| **A** | daily_observe_propose | 09:00 Asia/Jerusalem | No | [`runners/daily_observe_propose.sh`](../runners/daily_observe_propose.sh) |
+| **B** | execute_approvals | every 15 min | Yes (writes) | [`runners/execute_approvals.sh`](../runners/execute_approvals.sh) |
+| **C** | weekly_creative_firehose | Mon 10:00 Asia/Jerusalem | No | [`runners/weekly_creative_firehose.sh`](../runners/weekly_creative_firehose.sh) |
+| **D** | weekly_competitive_research | Mon 11:00 Asia/Jerusalem | No | [`runners/weekly_competitive_research.sh`](../runners/weekly_competitive_research.sh) |
+| **E** | propose_audiences_for_service | operator-initiated | No | [`runners/propose_audiences_for_service.sh`](../runners/propose_audiences_for_service.sh) |
+| **F** | weekly_self_audit | Sun 08:00 Asia/Jerusalem | No | [`runners/weekly_self_audit.sh`](../runners/weekly_self_audit.sh) |
+| **G** | daily_ab_test_decisions | 09:30 Asia/Jerusalem | No | [`runners/daily_ab_test_decisions.sh`](../runners/daily_ab_test_decisions.sh) |
+| **H** | midday_health_check | 13:00 Asia/Jerusalem | No | [`runners/midday_health_check.sh`](../runners/midday_health_check.sh) |
+<!-- END GENERATED:flows:flow-index -->
 
-The HITL invariant: **Flow A and Flow C never touch Meta. Flow B is the only door.**
+> **Source of truth:** [`config/flows.yaml`](../config/flows.yaml). Hand-edits to this table are overwritten by `make generate`. Per-flow protocols live in [`campaigner/CAMPAIGNER.md`](../campaigner/CAMPAIGNER.md).
+
+The HITL invariant: **only Flow B touches Meta.** Every other flow proposes; humans approve; Flow B executes.
 
 ## Two-gate evaluation model
 
@@ -121,7 +128,7 @@ The repo is a **monorepo** with three deployable services:
 
 | Service | Path | Image | Deployment | What it does |
 |---|---|---|---|---|
-| **agent** | `campaigner/` + `runners/` + `migrations/` + `scripts/` | `campaigner-agent` | 3 GKE CronJobs | The three flows above |
+| **agent** | `campaigner/` + `runners/` + `migrations/` + `scripts/` + `config/` | `campaigner-agent` | 7 GKE CronJobs | The flows above (wired via [`config/flows.yaml`](../config/flows.yaml)) |
 | **web** | `web/` | `campaigner-web` | GKE Deployment + Ingress | Hebrew dashboard for approvals + business profile |
 | **webhook** | `webhook/` | `campaigner-webhook` | GKE Deployment | Lead Ads → Trello receiver (narrow-scope, NOT the agent) |
 

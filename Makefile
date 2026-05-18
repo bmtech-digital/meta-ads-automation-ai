@@ -3,6 +3,7 @@
         web web_build_push web_deploy web_restart web_logs \
         webhook webhook_build_push webhook_deploy webhook_restart webhook_logs \
         namespace secrets gcp_credentials_secret \
+        generate verify-generated \
         all status pods delete_all \
         dev dev_down dev_logs
 
@@ -38,6 +39,10 @@ help:
 	@echo "  make static_ip               - Reserve global static IP for public dashboard"
 	@echo "  make web_ingress             - Apply ingress + ManagedCertificate (after DNS is set)"
 	@echo "  make all                     - Full stack: namespace + secrets + GCP creds + agent + web + webhook"
+	@echo ""
+	@echo "Generated artifacts (config/flows.yaml -> manifests + docs):"
+	@echo "  make generate         - Regenerate cronjob YAMLs + the routing/matrix tables in CAMPAIGNER.md + ARCHITECTURE.md"
+	@echo "  make verify-generated - CI check: exit 1 if generated files have drifted from config/flows.yaml"
 	@echo ""
 	@echo "Inspection:"
 	@echo "  make status           - Show deployments, pods, services, cronjobs, ingress"
@@ -81,6 +86,10 @@ agent_deploy: get_gcp_cluster
 	kubectl apply -f kubefiles/agent_cronjob_daily_observe.yaml
 	kubectl apply -f kubefiles/agent_cronjob_execute_approvals.yaml
 	kubectl apply -f kubefiles/agent_cronjob_weekly_creative.yaml
+	kubectl apply -f kubefiles/agent_cronjob_weekly_competitive_research.yaml
+	kubectl apply -f kubefiles/agent_cronjob_weekly_self_audit.yaml
+	kubectl apply -f kubefiles/agent_cronjob_daily_ab_decisions.yaml
+	kubectl apply -f kubefiles/agent_cronjob_midday_health_check.yaml
 
 agent_logs:
 	@JOB=$$(kubectl get jobs -n $(NAMESPACE) --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[-1:].metadata.name}'); \
@@ -152,6 +161,18 @@ webhook_restart:
 webhook_logs:
 	kubectl logs -n $(NAMESPACE) -l app=webhook --tail=100 -f
 
+# --- Generated artifacts (config/flows.yaml -> manifests + docs) ---
+
+# `make generate` regenerates kubefiles/agent_cronjob_*.yaml and the
+# routing / matrix / flow-index tables inside CAMPAIGNER.md and
+# ARCHITECTURE.md from config/flows.yaml. Idempotent. Run after every
+# edit to config/flows.yaml; CI's `make verify-generated` rejects drift.
+generate:
+	python3 scripts/generate_from_flows.py
+
+verify-generated:
+	python3 scripts/generate_from_flows.py --check
+
 # --- Cluster setup ---
 
 namespace: get_gcp_cluster
@@ -208,6 +229,9 @@ delete_all: get_gcp_cluster
 	- kubectl delete -f kubefiles/agent_cronjob_execute_approvals.yaml || true
 	- kubectl delete -f kubefiles/agent_cronjob_weekly_creative.yaml || true
 	- kubectl delete -f kubefiles/agent_cronjob_weekly_competitive_research.yaml || true
+	- kubectl delete -f kubefiles/agent_cronjob_weekly_self_audit.yaml || true
+	- kubectl delete -f kubefiles/agent_cronjob_daily_ab_decisions.yaml || true
+	- kubectl delete -f kubefiles/agent_cronjob_midday_health_check.yaml || true
 	- kubectl delete -f kubefiles/web_ingress.yaml || true
 	- kubectl delete -f kubefiles/web_deployment.yaml || true
 	- kubectl delete -f kubefiles/webhook_deployment.yaml || true

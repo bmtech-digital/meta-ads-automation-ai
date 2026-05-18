@@ -4,7 +4,7 @@
 
 ## What this folder is
 
-Five Bash scripts. Each wraps a single `claude -p` headless invocation with environment validation, heartbeats, and exit-code discipline. Four are cron entrypoints (the seam between Cloud Scheduler / cron and the agent); one is operator-initiated.
+Bash scripts, one per flow. Each wraps a single `claude -p` headless invocation with environment validation, heartbeats, and exit-code discipline. Seven are cron entrypoints (the seam between Cloud Scheduler / cron and the agent), wired via [`../config/flows.yaml`](../config/flows.yaml); one (Flow E) is operator-initiated; the remaining auxiliary scripts (`weekly_audience_refresh.sh`, `weekly_digest.sh`, `onboarding_chain.sh`) predate the registry and are not yet declared there.
 
 | Script | Flow | Schedule (Asia/Jerusalem) |
 |---|---|---|

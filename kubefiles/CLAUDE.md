@@ -6,6 +6,8 @@
 
 Plain k8s manifests (YAML), applied via `kubectl apply -f`. **No Helm, no Kustomize overlays at this level** — this folder is intentionally low-magic. Per-environment overlays live under [`../web/k8s/`](../web/k8s/) (web only, where Phase 0 needed kustomize for staging vs prod). Everything in this folder is one cluster, one namespace.
 
+> **CronJob manifests are generated** by `make generate` from [`../config/flows.yaml`](../config/flows.yaml). Hand-edits to `agent_cronjob_*.yaml` are rejected by CI's `make verify-generated`. To change a schedule / runner / resource block, edit `flows.yaml` and regenerate.
+
 ## Cluster of record
 
 | | Value | Source |
@@ -24,10 +26,13 @@ The cluster is shared with the sibling `generic_agent` project — that's why th
 |---|---|---|
 | [`namespace.yaml`](namespace.yaml) | Namespace | Creates `campaigner`. Apply once. |
 | [`secrets_template.yaml`](secrets_template.yaml) | Secret | Template with `${VAR}` placeholders. Applied via `envsubst` from `make secrets`. **Never edit with real values committed.** |
-| [`agent_cronjob_daily_observe.yaml`](agent_cronjob_daily_observe.yaml) | CronJob | Flow A — 09:00 IL daily. |
-| [`agent_cronjob_execute_approvals.yaml`](agent_cronjob_execute_approvals.yaml) | CronJob | Flow B — every 15 min. |
-| [`agent_cronjob_weekly_creative.yaml`](agent_cronjob_weekly_creative.yaml) | CronJob | Flow C — Mon 10:00 IL. |
-| [`agent_cronjob_weekly_competitive_research.yaml`](agent_cronjob_weekly_competitive_research.yaml) | CronJob | Flow D — Mon 11:00 IL. |
+| [`agent_cronjob_daily_observe.yaml`](agent_cronjob_daily_observe.yaml) | CronJob | Flow A — 09:00 IL daily. **Generated** from `config/flows.yaml`. |
+| [`agent_cronjob_execute_approvals.yaml`](agent_cronjob_execute_approvals.yaml) | CronJob | Flow B — every 15 min. **Generated.** |
+| [`agent_cronjob_weekly_creative.yaml`](agent_cronjob_weekly_creative.yaml) | CronJob | Flow C — Mon 10:00 IL. **Generated.** |
+| [`agent_cronjob_weekly_competitive_research.yaml`](agent_cronjob_weekly_competitive_research.yaml) | CronJob | Flow D — Mon 11:00 IL. **Generated.** |
+| [`agent_cronjob_weekly_self_audit.yaml`](agent_cronjob_weekly_self_audit.yaml) | CronJob | Flow F — Sun 08:00 IL. **Generated.** |
+| [`agent_cronjob_daily_ab_decisions.yaml`](agent_cronjob_daily_ab_decisions.yaml) | CronJob | Flow G — 09:30 IL daily. **Generated.** |
+| [`agent_cronjob_midday_health_check.yaml`](agent_cronjob_midday_health_check.yaml) | CronJob | Flow H — 13:00 IL daily. **Generated.** |
 | [`web_deployment.yaml`](web_deployment.yaml) | Deployment + Service | Next.js dashboard. |
 | [`web_ingress.yaml`](web_ingress.yaml) | Ingress + ManagedCertificate | Public HTTPS at `campaigner.aiweon.co.il`. Apply only after DNS A-record points to the static IP. |
 | [`webhook_deployment.yaml`](webhook_deployment.yaml) | Deployment + Service | Flask webhook receiver. |
