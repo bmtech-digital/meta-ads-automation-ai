@@ -135,7 +135,7 @@ If `status='no_budget_set'` log the observation anyway (the card uses it to surf
 
 ### Step 0.5: Tracking Health Gate (M1, added 2026-05-12)
 
-Run **before** Step 1 (signals). If Pixel/CAPI is broken, the conversions / CPA / CPL / ROAS / fatigue ratios that Step 1 fetches are unreliable. The agent must not diagnose campaigns or propose scaling on untrusted data. Per PERSONALITY.md, the agent's job is to surface the gap to the operator, not to optimize over noise.
+Run **before** Step 1 (signals). If Pixel/CAPI is broken, the conversions / CPA / CPL / ROAS / fatigue ratios that Step 1 fetches are unreliable. The agent must not diagnose campaigns or propose scaling on untrusted data — surface the gap to the operator instead. Optimizing over noise is a guardrail violation; see `prompts/guardrails.md` and the data-sufficiency rule in `docs/CAMPAIGN_EVALUATION.md` §9.
 
 ```bash
 TRACK_JSON=$(python -m campaigner.tools.check_tracking_health --business-id "$BUSINESS_ID")
@@ -795,7 +795,7 @@ Exit 0.
 
 Marketing agencies send a weekly status report. Until 2026-05-13 the operator had to reconstruct "what did the agent do last week" by scrolling through approvals. Flow F replaces that scroll with one Hebrew narrative: what was proposed, what landed, what got pushed back, what's open, what's next.
 
-This is the visible counterpart to the feedback loop (Step 1.6) — the agent's self-reflection out loud. Personality non-negotiable #5 ("when Roi pushes back, do not defend, revisit") is enforced structurally: if the approval rate is low or rejection themes are clustered, the digest acknowledges it openly.
+This is the visible counterpart to the feedback loop (Step 1.6) — the agent's self-reflection out loud. The rule is enforced structurally, not stylistically: if the approval rate is low or rejection themes are clustered, the digest acknowledges it openly rather than papering over it.
 
 ### Step 1: Load the structured audit
 
@@ -956,7 +956,7 @@ python -m campaigner.tools.propose_task \
   --rationale "..." --urgency urgent
 ```
 
-The agent does NOT auto-propose `pause_campaign` from Flow H. Pause is a meaningful change; surface the spike + the recommended action, let the operator decide. Per PERSONALITY.md §9 ("Israel volatility — ask a human before pausing on CPM spike").
+The agent does NOT auto-propose `pause_campaign` from Flow H. Pause is a meaningful change; surface the spike + the recommended action, let the operator decide. Per `docs/CAMPAIGN_EVALUATION.md` §9 — possible Israel volatility (security event), ask a human before pausing.
 
 ### Step 3: Tracking drift
 

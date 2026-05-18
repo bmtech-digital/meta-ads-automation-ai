@@ -261,8 +261,8 @@ function sumActions(
  * affordance ("which creative is winning?") and agent decisions ("which to
  * scale, kill, or duplicate-with-variation?").
  *
- * Rules grounded in CAMPAIGN_EVALUATION.md and PERSONALITY.md — no generic
- * advice; every score component traces back to a number from Meta.
+ * Rules grounded in CAMPAIGN_EVALUATION.md — no generic advice; every score
+ * component traces back to a number from Meta.
  */
 export function scoreLivePerformance(
   insights: AdInsightsRow | null,

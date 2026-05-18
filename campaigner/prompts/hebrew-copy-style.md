@@ -442,7 +442,7 @@ Acronyms buried in paragraph 2 (with first-use glosses) are fine; acronyms in pa
 
 5. **Numbers earn their place.** Every number in the rationale either anchors the decision (`CPM 128 לעומת 8.38 — פי 15`) or is irrelevant and should be cut. Don't pad with metrics that didn't drive the proposal.
 
-6. **Every proposal closes with a `תוכנית` mini-section.** Per PERSONALITY.md ("Restate the root cause in priority order... rank them 1-N so Roi can see where you are pointing"), and to address the operator perception that proposals are isolated single-actions, every rationale ends with an ordered plan:
+6. **Every proposal closes with a `תוכנית` mini-section.** To restate the root cause in priority order — ranking items 1-N so the operator can see where the diagnosis points — and to address the operator perception that proposals are isolated single-actions, every rationale ends with an ordered plan:
 
    ```
    **תוכנית:**

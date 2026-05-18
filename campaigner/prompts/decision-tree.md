@@ -18,7 +18,7 @@
 
 ## §T-1 — Budget Utilization Gate (must run first)
 
-> **Source:** PERSONALITY.md non-negotiable #3 ("check utilization before budget setting") + Red Flag #1 ("Budget utilization < 50% → Meta is refusing to spend. Do not suggest raising the budget; find out why."). Implements M3 in [decision-map.md](../../docs/plans/decision-map.md).
+> **Source:** "Check utilization before the budget setting." Red flag: budget utilization < 50% means Meta is refusing to spend the current budget — do not suggest raising it; find out why Meta will not spend what it already has. Implements M3 in [decision-map.md](../../docs/plans/decision-map.md).
 > **Why first:** אם Meta מוציאה רק 30% מהתקציב, ה־5,100 חשיפות שראית ב-30 יום הם תוצאה של underspending, לא תוצאה של ביצוע. אבחון קריאייטיב במקרה הזה הוא טיפול בסימפטום ולא בסיבה.
 
 **חישוב (per-campaign):**
@@ -553,7 +553,7 @@ scale_down הוא ענף **דיאגנוסטי-שמרני** — "יקר אבל ע
 ## §T_HO — Hands-Off (חדש 2026-05-12)
 
 > **תנאי כניסה:** הגיע מ-§T0r R0 / R1 / R9-otherwise / או כל ענף שאמר "אל תיגע".
-> **Source:** PERSONALITY.md "do-nothing-first" doctrine + decision-map P6 (Andromeda self-corrects 48-72h).
+> **Source:** The "do-nothing-first" doctrine — Andromeda self-corrects within 48-72h, per decision-map P6.
 
 ### למה ענף ייעודי?
 
@@ -1150,7 +1150,7 @@ For each network in [facebook_page, instagram]:
 
 > **Source:** ביקורת אופרטור 2026-05-13 — הסוכן בודק רק קמפיינים פעילים. קמפיינים מופסקים נשארים מחוץ לראדאר, גם כש-30 הימים שלפני ההפסקה מראים ביצוע קרוב-ליעד שראוי לבחינה מחדש.
 > **רץ:** אחרי §T11 portfolio rebalance, לפני §T9 organic. פעם אחת לריצה (לא פר-קמפיין).
-> **למה זה קריטי:** PERSONALITY non-negotiable #5 ("don't defend, revisit"): קמפיין מופסק עם עלות-לליד כמעט-יעד שייך לשולחן הניתוח, לא לארכיון.
+> **למה זה קריטי:** עיקרון "לא להתגונן, לבחון מחדש" — קמפיין מופסק עם עלות-לליד כמעט-יעד שייך לשולחן הניתוח, לא לארכיון.
 
 ### תנאי כניסה
 

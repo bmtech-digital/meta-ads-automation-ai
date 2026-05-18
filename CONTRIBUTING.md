@@ -10,8 +10,8 @@ Read these in order, **once**:
 
 1. [`README.md`](README.md) — high-level overview.
 2. [`CLAUDE.md`](CLAUDE.md) — project context, architecture, ad accounts, tech stack.
-3. [`docs/PERSONALITY.md`](docs/PERSONALITY.md) — how the agent talks (binding for any prompt/guardrail change).
-4. [`docs/CAMPAIGN_EVALUATION.md`](docs/CAMPAIGN_EVALUATION.md) + [`docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md`](docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md) — the campaign philosophy that drives every decision rule.
+3. [`docs/CAMPAIGN_EVALUATION.md`](docs/CAMPAIGN_EVALUATION.md) + [`docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md`](docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md) — the campaign philosophy that drives every decision rule.
+4. [`campaigner/prompts/hebrew-copy-style.md`](campaigner/prompts/hebrew-copy-style.md) — the voice rules (binding for any prompt or copy change).
 5. The `CLAUDE.md` in the folder you're about to touch — see the [navigation map](CLAUDE.md#-per-folder-navigation-claudemd-in-every-working-directory).
 
 ## Set up your environment

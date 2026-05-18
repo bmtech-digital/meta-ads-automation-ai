@@ -29,9 +29,9 @@ In this order. Don't skim — these are short and load-bearing.
 | 1 | [`README.md`](../README.md) | Product framing, quick-start commands |
 | 2 | [`ARCHITECTURE.md`](ARCHITECTURE.md) (this folder) | The map: services, data, flows, why-each-choice |
 | 3 | [`../CLAUDE.md`](../CLAUDE.md) | Hard rules + per-folder navigation map |
-| 4 | [`PERSONALITY.md`](PERSONALITY.md) | The voice and diagnostic method (binding for any prompt change) |
-| 5 | [`CAMPAIGN_EVALUATION.md`](CAMPAIGN_EVALUATION.md) | The two-gate model — the "is this campaign good?" question |
-| 6 | [`CAMPAIGN_BUILDING_RECOMMENDATIONS.md`](CAMPAIGN_BUILDING_RECOMMENDATIONS.md) | 2026 best practices the agent enforces |
+| 4 | [`CAMPAIGN_EVALUATION.md`](CAMPAIGN_EVALUATION.md) | The two-gate model — the "is this campaign good?" question |
+| 5 | [`CAMPAIGN_BUILDING_RECOMMENDATIONS.md`](CAMPAIGN_BUILDING_RECOMMENDATIONS.md) | 2026 best practices the agent enforces |
+| 6 | [`../campaigner/prompts/hebrew-copy-style.md`](../campaigner/prompts/hebrew-copy-style.md) | Hebrew voice rules — binding for any prompt or operator-facing output |
 
 That's ~90 minutes of reading. Don't write code before you've done this once.
 
@@ -252,7 +252,7 @@ If you're stuck for >30 minutes: ask Roi. Don't disappear into the docs alone.
 |---|---|
 | Product / business intent | Roi |
 | Architecture / spec | First read [`ARCHITECTURE.md`](ARCHITECTURE.md), then [`plans/campaigner-spec.md`](plans/campaigner-spec.md), then ask Roi |
-| Why a particular guardrail / decision rule | [`CAMPAIGN_EVALUATION.md`](CAMPAIGN_EVALUATION.md) and [`PERSONALITY.md`](PERSONALITY.md) |
+| Why a particular guardrail / decision rule | [`CAMPAIGN_EVALUATION.md`](CAMPAIGN_EVALUATION.md), [`../campaigner/prompts/guardrails.md`](../campaigner/prompts/guardrails.md), [`../campaigner/prompts/performance-brain.md`](../campaigner/prompts/performance-brain.md) |
 | Past decisions and their reasoning | [`plans/decisions-log.md`](plans/decisions-log.md) |
 | What's currently being built | [`plans/cheeky-seeking-blossom.md`](plans/cheeky-seeking-blossom.md) |
 | Anything Hebrew copy related | [`campaigner/prompts/hebrew-copy-style.md`](../campaigner/prompts/hebrew-copy-style.md) |

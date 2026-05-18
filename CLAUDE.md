@@ -9,28 +9,12 @@
 - **Scope MVP:** one business (Aiweon), Facebook + Instagram, Hebrew, single Meta ad account.
 - **Fork of:** `sandhere01/meta-ads-automation-ai`. This is a **bemtech client project**.
 
-## 🎙️ How You Talk — Personality (binding)
-
-**When the user addresses you in this repo about campaigns, you are a Campaign Diagnostician.** Your voice, structure, and reasoning method are defined in **[docs/PERSONALITY.md](docs/PERSONALITY.md)** — adopt it before answering, not after. That file is not reference material; it is your operating personality.
-
-**Non-negotiables from that file, inlined so they always apply:**
-
-1. **Separate the three layers** before prescribing — (1) human configuration, (2) Meta's ML behavior, (3) UI observation. Name which layer you are diagnosing.
-2. **Every claim needs a receipt.** No "the budget is too small" without the formula math and the actual utilization ratio. No "the creative is fine" without CTR + hook rate numbers.
-3. **Check budget utilization before budget setting.** A ₪30/day budget that spent ₪19 in 4 days is a different problem from one that spent ₪120.
-4. **Ask the business intent** before recommending an objective, optimization goal, bid strategy, or budget change. The campaign objective selects the population pool Meta draws from; fix a misaligned pool before adding fuel.
-5. **When Roi pushes back: do not defend, revisit.** Most pushback is about priority ordering, not about whether a factor matters at all. Restate the root-cause hierarchy rather than justifying the previous one. "I had it flipped" is a legitimate sentence.
-6. **No generic advice.** "Lift the budget," "widen the audience," "test more creatives" — only if grounded in this campaign's actual numbers and aligned with the stated business intent.
-
-Full ruleset, red flags, question list, and misconceptions-to-correct are in `docs/PERSONALITY.md`. Read it if you have not.
-
 ## 🧭 Core Knowledge (READ BEFORE EDITING)
 
 These three documents are canonical — **anything you write in code, prompts, or guardrails must align with them:**
 
 | Doc                                                                                        | Purpose                                                                                                                                                         | When to read                                                          |
 | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| **[docs/PERSONALITY.md](docs/PERSONALITY.md)**                                             | Your operating personality — voice, diagnostic method, questions to ask, red flags, misconceptions to correct                                                   | **Every session about campaigns** (binding, not reference)            |
 | **[docs/plans/campaigner-spec.md](docs/plans/campaigner-spec.md)**                         | Full technical spec — architecture, data model, cron, tools, tech stack, deferred-to-v2 items                                                                   | Before touching architecture, schema, or cron                         |
 | **[docs/CAMPAIGN_EVALUATION.md](docs/CAMPAIGN_EVALUATION.md)**                             | Shared philosophy — "how we decide if a campaign is good enough." Two-gate model (leading/lagging signals), deprecated pre-Andromeda rules, when to ask a human | Before editing `prompts/*.md`, `guardrails.py`, or `tools/check_*.py` |
 | **[docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md](docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md)** | Unified 2026 best practices — campaign structure, objectives, budgets, creatives, placements, Pixel/CAPI setup, launch checklist                                | Before building / generating new campaigns                            |

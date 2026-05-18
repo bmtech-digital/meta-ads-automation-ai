@@ -293,7 +293,7 @@ A jump > 30% → rejection.
 
 **Rule:** A campaign that the user marked under `businesses.monthly_brief.hands_off_campaign_ids` for the current month → no `scale_up` / `scale_down` / `pause_campaign` / `new_creative` / `expand_audience` / `budget_change` proposals. **Allowed:** `alert` (if something needs attention) and `observation` (logged to `agent_decisions` as usual).
 
-**Why:** PERSONALITY non-negotiable #4 — "Ask the business intent before recommending." When the user manually flagged "hands off," the agent should respect that, even when the numbers justify action. The user knows something the agent doesn't (a parallel process, a conservative experiment, business sensitivity).
+**Why:** Ask the business intent before recommending. When the user has manually flagged "hands off," the agent respects that even when the numbers justify action. The user knows something the agent doesn't (a parallel process, a conservative experiment, business sensitivity).
 
 **How to check:** In Flow A Step 1 the agent loads `load_business_knowledge` and gets `monthly_brief_summary`. If the campaign on deck is in `hands_off_campaign_ids` **and** `is_current_month == true` (brief isn't stale) → log SKIP with rationale="hands_off_per_monthly_brief".
 

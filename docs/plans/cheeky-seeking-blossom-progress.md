@@ -86,5 +86,5 @@ _(empty — populate as implementation progresses)_
 - Plan: [cheeky-seeking-blossom.md](cheeky-seeking-blossom.md)
 - Backlog (tiers 2 & 3): [decision-map.md](decision-map.md)
 - Parent spec: [campaigner-spec.md](campaigner-spec.md)
-- Personality binding: [../PERSONALITY.md](../PERSONALITY.md)
+- Hebrew voice rules: [../../campaigner/prompts/hebrew-copy-style.md](../../campaigner/prompts/hebrew-copy-style.md)
 - Evaluation philosophy: [../CAMPAIGN_EVALUATION.md](../CAMPAIGN_EVALUATION.md)

@@ -157,8 +157,9 @@ The MVP tooling (`campaigner/tools/`, `lib/`, the schema) is reused; only the or
 |---|---|
 | Onboard as a new contributor | [`ONBOARDING.md`](ONBOARDING.md) |
 | Hard rules + non-negotiables | [`../CLAUDE.md`](../CLAUDE.md) |
-| Agent personality + diagnostic method | [`PERSONALITY.md`](PERSONALITY.md) |
 | Two-gate evaluation philosophy | [`CAMPAIGN_EVALUATION.md`](CAMPAIGN_EVALUATION.md) |
+| Agent diagnostic method (per-flow) | [`../campaigner/prompts/performance-brain.md`](../campaigner/prompts/performance-brain.md), [`../campaigner/prompts/decision-tree.md`](../campaigner/prompts/decision-tree.md) |
+| Hebrew voice + operator-facing rationale | [`../campaigner/prompts/hebrew-copy-style.md`](../campaigner/prompts/hebrew-copy-style.md) |
 | Campaign-building best practices (2026) | [`CAMPAIGN_BUILDING_RECOMMENDATIONS.md`](CAMPAIGN_BUILDING_RECOMMENDATIONS.md) |
 | Full technical spec (heavy) | [`plans/campaigner-spec.md`](plans/campaigner-spec.md) |
 | What's actively being built | [`plans/cheeky-seeking-blossom.md`](plans/cheeky-seeking-blossom.md) |

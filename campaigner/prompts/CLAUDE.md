@@ -32,7 +32,7 @@ The cron one-line summary that goes to stdout is **English** — operators tail 
 
 ## Editing rules
 
-1. **Anything you write here must align with [the three canonical docs](../../CLAUDE.md#-core-knowledge-read-before-editing):** `PERSONALITY.md`, `CAMPAIGN_EVALUATION.md`, `CAMPAIGN_BUILDING_RECOMMENDATIONS.md`. If a prompt drifts from those, fix the prompt — not the canonical doc.
+1. **Anything you write here must align with [the canonical docs](../../CLAUDE.md#-core-knowledge-read-before-editing):** `CAMPAIGN_EVALUATION.md` (two-gate philosophy) and `CAMPAIGN_BUILDING_RECOMMENDATIONS.md` (2026 best practices). If a prompt drifts from those, fix the prompt — not the canonical doc.
 2. **Section numbering is referenced from code and other prompts.** `decision-tree.md` §17, `guardrails.md` §14, `performance-brain.md` §6.4, `hebrew-copy-style.md` §11 — these section numbers appear in [`CAMPAIGNER.md`](../CAMPAIGNER.md), tools, and tests. If you renumber, grep first and update every caller.
 3. **Hebrew prompt content stays in Hebrew.** Don't translate examples to English to "make them clearer to Claude" — that erodes the voice rules.
 4. **Deprecated rules (CAMPAIGN_EVALUATION.md §8) must never reappear.** No "frequency > 3 = kill", no "1 ad set = 1 ad", no manual creative pruning in 48h. If a prompt sneaks one back, push back.
@@ -49,7 +49,7 @@ The cron one-line summary that goes to stdout is **English** — operators tail 
 
 | Question | Read |
 |---|---|
-| The three canonical reference docs | [`../../docs/PERSONALITY.md`](../../docs/PERSONALITY.md), [`../../docs/CAMPAIGN_EVALUATION.md`](../../docs/CAMPAIGN_EVALUATION.md), [`../../docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md`](../../docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md) |
+| The canonical reference docs | [`../../docs/CAMPAIGN_EVALUATION.md`](../../docs/CAMPAIGN_EVALUATION.md), [`../../docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md`](../../docs/CAMPAIGN_BUILDING_RECOMMENDATIONS.md) |
 | Why a guardrail looks the way it does | [`../../docs/CAMPAIGN_EVALUATION.md`](../../docs/CAMPAIGN_EVALUATION.md) |
 | Where guardrails are also enforced in code | [`../tools/check_guardrails.py`](../tools/check_guardrails.py) |
 | What the agent does with these | [`../CAMPAIGNER.md`](../CAMPAIGNER.md) |

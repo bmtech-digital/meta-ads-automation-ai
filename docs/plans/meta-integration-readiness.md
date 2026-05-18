@@ -361,4 +361,4 @@ Phase-2 doc: `docs/plans/meta-webhooks-phase2.md` (not yet written).
 | Business Verification status | [`task-2.4-bemtech-bv.md`](task-2.4-bemtech-bv.md) |
 | Token expiry behaviour today | [`../../web/src/lib/token-expiry.ts`](../../web/src/lib/token-expiry.ts) |
 | Tracking pre-flight guardrail | [`../../migrations/008_schema_additions.sql`](../../migrations/008_schema_additions.sql) §2 |
-| HITL invariant | [root `CLAUDE.md`](../../CLAUDE.md) "How You Talk" + [`web/CLAUDE.md`](../../web/CLAUDE.md) "What NOT to do" |
+| HITL invariant | [root `CLAUDE.md`](../../CLAUDE.md) (HITL section) + [`web/CLAUDE.md`](../../web/CLAUDE.md) "What NOT to do" |
