@@ -62,6 +62,82 @@ Then read **only the files marked ✅ for your flow**:
 
 ---
 
+## Thresholds — Reference (PRD Step 3)
+
+<!-- BEGIN GENERATED:thresholds:schema-version -->
+**Thresholds schema version:** `1.0.0` — stamped on every `agent_decisions` row this run writes. Tune values in [`config/thresholds.yaml`](../config/thresholds.yaml); renames bump the second digit, value tweaks bump the third.
+<!-- END GENERATED:thresholds:schema-version -->
+
+Markdown prose references thresholds by name (`{{<domain>.<name>}}`) — never by literal. The table below is the resolution map: any `{{x.y}}` you see in a prompt resolves to the **Value** column. The schema version above is stamped on every `agent_decisions` row this run writes, so a past decision can always be re-evaluated against the threshold snapshot that was loaded for it.
+
+> **Source of truth:** [`config/thresholds.yaml`](../config/thresholds.yaml). Hand-edits to this table are overwritten by `make generate`.
+
+<!-- BEGIN GENERATED:thresholds:reference-table -->
+| Name | Value | Description |
+| --- | --- | --- |
+| **`anti_flood.*`** | | |
+| `{{anti_flood.budget_tier_small_ils}}` | 50 ILS | Daily-budget ceiling for the small tier — below this the agent caps at `max_proposals_small`. |
+| `{{anti_flood.budget_tier_medium_ils}}` | 500 ILS | Daily-budget ceiling for the medium tier — 50–500 caps at `max_proposals_medium`; above caps at `max_proposals_large`. |
+| `{{anti_flood.max_proposals_small}}` | 2 | Max proposals/day when `daily_budget_ils < budget_tier_small_ils`. |
+| `{{anti_flood.max_proposals_medium}}` | 5 | Max proposals/day when `daily_budget_ils` is between the small and medium tiers. |
+| `{{anti_flood.max_proposals_large}}` | 10 | Max proposals/day when `daily_budget_ils > budget_tier_medium_ils`. |
+| **`gate_1.*`** | | |
+| `{{gate_1.hook_rate_good_pct}}` | 35% | Hook rate above this = winner potential. Iterate variants. |
+| `{{gate_1.hook_rate_kill_pct}}` | 25% | Hook rate below this after the evaluation window = kill / add new angle. |
+| `{{gate_1.ctr_good_pct}}` | 2% | CTR above this = leading signal of winner. |
+| `{{gate_1.ctr_kill_pct}}` | 1% | CTR below this with sufficient volume = kill (offer/CTA broken). |
+| `{{gate_1.thumbstop_good_pct}}` | 30% | Thumb-stop rate above this = winner-grade engagement. |
+| `{{gate_1.thumbstop_kill_pct}}` | 20% | Thumb-stop rate below this after the evaluation window = kill. |
+| `{{gate_1.impressions_floor}}` | 1000 | Per-creative impressions floor for Gate 1 reliability. |
+| `{{gate_1.clicks_floor}}` | 50 | Per-creative clicks floor for CTR reliability. |
+| `{{gate_1.evaluation_window_hours}}` | 48 hours | Time floor before reading Gate 1 signals — earlier reads are Meta-delivery ramp, not signal. |
+| **`gate_2.*`** | | |
+| `{{gate_2.winner_ratio}}` | 0.85× | Winner-grade: CPA ≤ target × this ratio (with utilization + hook qualifiers). |
+| `{{gate_2.baseline_band_pct}}` | 15% | Average lane: KPI within ± this percent of target/baseline. |
+| `{{gate_2.expensive_threshold}}` | 1.3× | Loser / expensive-but-stable: CPA > target × this sustained for `expensive_sustained_days`. |
+| `{{gate_2.emergency_threshold}}` | 3.0× | Emergency Pause: CPA > target × this triggers urgent pause regardless of other signals. |
+| `{{gate_2.expensive_sustained_days}}` | 5 days | Days the expensive threshold must hold before the loser lane fires. |
+| `{{gate_2.emergency_zero_conv_days}}` | 3 days | Days at full budget with zero conversions before Emergency Pause fires. |
+| `{{gate_2.fatigue_cpr_multiple}}` | 2.0× | Meta Creative Fatigue flag: current CPR ≥ this × prior-window CPR. |
+| `{{gate_2.ab_test_significance_pct}}` | 95% | Statistical significance required to declare an A/B winner (or volume equivalent). |
+| **`learning.*`** | | |
+| `{{learning.min_conversions_for_exit}}` | 50 | Conversions in 7-day window required to exit LEARNING. Drives `budget_daily_min_ils = CPA × this / 7`. |
+| `{{learning.max_days_before_limited}}` | 7 days | Days a campaign can stay below the conversion floor before flipping to LEARNING_LIMITED. |
+| **`utilization.*`** | | |
+| `{{utilization.severely_under_ceiling}}` | 0.5 | Utilization below this = `severely_under` — Meta refusing to spend the budget. |
+| `{{utilization.under_ceiling}}` | 0.8 | Utilization below this (and above `severely_under_ceiling`) = `under`. |
+| `{{utilization.healthy_ceiling}}` | 1.05 | Utilization at or below this = `healthy`. Above = `over` (single-day overspend; Meta will rebalance). |
+| `{{utilization.new_creative_floor}}` | 0.5 | Guardrails §19: `new_creative` is rejected when `utilization_7d < this` (the existing pool isn't being seen — adding more variants won't help). |
+| **`scaling.*`** | | |
+| `{{scaling.scale_up_branch_a_pct}}` | 30% | Strict winner (CPA × `winner_ratio_strict` + hook > Gate-1-good + freq < `solid_strong_freq_ceiling`): scale_up by this. |
+| `{{scaling.scale_up_branch_b_pct}}` | 20% | Default winner: scale_up by this when the strict-winner conditions aren't fully met. |
+| `{{scaling.scale_up_branch_c_pct}}` | 15% | Solid-strong (CPA ~target + utilization ≥ `solid_strong_util_floor`): conservative scale_up. |
+| `{{scaling.scale_up_default_cap_pct}}` | 20% | Guardrails §4: default ceiling on a single daily-budget increase. |
+| `{{scaling.scale_up_strict_cap_pct}}` | 30% | Guardrails §4: ceiling when hook + frequency + ACTIVE conditions are all met. |
+| `{{scaling.scale_down_step_pct}}` | 15% | Guardrails §22: max single-step scale_down. |
+| `{{scaling.cooldown_hours}}` | 72 hours | Router §T0r R0 cooldown — hours since the last campaign edit before another structural change is allowed. |
+| `{{scaling.cadence_window_days}}` | 7 days | Guardrails §20: max one scale_up per campaign per this many days. |
+| `{{scaling.marginal_return_min_lift}}` | 1.1× | Guardrails §21: a prior scale_up must have produced ≥ this × prior conversions before another scale_up is allowed. |
+| `{{scaling.marginal_return_lookback_days}}` | 14 days | Guardrails §21: window over which the prior scale_up's effect is measured. |
+| `{{scaling.consecutive_scale_down_window_days}}` | 14 days | Guardrails §23: a campaign that had a scale_down within this window cannot get another. |
+| **`ab_test.*`** | | |
+| `{{ab_test.min_variants}}` | 2 | Guardrails §29: minimum creative variants per A/B test. |
+| `{{ab_test.max_variants}}` | 4 | Guardrails §29: maximum creative variants per A/B test (more = sample-per-variant too thin). |
+| `{{ab_test.min_window_days}}` | 7 days | Guardrails §30: minimum A/B test window before `ab_test_decide` is allowed. |
+| **`solid_strong.*`** | | |
+| `{{solid_strong.util_floor}}` | 0.95 | Solid-strong utilization floor (utilization ≥ this for the lane to qualify). |
+| `{{solid_strong.freq_ceiling}}` | 2.5 | Solid-strong frequency ceiling (freq < this for the lane to qualify). |
+| `{{solid_strong.hook_floor}}` | 0.3 | Solid-strong hook-rate floor (hook > this for the lane to qualify). |
+| **`portfolio.*`** | | |
+| `{{portfolio.safety_cap_ils}}` | 200 ILS | Hard ceiling on a single rebalance daily movement. |
+| `{{portfolio.delta_floor_ils}}` | 10 ILS | Floor below which a rebalance is noise — log SKIP. |
+| **`feedback.*`** | | |
+| `{{feedback.prior_rejection_lookback_days}}` | 60 days | Guardrails §37: window over which prior operator rejections constrain new proposals on the same (task_type, target). |
+| `{{feedback.active_plan_window_days}}` | 21 days | Guardrails §39: window over which an active plan binds the agent to advance or explicitly skip. |
+<!-- END GENERATED:thresholds:reference-table -->
+
+---
+
 ## Tool-call discipline (focused-run lever #4 — added 2026-05-17)
 
 **Within a single run, never call the same tool with the same arguments twice.** Each redundant call costs 1-2k tokens of tool result text re-entering the cache for every subsequent turn. A run that calls `load_business_knowledge` three times pays for that decision three times *and* compounds it across the remaining tool turns.
@@ -480,13 +556,13 @@ Pending: `check_guardrails.py` will formalize this as a programmatic check. Unti
 
 ### Step 5: Anti-flood prioritization (§8.3)
 
-Count total surviving proposals. Enforce the daily cap based on business daily budget:
+Count total surviving proposals. Enforce the daily cap based on business daily budget (values resolve via the Thresholds Reference above):
 
 | daily_budget_ils | max proposals/day |
 | ---------------- | ----------------- |
-| < 50             | 2                 |
-| 50 – 500         | 5                 |
-| > 500            | 10                |
+| < `{{anti_flood.budget_tier_small_ils}}`             | `{{anti_flood.max_proposals_small}}`                 |
+| `{{anti_flood.budget_tier_small_ils}}` – `{{anti_flood.budget_tier_medium_ils}}`         | `{{anti_flood.max_proposals_medium}}`                 |
+| > `{{anti_flood.budget_tier_medium_ils}}`            | `{{anti_flood.max_proposals_large}}`                |
 
 If over cap, keep the top-urgency + top-impact ones. For each dropped proposal, log a `rejection` with rationale `"anti_flood_cap"`.
 

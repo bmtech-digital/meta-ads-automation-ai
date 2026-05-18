@@ -40,9 +40,9 @@ help:
 	@echo "  make web_ingress             - Apply ingress + ManagedCertificate (after DNS is set)"
 	@echo "  make all                     - Full stack: namespace + secrets + GCP creds + agent + web + webhook"
 	@echo ""
-	@echo "Generated artifacts (config/flows.yaml -> manifests + docs):"
-	@echo "  make generate         - Regenerate cronjob YAMLs + the routing/matrix tables in CAMPAIGNER.md + ARCHITECTURE.md"
-	@echo "  make verify-generated - CI check: exit 1 if generated files have drifted from config/flows.yaml"
+	@echo "Generated artifacts (config/*.yaml -> manifests + docs + lib constants):"
+	@echo "  make generate         - Regenerate from config/flows.yaml AND config/thresholds.yaml"
+	@echo "  make verify-generated - CI check: exit 1 on drift between any source YAML and its derivatives"
 	@echo ""
 	@echo "Inspection:"
 	@echo "  make status           - Show deployments, pods, services, cronjobs, ingress"
@@ -161,17 +161,26 @@ webhook_restart:
 webhook_logs:
 	kubectl logs -n $(NAMESPACE) -l app=webhook --tail=100 -f
 
-# --- Generated artifacts (config/flows.yaml -> manifests + docs) ---
+# --- Generated artifacts (config/*.yaml -> manifests + docs + lib constants) ---
 
-# `make generate` regenerates kubefiles/agent_cronjob_*.yaml and the
-# routing / matrix / flow-index tables inside CAMPAIGNER.md and
-# ARCHITECTURE.md from config/flows.yaml. Idempotent. Run after every
-# edit to config/flows.yaml; CI's `make verify-generated` rejects drift.
+# `make generate` regenerates everything derived from config/*.yaml:
+#   - flows.yaml      -> kubefiles/agent_cronjob_*.yaml, the routing /
+#                        matrix / flow-index tables inside CAMPAIGNER.md
+#                        and ARCHITECTURE.md.
+#   - thresholds.yaml -> the Thresholds Reference table + schema-version
+#                        banner inside CAMPAIGNER.md, plus the Python
+#                        constants module campaigner/lib/thresholds.py
+#                        (consumed by log_decision.py for schema-version
+#                        stamping).
+# Idempotent. Run after every edit to a source YAML; CI's
+# `make verify-generated` rejects drift.
 generate:
 	python3 scripts/generate_from_flows.py
+	python3 scripts/generate_from_thresholds.py
 
 verify-generated:
 	python3 scripts/generate_from_flows.py --check
+	python3 scripts/generate_from_thresholds.py --check
 
 # --- Cluster setup ---
 

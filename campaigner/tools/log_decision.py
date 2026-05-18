@@ -14,6 +14,7 @@ import argparse
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import get_connection
+from campaigner.lib.thresholds import SCHEMA_VERSION as THRESHOLDS_SCHEMA_VERSION
 from campaigner.tools._contract import (
     emit_runtime_error,
     emit_success,
@@ -112,14 +113,16 @@ def main() -> None:
                     summary, rationale, inputs, outputs,
                     related_approval_id, campaign_id, adset_id, ad_id,
                     llm_model, llm_tokens_in, llm_tokens_out, latency_ms,
-                    guardrail_violations, confidence
+                    guardrail_violations, confidence,
+                    thresholds_schema_version
                 )
                 VALUES (
                     %s, %s, %s, %s, %s,
                     %s, %s, %s::jsonb, %s::jsonb,
                     %s, %s, %s, %s,
                     %s, %s, %s, %s,
-                    %s, %s
+                    %s, %s,
+                    %s
                 )
                 RETURNING id, created_at
                 """,
@@ -143,6 +146,7 @@ def main() -> None:
                     args.latency_ms,
                     violations,
                     args.confidence,
+                    THRESHOLDS_SCHEMA_VERSION,
                 ),
             )
             return cur.fetchone()
@@ -162,6 +166,7 @@ def main() -> None:
             "node_name": args.node_name,
             "decision_type": args.decision_type,
             "created_at": row["created_at"].isoformat(),
+            "thresholds_schema_version": THRESHOLDS_SCHEMA_VERSION,
         }
     )
 

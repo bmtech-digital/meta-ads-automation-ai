@@ -34,15 +34,15 @@ utilization       = spend_window_ils / expected_window
 
 | Utilization | Status | משמעות |
 | --- | --- | --- |
-| < 50% | `severely_under` | Meta מסרבת להוציא את התקציב. בעיית alignment ברורה — pool, audience, או auction. |
-| 50% – 80% | `under` | Meta מוציאה חלק; בודקים למה לא הכל. |
-| 80% – 105% | `healthy` | תקציב נצרך כראוי. עוברים ל-§T0. |
-| > 105% | `over` | overspend בודד — Meta תאזן ביום הבא; לא action בלעדי. |
+| < {{utilization.severely_under_ceiling}} | `severely_under` | Meta מסרבת להוציא את התקציב. בעיית alignment ברורה — pool, audience, או auction. |
+| {{utilization.severely_under_ceiling}} – {{utilization.under_ceiling}} | `under` | Meta מוציאה חלק; בודקים למה לא הכל. |
+| {{utilization.under_ceiling}} – {{utilization.healthy_ceiling}} | `healthy` | תקציב נצרך כראוי. עוברים ל-§T0. |
+| > {{utilization.healthy_ceiling}} | `over` | overspend בודד — Meta תאזן ביום הבא; לא action בלעדי. |
 
 ```
 §T-1: Budget Utilization
   │
-  ├─ status == "severely_under" (utilization < 50%)
+  ├─ status == "severely_under" (utilization < {{utilization.severely_under_ceiling}})
   │  │  פעולה ראשונה: אבחן למה. **בלוק קשיח על `task_type=new_creative`** — אסור להציע
   │  │  וריאנט חדש כשהבעיה היא שאף אחד לא רואה את הקיים. הוסף קריאייטיב = לזרוק עוד דליים
   │  │  למאגר ריק. (guardrail: `no_new_creative_when_underspending` יפסול.)
@@ -66,16 +66,16 @@ utilization       = spend_window_ils / expected_window
   │        propose alert task_type="alert" עם rationale שמבקש מהמשתמש לבחון
   │        edits אחרונים / Learning reset.
   │
-  ├─ status == "under" (50%-80%)
+  ├─ status == "under" ({{utilization.severely_under_ceiling}}-{{utilization.under_ceiling}})
   │  └─ פעולה: מותר להמשיך ל-§T0, **אבל** ה-rationale של כל הצעה שתיצור מ-§T0 והלאה
   │     **חייב לפתוח** במשפט שמסביר שהתקציב לא נוצל במלואו: "המודעה רצה 7 ימים והוציאה
   │     ₪X מתוך ₪Y מתוכננים (Z%). אנחנו ממליצים גם על [פעולה] כדי לעזור ל-Meta לנצל
   │     את התקציב הקיים." זה דורש מהסוכן להראות receipts גם כשהוא ממשיך, לא לדלג עליהם.
   │
-  ├─ status == "healthy" (80%-105%)
+  ├─ status == "healthy" ({{utilization.under_ceiling}}-{{utilization.healthy_ceiling}})
   │  └─ פעולה: עבור ל-§T0 כרגיל. תיעד utilization ב-`inputs` של ה-diagnosis decision.
   │
-  └─ status == "over" (>105%)
+  └─ status == "over" (>{{utilization.healthy_ceiling}})
      └─ פעולה: monitoring only. אל תציע scale-down על overspend בודד; Meta תאזן ביום
         הבא. אם over נמשך 3+ ימים → טפל תחת §T2 winner branch.
 ```
@@ -182,7 +182,7 @@ This is enforced by [guardrails.md §26 rationale content check](guardrails.md#2
 | `cpa_vs_target` (או cpl/roas) | `business.primary_kpi` + יעד | `load_business_knowledge.kpi_target.target_value`. **אם null → קרא ל-`estimate_cpl --business-id $BID --campaign-name "$CAMPAIGN_NAME"` קודם** (חוסך WebSearch + מבטיח התאמת תת-ורטיקל לקמפיין הספציפי; ראה §T-2.1 למטה). אם הוא מחזיר `needs_live_research=false` — הצע `set_kpi_target` עם ה-`research_block` שלו ועקב את הברנצ'. אם `needs_live_research=true` או `confidence_of_match=fallback` → המשך לפי §26 נתיב B (WebSearch חי) או log SKIP. `fetch_insights.actions` ל-current. |
 | `hook_rate_top` | Meta insights ad-level | `fetch_insights --level ad --days 7` → max(video_play_actions/impressions) |
 | `frequency_7d` | Meta insights | `fetch_insights --level campaign --days 7` |
-| `fatigue_flag` | computed locally | `check_creative_fatigue --business-id ... --days 7` (Block 5, 2026-05-12). Per-ad ratio current_cpr / prior_cpr ≥ 2.0 → flag. Aggregate `any_fatigue` at campaign level. |
+| `fatigue_flag` | computed locally | `check_creative_fatigue --business-id ... --days 7` (Block 5, 2026-05-12). Per-ad ratio current_cpr / prior_cpr ≥ {{gate_2.fatigue_cpr_multiple}} → flag. Aggregate `any_fatigue` at campaign level. |
 | `hours_since_last_edit` | Meta object state | `fetch_meta_state.hours_since_last_edit` |
 | `active_creative_count` | DB + insights | `list_active_creatives --with-performance --perf-days 7` returns `active_with_impressions_count` (creatives with impressions ≥ 100 in window). This is the §T_PE threshold metric. |
 | `days_since_last_creative_add` | DB | `list_active_creatives` order by `created_at DESC LIMIT 1` |
@@ -194,11 +194,11 @@ This is enforced by [guardrails.md §26 rationale content check](guardrails.md#2
 ```
 §T0r: classify campaign C
   │
-  ├─ R0  hours_since_last_edit < 72h
+  ├─ R0  hours_since_last_edit < {{scaling.cooldown_hours}}h
   │       → lane: hands_off                              (§T_HO branch "post_edit_cooldown")
-  │       why: כל שינוי מאפס למידה. 72 שעות הן זמן ה-re-stabilization של Andromeda.
+  │       why: כל שינוי מאפס למידה. {{scaling.cooldown_hours}} שעות הן זמן ה-re-stabilization של Andromeda.
   │
-  ├─ R1  campaign_status == LEARNING (≤ 7d ו-conversions_7d < 50)
+  ├─ R1  campaign_status == LEARNING (≤ {{learning.max_days_before_limited}}d ו-conversions_7d < {{learning.min_conversions_for_exit}})
   │       → lane: hands_off                              (existing §T4 logic)
   │       why: guardrail `no_learning_phase_touch` חוסם הכל ממילא; אין טעם לנתח.
   │
@@ -206,34 +206,34 @@ This is enforced by [guardrails.md §26 rationale content check](guardrails.md#2
   │       → lane: targeted_intervention                  (existing §T5 logic)
   │       why: יציאה מ-Learning דורשת או scale_up עד min_budget או expand_audience.
   │
-  ├─ R3  utilization_7d < 0.5                            (severely under)
+  ├─ R3  utilization_7d < {{utilization.severely_under_ceiling}}                            (severely under)
   │       → lane: pool_misalignment                      (§T-1 severely_under branch)
   │       why: כל פעולה אחרת לפני שמתקנים pool/audience זריקת תקציב.
   │
   ├─ R4  fatigue_flag == true
   │       → lane: creative_refresh_candidate             (§T1 fatigue branch — firehose 3-5)
   │
-  ├─ R5  cpa_vs_target > 3.0  AND  conversions_7d == 0  (3+ ימים)
+  ├─ R5  cpa_vs_target > {{gate_2.emergency_threshold}}  AND  conversions_7d == 0  ({{gate_2.emergency_zero_conv_days}}+ ימים)
   │       → lane: emergency_pause                        (§T1 emergency)
   │
-  ├─ R6  cpa_vs_target > 1.3 sustained 5+ days
+  ├─ R6  cpa_vs_target > {{gate_2.expensive_threshold}} sustained {{gate_2.expensive_sustained_days}}+ days
   │     │
-  │     ├─ AND CTR > 2% AND no conversions  → lane: landing_page_issue  (§T1 alert)
-  │     ├─ AND CTR < 1%                     → lane: creative_refresh    (§T1 CTR-low branch)
+  │     ├─ AND CTR > {{gate_1.ctr_good_pct}}% AND no conversions  → lane: landing_page_issue  (§T1 alert)
+  │     ├─ AND CTR < {{gate_1.ctr_kill_pct}}%                     → lane: creative_refresh    (§T1 CTR-low branch)
   │     └─ otherwise                         → lane: scale_down_candidate (§T_SD)
   │
   ├─ R7  active_creative_count < 5  OR  days_since_last_creative_add > 7
   │       → lane: creative_pool_exhausted                (§T_PE — firehose 3-5 מ-creative-guide §7)
   │       why: ענה לבקשת הלקוח "אין לי עם מה לעבוד". אסור לפעול עד שיש מאגר.
   │
-  ├─ R8  cpa_vs_target ≤ 1.0  AND  utilization_7d ≥ 0.95
-  │       AND  frequency_7d < 2.5
-  │       AND  hook_rate_top > 0.30
+  ├─ R8  cpa_vs_target ≤ 1.0  AND  utilization_7d ≥ {{solid_strong.util_floor}}
+  │       AND  frequency_7d < {{solid_strong.freq_ceiling}}
+  │       AND  hook_rate_top > {{solid_strong.hook_floor}}
   │       AND  fatigue_flag == false
   │       → lane: scale_up_candidate                     (§T2+ — extended winner branch)
   │       why: קמפיין חזק עם מקום לצמיחה. כפוף ל-marginal-return guard ול-cadence cap.
   │
-  ├─ R9  utilization_7d > 1.05  sustained 3+ days
+  ├─ R9  utilization_7d > {{utilization.healthy_ceiling}}  sustained 3+ days
   │     │
   │     ├─ AND winner-grade (R8 conditions also true)  → lane: scale_up_candidate (R8)
   │     └─ otherwise                                     → lane: hands_off (§T_HO "sustained_over_no_winner")
@@ -268,22 +268,22 @@ python -m campaigner.tools.log_decision \
 ```
 FOR EACH active creative:
 
-  ┌─ data sufficient? (≥ 1,000 impressions AND ≥ 50 clicks)
+  ┌─ data sufficient? (≥ {{gate_1.impressions_floor}} impressions AND ≥ {{gate_1.clicks_floor}} clicks)
   │  └─ לא → log SKIP, wait for volume, המשך לקריאייטיב הבא
   │
-  ├─ Hook rate < 25% אחרי 48h?
+  ├─ Hook rate < {{gate_1.hook_rate_kill_pct}}% אחרי {{gate_1.evaluation_window_hours}}h?
   │  └─ מסקנה: לא עוצר גלילה
   │     action: KILL creative (pause), propose new_creative עם hook שונה (§7.5)
   │
-  ├─ CTR < 1% עם ≥ 1,000 חשיפות?
+  ├─ CTR < {{gate_1.ctr_kill_pct}}% עם ≥ {{gate_1.impressions_floor}} חשיפות?
   │  └─ מסקנה: הנעה לפעולה חלשה / חוסר התאמה לקהל
   │     action: KILL creative, propose new_creative עם angle אחר
   │
-  ├─ Hook 25-35% + CTR תקין?
+  ├─ Hook {{gate_1.hook_rate_kill_pct}}-{{gate_1.hook_rate_good_pct}}% + CTR תקין?
   │  └─ מסקנה: solid — תן זמן
   │     action: אל תיגע. log SKIP. חוזר בסבב הבא.
   │
-  └─ Hook > 35% + CTR > 2%?
+  └─ Hook > {{gate_1.hook_rate_good_pct}}% + CTR > {{gate_1.ctr_good_pct}}%?
      └─ מסקנה: winner potential
         action: propose new_creative × 2-3 (iterate על הזווית המנצחת)
 ```
@@ -294,21 +294,21 @@ FOR EACH active creative:
 
 ## §T1 — CPA יקר מדי (Gate 2)
 
-**תנאי כניסה:** קמפיין `status=ACTIVE` (יצא מ-Learning, ≥ 50 המרות ב-7 ימים), CPA > יעד × 1.3 למשך 5+ ימים.
+**תנאי כניסה:** קמפיין `status=ACTIVE` (יצא מ-Learning, ≥ {{learning.min_conversions_for_exit}} המרות ב-7 ימים), CPA > יעד × {{gate_2.expensive_threshold}} למשך {{gate_2.expensive_sustained_days}}+ ימים.
 
 ```
-CPA > יעד × 1.3 למשך 5+ ימים
+CPA > יעד × {{gate_2.expensive_threshold}} למשך {{gate_2.expensive_sustained_days}}+ ימים
   │
-  ├─ CTR < 1%?
+  ├─ CTR < {{gate_1.ctr_kill_pct}}%?
   │  └─ מסקנה: המודעה לא מעניינת / הקהל לא נכון
   │     action: propose new_creative (firehose 3-5 וריאנטים), לא pause
   │
-  ├─ CTR גבוה (> 2%), אין המרות?
+  ├─ CTR גבוה (> {{gate_1.ctr_good_pct}}%), אין המרות?
   │  └─ מסקנה: בעיה בדף הנחיתה / ב-Offer — לא בקריאייטיב
   │     action: propose alert — "CTR גבוה אבל לנטישה בדף הנחיתה"
   │              (task_type='new_creative' לא יעזור. rationale מציין תחום האחריות)
   │
-  ├─ Meta Creative Fatigue flag (CPR ≥ 2× היסטורי)?
+  ├─ Meta Creative Fatigue flag (CPR ≥ {{gate_2.fatigue_cpr_multiple}}× היסטורי)?
   │  └─ מסקנה: שחיקת קריאייטיב — Meta מזהה לבד
   │     action: propose new_creative × 3-5 (diversity).
   │     **אל תציע pause** — guardrail `prefer_add_creative_over_pause` יפסול.
@@ -317,7 +317,7 @@ CPA > יעד × 1.3 למשך 5+ ימים
   │  └─ monitoring signal בלבד. אם CPR יציב, אל תיגע (guardrail `no_frequency_only_kill`).
   │     אם CPR לא יציב → טפל תחת ענף ה-Fatigue flag למעלה.
   │
-  └─ Emergency (CPA > 3× יעד OR 3+ ימים 0 conversions עם תקציב מלא)?
+  └─ Emergency (CPA > {{gate_2.emergency_threshold}}× יעד OR {{gate_2.emergency_zero_conv_days}}+ ימים 0 conversions עם תקציב מלא)?
      └─ action: propose pause_campaign עם urgency='urgent'
 ```
 
@@ -325,7 +325,7 @@ CPA > יעד × 1.3 למשך 5+ ימים
 
 ## §T2+ — Scale-Up Candidate (extended winner branch)
 
-> **תנאי כניסה:** הגיע מ-§T0r R8 או R9 winner-grade. CPA ≤ יעד, utilization ≥ 95%, frequency < 2.5, hook > 30%, ללא fatigue. **גם** קמפיין שפוגע ביעד (לא רק × 0.8) עם תקציב נצרך לחלוטין — לפי בקשת הלקוח 2026-05-12: "אם קמפיין טוב ויש אפשרות להגדיל אותו אז להמליץ".
+> **תנאי כניסה:** הגיע מ-§T0r R8 או R9 winner-grade. CPA ≤ יעד, utilization ≥ {{solid_strong.util_floor}}, frequency < {{solid_strong.freq_ceiling}}, hook > {{solid_strong.hook_floor}}, ללא fatigue. **גם** קמפיין שפוגע ביעד (לא רק × 0.8) עם תקציב נצרך לחלוטין — לפי בקשת הלקוח 2026-05-12: "אם קמפיין טוב ויש אפשרות להגדיל אותו אז להמליץ".
 > **Source:** Extended from original §T2 + research synthesis 2026-05-12.
 
 ### Pre-checks (כולם חייבים לעבור לפני שמציעים scale_up)
@@ -335,7 +335,7 @@ CPA > יעד × 1.3 למשך 5+ ימים
   │
   ├─ Pre-check 1: Marginal-return guard (חדש 2026-05-12)
   │  טול: `check_marginal_return --business-id ... --campaign-id ...`
-  │  - אם `last_event == null` (אין הגדלה ב-14 יום) → guard passes, continue.
+  │  - אם `last_event == null` (אין הגדלה ב-{{scaling.marginal_return_lookback_days}} יום) → guard passes, continue.
   │  - אם `diagnostic_only == true` (החלון הקודם 0 conversions, או post window עוד לא הבשיל)
   │    → guard passes עם diagnostic note, ammend rationale עם הסיבה.
   │  - אם `passes_guard == false` → BLOCK scale_up. השתמש ב-`block_reason`
@@ -351,7 +351,7 @@ CPA > יעד × 1.3 למשך 5+ ימים
   ├─ Pre-check 3: Cadence cap (חדש 2026-05-12, Roi 2026-05-12)
   │  IF count(approvals WHERE task_type IN ('scale_up','budget_change')
   │                       AND target_id=campaign_id
-  │                       AND executed_at within last 7 days) ≥ 1
+  │                       AND executed_at within last {{scaling.cadence_window_days}} days) ≥ 1
   │  → BLOCK scale_up. log SKIP rationale="weekly_cadence_cap".
   │     guardrail: `scale_up_cadence_max_1_per_week` יפסול.
   │     הסבר ל-Roi (אם שאל): "הגדלת תקציב כל פעם דורשת ל-Meta לאזן מחדש pacing.
@@ -368,30 +368,30 @@ CPA > יעד × 1.3 למשך 5+ ימים
 ```
 Pre-checks passed → choose magnitude:
   │
-  ├─ Branch A: Classic winner (CPA < target × 0.8 + 5-7d stable)
-  │  AND hook > 35% AND frequency < 2.0 AND status=ACTIVE
-  │  → propose scale_up 30%
+  ├─ Branch A: Classic winner (CPA < target × 0.8 + {{gate_2.expensive_sustained_days}}-7d stable)
+  │  AND hook > {{gate_1.hook_rate_good_pct}}% AND frequency < 2.0 AND status=ACTIVE
+  │  → propose scale_up {{scaling.scale_up_branch_a_pct}}%
   │     guardrail check: `budget_jump_max_30pct` — תנאים עליונים מותרים.
   │
-  ├─ Branch B: Solid winner (CPA < target × 0.8 + 5-7d stable, התנאים העליונים לא במלואם)
-  │  → propose scale_up 20% (default)
+  ├─ Branch B: Solid winner (CPA < target × 0.8 + {{gate_2.expensive_sustained_days}}-7d stable, התנאים העליונים לא במלואם)
+  │  → propose scale_up {{scaling.scale_up_branch_b_pct}}% (default)
   │
   ├─ Branch C: "פוגע ביעד + מקום לצמיחה" (חדש 2026-05-12)
   │  Roi 2026-05-12: "אם קמפיין טוב ויש אפשרות להגדיל אותו אז להמליץ
   │                   בגלל שאין לנו דברים חדשים על הפרק תגדיל את התקציב
   │                   (רק אם זה באמת יעיל)."
   │
-  │  Trigger: cpa_vs_target between 0.85 and 1.05  (פוגע ביעד, לא כוכב)
-  │           AND utilization_7d ≥ 0.95
-  │           AND hook_rate_top > 0.30 AND frequency_7d < 2.5
+  │  Trigger: cpa_vs_target between {{gate_2.winner_ratio}} and 1.05  (פוגע ביעד, לא כוכב)
+  │           AND utilization_7d ≥ {{solid_strong.util_floor}}
+  │           AND hook_rate_top > {{solid_strong.hook_floor}} AND frequency_7d < {{solid_strong.freq_ceiling}}
   │           AND no fatigue_flag
   │           AND all 4 pre-checks above passed
   │           AND active_creative_count ≥ 5 (יש עם מה לעבוד)
-  │  → propose scale_up +15% (שמרני מ-default 20% — קמפיין יציב, לא מצטיין)
+  │  → propose scale_up +{{scaling.scale_up_branch_c_pct}}% (שמרני מ-default {{scaling.scale_up_branch_b_pct}}% — קמפיין יציב, לא מצטיין)
   │     urgency='medium'
   │     rationale (עברית פשוטה, פסקה ראשונה ללא ראשי תיבות):
   │       "הקמפיין עומד ביעד ומוציא את כל התקציב שלו, בלי סימני שחיקה.
-  │        מציע הגדלה של 15% — Meta כבר יודעת מי הקהל ויש סיכוי גבוה שתעביר
+  │        מציע הגדלה של {{scaling.scale_up_branch_c_pct}}% — Meta כבר יודעת מי הקהל ויש סיכוי גבוה שתעביר
   │        את התקציב הנוסף לאותם אנשים ותביא יותר תוצאות בעלות דומה."
   │     rationale שלב 2 (מותר acronyms עם הסבר):
   │       "CPA (עלות להמרה) X לעומת יעד Y. Frequency Z, hook rate W%.
@@ -412,8 +412,8 @@ Pre-checks passed → choose magnitude:
 
 ## §T_SD — Scale-Down Candidate (חדש 2026-05-12)
 
-> **תנאי כניסה:** הגיע מ-§T0r R6 default (cpa_vs_target > 1.3 sustained 5+ days, ללא fatigue, ללא CTR-low). תחום ה-CPA: 1.3-3.0× יעד (מעל זה Emergency Pause ב-§T1).
-> **Source:** Roi 2026-05-12 — "מתי מורידים?" החלטה: scale_down ענף מלא, -15% per step, ניתוק tighter Learning reset.
+> **תנאי כניסה:** הגיע מ-§T0r R6 default (cpa_vs_target > {{gate_2.expensive_threshold}} sustained {{gate_2.expensive_sustained_days}}+ days, ללא fatigue, ללא CTR-low). תחום ה-CPA: {{gate_2.expensive_threshold}}-{{gate_2.emergency_threshold}}× יעד (מעל זה Emergency Pause ב-§T1).
+> **Source:** Roi 2026-05-12 — "מתי מורידים?" החלטה: scale_down ענף מלא, -{{scaling.scale_down_step_pct}}% per step, ניתוק tighter Learning reset.
 
 ### למה scale_down ולא pause?
 
@@ -430,7 +430,7 @@ Pre-checks passed → choose magnitude:
   │     נימוק: שינוי תקציב בקמפיין שעוד לא יצא מלמידה מאפס את הספירה.
   │
   ├─ Pre-check 2: Recent edit cooldown
-  │  IF hours_since_last_edit < 72h  → BLOCK. log SKIP rationale="scale_down_post_edit_cooldown".
+  │  IF hours_since_last_edit < {{scaling.cooldown_hours}}h  → BLOCK. log SKIP rationale="scale_down_post_edit_cooldown".
   │     נימוק: השינוי הקודם עוד לא התייצב. אל תוסיף שינוי על שינוי.
   │
   ├─ Pre-check 3: Recent conversion check
@@ -440,23 +440,23 @@ Pre-checks passed → choose magnitude:
   │
   ├─ Pre-check 4: Cadence cap (חדש 2026-05-12)
   │  IF count(approvals WHERE task_type='scale_down' AND target_id=campaign_id
-  │                       AND executed_at within last 14 days) ≥ 1
+  │                       AND executed_at within last {{scaling.consecutive_scale_down_window_days}} days) ≥ 1
   │  → BLOCK. log SKIP rationale="consecutive_scale_down_blocked".
   │     guardrail: `no_consecutive_scale_down_14d` יפסול.
   │     נימוק: שתי הורדות רצופות = פאוזה איטית. אם אחת לא תיקנה — צריך לעצור ולשנות
   │     קופי או יעד, לא להוריד עוד.
   │
   └─ אם כל ה-Pre-checks עברו:
-     → propose scale_down -15% (צעד יחיד, לעולם לא יותר ב-proposal אחד)
+     → propose scale_down -{{scaling.scale_down_step_pct}}% (צעד יחיד, לעולם לא יותר ב-proposal אחד)
         urgency='medium'
         rationale (עברית פשוטה, פסקה ראשונה):
           "הקמפיין יקר מהיעד ב-30%-50% אבל יציב — הוא מביא לידים, רק בעלות גבוהה
-           מהמתוכנן. מציע להוריד תקציב ב-15% כדי לחסוך עד שתחליפו קופי/קהל,
+           מהמתוכנן. מציע להוריד תקציב ב-{{scaling.scale_down_step_pct}}% כדי לחסוך עד שתחליפו קופי/קהל,
            בלי לאבד את כל הלמידה שנצברה."
         payload: {"new_daily_budget_cents":..., "old_daily_budget_cents":...,
-                  "magnitude_pct":-15, "reason":"cpa_over_target_stable"}
+                  "magnitude_pct":-{{scaling.scale_down_step_pct}}, "reason":"cpa_over_target_stable"}
         תוכנית mini-section חובה לפי hebrew-copy-style §11.6 — בדרך כלל:
-          1. הורדה -15% עכשיו (שימור Learning)
+          1. הורדה -{{scaling.scale_down_step_pct}}% עכשיו (שימור Learning)
           2. בעוד 7 ימים: אם CPA חזר לטווח — להגדיל בחזרה. אם נשאר יקר — להציע
              קופי חדש (לא הורדה נוספת).
           3. אם גם הקופי החדש לא משנה — pause ובחינה של pool/objective.
@@ -464,9 +464,9 @@ Pre-checks passed → choose magnitude:
 
 ### מתי לא scale_down אלא משהו אחר
 
-- CPA > 3× יעד OR 0 conversions 3+ ימים → §T1 Emergency Pause.
-- CPR ≥ 2× baseline (fatigue) → §T1 fatigue branch → new_creative × 3-5.
-- CTR < 1% → §T1 CTR-low → new_creative עם angle אחר.
+- CPA > {{gate_2.emergency_threshold}}× יעד OR 0 conversions {{gate_2.emergency_zero_conv_days}}+ ימים → §T1 Emergency Pause.
+- CPR ≥ {{gate_2.fatigue_cpr_multiple}}× baseline (fatigue) → §T1 fatigue branch → new_creative × 3-5.
+- CTR < {{gate_1.ctr_kill_pct}}% → §T1 CTR-low → new_creative עם angle אחר.
 
 scale_down הוא ענף **דיאגנוסטי-שמרני** — "יקר אבל עובד, וצריך זמן להחליט".
 
@@ -484,7 +484,7 @@ scale_down הוא ענף **דיאגנוסטי-שמרני** — "יקר אבל ע
 
 | ענף | טריגר | פעולה |
 | --- | --- | --- |
-| §T1 fatigue | Meta Creative Fatigue flag (CPR ≥ 2× baseline) | new_creative × 3-5 + שמירת הקיים |
+| §T1 fatigue | Meta Creative Fatigue flag (CPR ≥ {{gate_2.fatigue_cpr_multiple}}× baseline) | new_creative × 3-5 + שמירת הקיים |
 | §T_PE (חדש) | המאגר עצמו קטן (פחות מ-5 פעילים) או מבוגר (7+ ימים ללא תוספת) | new_creative × 3-5 + log תיעוד שהמאגר התרוקן |
 
 ההבדל קריטי: §T1 מציע קריאייטיב חדש כי הקיים נשחק. §T_PE מציע כי **אין מאגר** — הקמפיין רץ על אדים. המסר לרוי שונה לחלוטין.
@@ -564,12 +564,12 @@ scale_down הוא ענף **דיאגנוסטי-שמרני** — "יקר אבל ע
 ```
 §T_HO: Hands-Off
   │
-  ├─ post_edit_cooldown (72h)
+  ├─ post_edit_cooldown ({{scaling.cooldown_hours}}h)
   │  log SKIP rationale="post_edit_cooldown_72h":
   │    "הקמפיין נערך לפני X שעות. Meta עדיין מאזנת מחדש את הלמידה.
   │     אבחון חוזר מעל למקור-עצמו של הרעש. נחזור בעוד Y שעות."
   │
-  ├─ learning_phase (status=LEARNING, < 50 conv, ≤ 7d)
+  ├─ learning_phase (status=LEARNING, < {{learning.min_conversions_for_exit}} conv, ≤ {{learning.max_days_before_limited}}d)
   │  log SKIP rationale="learning_phase_protected":
   │    "הקמפיין בלמידה הראשונית. כל שינוי מאפס את הספירה ל-7 ימים נוספים.
   │     מחכים שייצא לבד או שיגיע ל-budget_daily_min_ils."
@@ -583,7 +583,7 @@ scale_down הוא ענף **דיאגנוסטי-שמרני** — "יקר אבל ע
   │  log SKIP rationale="calendar_anomaly":
   │    "שבת/חג. נתוני יום החג לא משקפים behavior רגיל."
   │
-  └─ sustained_over_no_winner (utilization > 1.05 3+ days but not winner-grade)
+  └─ sustained_over_no_winner (utilization > {{utilization.healthy_ceiling}} 3+ days but not winner-grade)
      log SKIP rationale="sustained_over_no_action":
        "ה-overspend נמשך X ימים אבל הקמפיין לא עומד בתנאי winner.
         scale-down בלי signal של בעיה (fatigue/CPA-high) שובר Learning;
@@ -621,7 +621,7 @@ scale_down הוא ענף **דיאגנוסטי-שמרני** — "יקר אבל ע
 
 ## §T4 — קמפיין ב-Learning Phase
 
-**תנאי כניסה:** `status=LEARNING` (conversions_7d < 50 AND days_active ≤ 7).
+**תנאי כניסה:** `status=LEARNING` (conversions_7d < {{learning.min_conversions_for_exit}} AND days_active ≤ {{learning.max_days_before_limited}}).
 
 ```
 Learning Phase
@@ -631,7 +631,7 @@ Learning Phase
   │
   └─ חריג יחיד: תקציב מתחת ל-budget_daily_min_ils (§6 performance-brain)?
      └─ action: propose scale_up עד לתקציב מינימלי
-        rationale: "קמפיין לא ייצא מ-Learning ב-תקציב הנוכחי. חישוב מינימלי: (CPA×50)/7 = X"
+        rationale: "קמפיין לא ייצא מ-Learning ב-תקציב הנוכחי. חישוב מינימלי: (CPA×{{learning.min_conversions_for_exit}})/{{learning.max_days_before_limited}} = X"
         guardrail: `no_learning_phase_touch` בודק `task_type` — scale_up חוקי כאן, pause לא.
 ```
 
@@ -639,10 +639,10 @@ Learning Phase
 
 ## §T5 — קמפיין Learning Limited
 
-**תנאי כניסה:** `status=LEARNING_LIMITED` (conversions_7d < 50 AND days_active > 7 AND not trending up).
+**תנאי כניסה:** `status=LEARNING_LIMITED` (conversions_7d < {{learning.min_conversions_for_exit}} AND days_active > {{learning.max_days_before_limited}} AND not trending up).
 
 ```
-Learning Limited (>7d בלי 50 conversions)
+Learning Limited (>{{learning.max_days_before_limited}}d בלי {{learning.min_conversions_for_exit}} conversions)
   │
   ├─ תקציב מתחת ל-budget_daily_min_ils?
   │  └─ action: propose scale_up עד לתקציב מינימלי
@@ -774,10 +774,10 @@ A/B קלאסי (Meta Split-Test product, 50/50 חלוקה, MDE pre-set) **מופ
   │  │   • אופרטור-יוזם: דרך /ab-tests/new (לא ב-MVP; ב-MVP הסוכן מציע, אופרטור מאשר)
   │  │
   │  ├─ Pre-checks לפני propose:
-  │  │  a. ≥ 2 ו ≤ 4 קריאייטיבים (§29 ab_test_requires_min_creatives — חוסם אחרת)
+  │  │  a. ≥ {{ab_test.min_variants}} ו ≤ {{ab_test.max_variants}} קריאייטיבים (§29 ab_test_requires_min_creatives — חוסם אחרת)
   │  │  b. כל הקריאייטיבים יושבים באותו adset_id (Meta דורש; ad sets שונים = שני tests)
   │  │  c. variant_label ייחודי לכל אחד ('A','B','C','D')
-  │  │  d. window_days ≥ 7 (§30 ab_test_min_window_7d — חוסם אחרת)
+  │  │  d. window_days ≥ {{ab_test.min_window_days}} (§30 ab_test_min_window_7d — חוסם אחרת)
   │  │  e. אין test פעיל אחר באותו (adset_id, test_name) — partial unique index ב-DB יזרוק
   │  │
   │  └─ propose ab_test_setup (urgency=medium):
@@ -841,7 +841,7 @@ A/B קלאסי (Meta Split-Test product, 50/50 חלוקה, MDE pre-set) **מופ
 
 1. **ab_test_setup חייב כל הקריאייטיבים באותו adset.** מבחנים בין ad-sets שונים = רעש; טרגוט שונה / תקציב שונה משפיע. החריג: ai test_setup חוצה ad_sets כשמשנים *רק* את הקריאייטיב — לא נתמך ב-MVP.
 2. **decide לא דורש status='healthy' tracking** אבל **הצעת follow-up scale_up** כן (§17).
-3. **אסור ab_test_decide על test שלא רץ ≥ 7 ימים** אלא אם cancel_instead=true (§30 חוסם).
+3. **אסור ab_test_decide על test שלא רץ ≥ {{ab_test.min_window_days}} ימים** אלא אם cancel_instead=true (§30 חוסם).
 4. **אסור 2 ab_test_setup פעילים באותו adset+test_name** — partial unique index יזרוק. אם רוצים להריץ שוב — צריך לעבור עם הקודם ל-decided/cancelled קודם.
 5. **respect_hands_off** (§25) חל גם כאן — לא להציע setup/decide על קמפיין hands_off.
 6. **decision_snapshot חייב להיות פלט verbatim של `evaluate_ab_test`.** אסור לסוכן "להעריך לבד" ולכתוב dict ידני — צריך לקרוא לכלי שיביא מ-Meta את האימפרשנס/conversion הנכונים.
@@ -1043,8 +1043,8 @@ For each network in [facebook_page, instagram]:
 
 | תפקיד בתיק | מי? (לפי §T0r lane + מדדים) | אמת מידה כמותית |
 |---|---|---|
-| **"רעב לתקציב"** (donor של scale_up) | lane=`scale_up_candidate` + utilization_7d ≥ 0.95 + CPA ≤ target × 0.85 + ACTIVE 7+ ימים | קמפיין שמכרסם תקציב יומי מלא ועדיין מחזיר מתחת ליעד — סימן ברור ש-Meta היתה לוקחת יותר אילו היה לה |
-| **"מקור תקציב"** (donor של scale_down) | lane=`scale_down_candidate` + CPA 1.3-3.0× target + ACTIVE 7+ ימים + לא בענף fatigue (יש דרך אחרת לתקן fatigue) | קמפיין יציב אבל יקר — חבל לסגור, אבל יכול לחיות עם פחות עד שיתקן |
+| **"רעב לתקציב"** (donor של scale_up) | lane=`scale_up_candidate` + utilization_7d ≥ {{solid_strong.util_floor}} + CPA ≤ target × {{gate_2.winner_ratio}} + ACTIVE 7+ ימים | קמפיין שמכרסם תקציב יומי מלא ועדיין מחזיר מתחת ליעד — סימן ברור ש-Meta היתה לוקחת יותר אילו היה לה |
+| **"מקור תקציב"** (donor של scale_down) | lane=`scale_down_candidate` + CPA {{gate_2.expensive_threshold}}-{{gate_2.emergency_threshold}}× target + ACTIVE 7+ ימים + לא בענף fatigue (יש דרך אחרת לתקן fatigue) | קמפיין יציב אבל יקר — חבל לסגור, אבל יכול לחיות עם פחות עד שיתקן |
 | **לא מועמד** | hands_off / learning / cold_start / fatigue / pool_exhausted | הקטגוריות האלה כבר טופלו במסלולים שלהן; אל תיגע |
 
 ### לוגיקה
@@ -1069,8 +1069,8 @@ For each network in [facebook_page, instagram]:
   │
   │    pre-checks על הזוג:
   │    a. winner.campaign_id != expensive.campaign_id (בנאלי)
-  │    b. winner לא בקדנס cooldown: scale_ups_last_7d == 0 (§20)
-  │    c. expensive לא בקדנס cooldown: scale_downs_last_14d == 0 (§23)
+  │    b. winner לא בקדנס cooldown: scale_ups in last {{scaling.cadence_window_days}}d == 0 (§20)
+  │    c. expensive לא בקדנס cooldown: scale_downs in last {{scaling.consecutive_scale_down_window_days}}d == 0 (§23)
   │    d. winner.marginal_return_passed == true (§21 — אחרת אין טעם להוסיף לו תקציב)
   │    e. אף אחד מהשניים לא ב-hands_off + is_current_month (§25)
   │
@@ -1080,14 +1080,14 @@ For each network in [facebook_page, instagram]:
   │
   ├─ Step 4: חישוב הסכום שיועבר:
   │    delta_ils = min(
-  │      expensive.daily_budget_ils × 0.15,   -- §22 -15% per step on scale_down
-  │      winner.daily_budget_ils × 0.20,      -- §3 +20% per step on scale_up (Branch A)
-  │      ₪200                                 -- safety cap לתנועה יומית
+  │      expensive.daily_budget_ils × ({{scaling.scale_down_step_pct}} / 100),   -- §22 -{{scaling.scale_down_step_pct}}% per step on scale_down
+  │      winner.daily_budget_ils × ({{scaling.scale_up_branch_b_pct}} / 100),    -- §3 +{{scaling.scale_up_branch_b_pct}}% per step on scale_up (Branch A)
+  │      ₪{{portfolio.safety_cap_ils}}                                            -- safety cap לתנועה יומית
   │    )
   │    new_expensive = expensive.daily_budget_ils - delta_ils
   │    new_winner    = winner.daily_budget_ils    + delta_ils
   │
-  │    אם delta_ils < ₪10 → log SKIP rationale="rebalance_delta_below_meaningful_threshold"
+  │    אם delta_ils < ₪{{portfolio.delta_floor_ils}} → log SKIP rationale="rebalance_delta_below_meaningful_threshold"
   │    (חבל לבזבז על תור-אישור על תזוזות זניחות.)
   │
   ├─ Step 5: emit two LINKED proposals (חובה: אותו run_id; כל אחד מציין את השני ב-rationale)
@@ -1132,10 +1132,10 @@ For each network in [facebook_page, instagram]:
 
 1. **חובה לראות את שני הצדדים בתור.** אם אחד מהשניים נפסל בגארדריילים, האחר לא נשלח. נסה זוג אחר או log SKIP. **אסור** scale_up בלי המקור שלו, או scale_down בלי המוטב שלו.
 2. **אסור rebalance בתוך אותו קמפיין.** אם הסוכן רוצה לחזק adset בתוך קמפיין על חשבון adset אחר באותו קמפיין — זה לא §T11, זה ענף נפרד (consolidate_adsets, לא בהיקף MVP).
-3. **delta_ils ≥ ₪10** — מתחת לזה זה רעש.
+3. **delta_ils ≥ ₪{{portfolio.delta_floor_ils}}** — מתחת לזה זה רעש.
 4. **לא יותר מ-rebalance-pair אחד בריצה.** אם יש 5 רעבים ו-5 יקרים, סוכן MVP מציע רק את הזוג הכי טוב. הזוגות הבאים — בריצות הבאות (אחרי ש-Meta הזיזה למידה).
 5. **רישום ב-`expected_impact`.** השדות `linked_to_scale_up_on` / `linked_to_scale_down_on` מאפשרים ל-UI אחר כך להציג "rebalance pair" כיחידה אחת.
-6. **כל הגארדריילים הרגילים חלים על שתי ההצעות בנפרד** — §17 (tracking), §20 (scale_up cadence), §21 (marginal-return), §22 (-15% scale_down cap), §23 (no consecutive scale_down), §25 (hands_off), §28 (לא רלוונטי כאן כי אין new_creative). אם §22 חוסם את ה-15% scale_down, יוצא delta קטן יותר בהתאם — אל תעקוף.
+6. **כל הגארדריילים הרגילים חלים על שתי ההצעות בנפרד** — §17 (tracking), §20 (scale_up cadence), §21 (marginal-return), §22 (-{{scaling.scale_down_step_pct}}% scale_down cap), §23 (no consecutive scale_down), §25 (hands_off), §28 (לא רלוונטי כאן כי אין new_creative). אם §22 חוסם את ה-{{scaling.scale_down_step_pct}}% scale_down, יוצא delta קטן יותר בהתאם — אל תעקוף.
 
 ### גבולות MVP (חוץ-היקף, נשמר לעתיד)
 

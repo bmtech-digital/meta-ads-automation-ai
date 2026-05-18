@@ -39,13 +39,13 @@ python -m campaigner.tools.log_decision \
 
 ## 2. `max_tasks_per_day` (§8.3)
 
-**Rule:** Daily proposal cap based on the business's budget:
+**Rule:** Daily proposal cap based on the business's budget (values resolve via [CAMPAIGNER.md Thresholds Reference](../CAMPAIGNER.md#thresholds--reference-prd-step-3)):
 
 | `businesses.daily_budget_ils` | Max proposals/day |
 | ----------------------------- | ----------------- |
-| < 50                          | 2                 |
-| 50 – 500                      | 5                 |
-| > 500                         | 10                |
+| < `{{anti_flood.budget_tier_small_ils}}`                          | `{{anti_flood.max_proposals_small}}`                 |
+| `{{anti_flood.budget_tier_small_ils}}` – `{{anti_flood.budget_tier_medium_ils}}`                      | `{{anti_flood.max_proposals_medium}}`                 |
+| > `{{anti_flood.budget_tier_medium_ils}}`                         | `{{anti_flood.max_proposals_large}}`                |
 
 **Why:** Applying decisions is cognitive effort. Flooding the user with tasks → decision fatigue → automatic approvals without thinking.
 
@@ -55,9 +55,9 @@ python -m campaigner.tools.log_decision \
 
 ## 3. `no_learning_phase_touch`
 
-**Rule:** A campaign in `status=LEARNING` (conversions_7d < 50 AND days_active ≤ 7) → no `pause_campaign` / `pause_adset` / `expand_audience` / `new_campaign`.
+**Rule:** A campaign in `status=LEARNING` (conversions_7d < `{{learning.min_conversions_for_exit}}` AND days_active ≤ `{{learning.max_days_before_limited}}`) → no `pause_campaign` / `pause_adset` / `expand_audience` / `new_campaign`.
 
-**Exception:** `scale_up` to the minimum budget (`budget_daily_min_ils = CPA × 50 / 7`) — otherwise the campaign will never exit Learning.
+**Exception:** `scale_up` to the minimum budget (`budget_daily_min_ils = CPA × {{learning.min_conversions_for_exit}} / {{learning.max_days_before_limited}}`) — otherwise the campaign will never exit Learning.
 
 **Why:** Any change to a campaign in Learning resets Meta's algorithm. Seven days go down the drain.
 
@@ -65,13 +65,13 @@ python -m campaigner.tools.log_decision \
 
 ## 4. `budget_jump_max_30pct`
 
-**Rule:** A single daily-budget change ≤ 20% (default). Up to 30% is allowed **only** if:
+**Rule:** A single daily-budget change ≤ `{{scaling.scale_up_default_cap_pct}}`% (default). Up to `{{scaling.scale_up_strict_cap_pct}}`% is allowed **only** if:
 
-- `hook_rate > 35%`
+- `hook_rate > {{gate_1.hook_rate_good_pct}}%`
 - `frequency < 2.0`
 - `status=ACTIVE` (exited Learning)
 
-A jump > 30% → rejection.
+A jump > `{{scaling.scale_up_strict_cap_pct}}`% → rejection.
 
 **Why:** Meta is calibrated for pacing. A jump too large → re-entering Learning, reset of progress.
 
@@ -133,7 +133,7 @@ A jump > 30% → rejection.
 
 **Why:** A live conversion = the ad is still relevant. Pausing makes no sense.
 
-**Exception:** Emergency kill (CPA > 3× target) overrides this rule.
+**Exception:** Emergency kill (CPA > `{{gate_2.emergency_threshold}}`× target) overrides this rule.
 
 ---
 
@@ -149,7 +149,7 @@ A jump > 30% → rejection.
 
 ## 12. `require_95pct_significance_for_ab` (new in 2026)
 
-**Rule:** Declaring a winner in an A/B test requires 95% statistical significance (or volume equivalent). No "hook A scored 2% > hook B 1.8% so A wins" with 100 impressions each.
+**Rule:** Declaring a winner in an A/B test requires `{{gate_2.ab_test_significance_pct}}`% statistical significance (or volume equivalent). No "hook A scored 2% > hook B 1.8% so A wins" with 100 impressions each.
 
 **Why:** Andromeda allocates budget unevenly on purpose. Performance differences at low volume = noise, not signal.
 
@@ -157,7 +157,7 @@ A jump > 30% → rejection.
 
 ## 13. `prefer_add_creative_over_pause` (new in 2026)
 
-**Rule:** A campaign flagged with Meta Creative Fatigue (CPR ≥ 2× baseline) → proposal `pause_campaign` is forbidden. Allowed proposal: `new_creative` × 3-5.
+**Rule:** A campaign flagged with Meta Creative Fatigue (CPR ≥ `{{gate_2.fatigue_cpr_multiple}}`× baseline) → proposal `pause_campaign` is forbidden. Allowed proposal: `new_creative` × 3-5.
 
 **Why:** Creative fatigue ≠ campaign problem. Pausing loses Learning. A firehose of creatives refreshes without that loss.
 
@@ -165,7 +165,7 @@ A jump > 30% → rejection.
 
 ## 14. `no_manual_creative_pruning_before_48h` (new in 2026)
 
-**Rule:** No `pause_adset` / `pause_campaign` on a new creative (less than 48h live) **unless** a Gate 1 kill trigger fires (hook < 25% OR CTR < 1% with sufficient volume).
+**Rule:** No `pause_adset` / `pause_campaign` on a new creative (less than `{{gate_1.evaluation_window_hours}}`h live) **unless** a Gate 1 kill trigger fires (hook < `{{gate_1.hook_rate_kill_pct}}`% OR CTR < `{{gate_1.ctr_kill_pct}}`% with sufficient volume).
 
 **Why:** Meta allocates budget unevenly on purpose — "winning" creatives get more. The skew looks like uneven proportions on a dashboard. Don't interpret it as "needs to be killed."
 
@@ -173,7 +173,7 @@ A jump > 30% → rejection.
 
 ## 15. `no_frequency_only_kill` (new in 2026)
 
-**Rule:** Frequency > 3 alone → **not** a pause trigger. Requires an additional signal (CPR ≥ 2×, or CPA > 1.3× target).
+**Rule:** Frequency > 3 alone → **not** a pause trigger. Requires an additional signal (CPR ≥ `{{gate_2.fatigue_cpr_multiple}}`×, or CPA > `{{gate_2.expensive_threshold}}`× target).
 
 **Why:** Andromeda targets better. High frequency ≠ fatigue. The real trigger is the Creative Fatigue flag.
 
@@ -219,7 +219,7 @@ A jump > 30% → rejection.
 
 ## 19. `no_new_creative_when_underspending` (new 2026-05-12)
 
-**Rule:** A campaign with `utilization_7d < 0.50` (per §T-1 — Meta spent less than half the budget) → **rejection for `task_type='new_creative'`**.
+**Rule:** A campaign with `utilization_7d < {{utilization.new_creative_floor}}` (per §T-1 — Meta spent less than half the budget) → **rejection for `task_type='new_creative'`**.
 
 **Why:** Roi 2026-05-12 — "adding a creative when the problem is that nobody sees the existing one = throwing more buckets at an empty well." The symptom is pool/audience/auction misalignment, not a shortage of angles. Adding a variant won't increase impressions if Meta refuses to spend the budget.
 
@@ -231,7 +231,7 @@ A jump > 30% → rejection.
 
 ## 20. `scale_up_cadence_max_1_per_week` (new 2026-05-12)
 
-**Rule:** Maximum one `task_type='scale_up'` (or `budget_change` with magnitude > 0) proposal per campaign per 7 consecutive days. The count is based on `executed_at` of approvals already executed against Meta.
+**Rule:** Maximum one `task_type='scale_up'` (or `budget_change` with magnitude > 0) proposal per campaign per `{{scaling.cadence_window_days}}` consecutive days. The count is based on `executed_at` of approvals already executed against Meta.
 
 **Why:** Roi 2026-05-12 — two stacked reasons:
 1. Every increase requires Meta to re-balance pacing. Sequential increases before the previous one stabilized = compounding noise.
@@ -246,8 +246,8 @@ A jump > 30% → rejection.
 ## 21. `marginal_return_check_before_scale_up` (new 2026-05-12)
 
 **Rule:** A `scale_up` proposal is rejected if:
-- A previous scale_up on the same `target_id` happened in the last 14 days, **and**
-- `delta_conversions(7d post last_scale) < 1.10 × baseline_conversions(7d pre last_scale)` (less than 10% lift).
+- A previous scale_up on the same `target_id` happened in the last `{{scaling.marginal_return_lookback_days}}` days, **and**
+- `delta_conversions(7d post last_scale) < {{scaling.marginal_return_min_lift}} × baseline_conversions(7d pre last_scale)` (less than 10% lift).
 
 **Why:** Roi 2026-05-12 — "only if it's actually effective. If it just doesn't give anything then don't propose." Without this check, the agent would propose +20% even after the previous increase proved no growth — wasting money for no result.
 
@@ -261,17 +261,17 @@ A jump > 30% → rejection.
 
 ## 22. `scale_down_max_15pct_per_step` (new 2026-05-12)
 
-**Rule:** A `scale_down` proposal that reduces daily budget by more than 15% in a single step → rejection.
+**Rule:** A `scale_down` proposal that reduces daily budget by more than `{{scaling.scale_down_step_pct}}`% in a single step → rejection.
 
-**Why:** Large drops break pacing the same way large increases do. -15% is a noticeable cut from Meta's perspective but small enough not to reset Learning.
+**Why:** Large drops break pacing the same way large increases do. -`{{scaling.scale_down_step_pct}}`% is a noticeable cut from Meta's perspective but small enough not to reset Learning.
 
-**How to replace:** Split into 2 scale_down proposals across 14 days (but also see §23 — `no_consecutive_scale_down_14d` which blocks a sequence that's too tight). If the situation truly demands a large drop — that's a signal for pause + analysis, not scale_down.
+**How to replace:** Split into 2 scale_down proposals across `{{scaling.consecutive_scale_down_window_days}}` days (but also see §23 — `no_consecutive_scale_down_14d` which blocks a sequence that's too tight). If the situation truly demands a large drop — that's a signal for pause + analysis, not scale_down.
 
 ---
 
 ## 23. `no_consecutive_scale_down_14d` (new 2026-05-12)
 
-**Rule:** Do not propose `scale_down` on a campaign that already had a `scale_down` proposal executed in the last 14 days.
+**Rule:** Do not propose `scale_down` on a campaign that already had a `scale_down` proposal executed in the last `{{scaling.consecutive_scale_down_window_days}}` days.
 
 **Why:** Two consecutive cuts = a slow pause. If the first scale_down didn't bring CPA into range — that's a sign the problem is copy, target, or audience, not spend cadence. Another cut just pushes the campaign into a spiral of fewer impressions → fewer conversions → worse-looking CPA in relative terms.
 
@@ -297,7 +297,7 @@ A jump > 30% → rejection.
 
 **How to check:** In Flow A Step 1 the agent loads `load_business_knowledge` and gets `monthly_brief_summary`. If the campaign on deck is in `hands_off_campaign_ids` **and** `is_current_month == true` (brief isn't stale) → log SKIP with rationale="hands_off_per_monthly_brief".
 
-**Sole exception:** Emergency Pause per §T1 (CPA > 3× target OR 3+ days with 0 conversions despite full budget). The user cannot block an emergency, but the rationale must say: "פעלתי בניגוד ל-hands_off כי [תנאי החירום]; אנא עדכן את הבריף בהתאם".
+**Sole exception:** Emergency Pause per §T1 (CPA > `{{gate_2.emergency_threshold}}`× target OR `{{gate_2.emergency_zero_conv_days}}`+ days with 0 conversions despite full budget). The user cannot block an emergency, but the rationale must say: "פעלתי בניגוד ל-hands_off כי [תנאי החירום]; אנא עדכן את הבריף בהתאם".
 
 **Implementation:** prompt-level inside the router (§T0r). Future Python check in `check_guardrails.py`.
 
@@ -411,7 +411,7 @@ See also [kpi-benchmarks.md "How rationale must be written"](kpi-benchmarks.md#h
 
 ## 29. `ab_test_requires_min_creatives` (new 2026-05-13 — Block 11)
 
-**Rule:** A `task_type='ab_test_setup'` proposal must include `payload.creatives` with **between 2 and 4 variants**. Fewer than 2 = nothing to compare; more than 4 = the sample per variant is too small to decide with confidence in a reasonable window.
+**Rule:** A `task_type='ab_test_setup'` proposal must include `payload.creatives` with **between `{{ab_test.min_variants}}` and `{{ab_test.max_variants}}` variants**. Fewer than `{{ab_test.min_variants}}` = nothing to compare; more than `{{ab_test.max_variants}}` = the sample per variant is too small to decide with confidence in a reasonable window.
 
 **Why:** A formal A/B test needs at least two variants to compare. At the upper bound: Andromeda splits budget among variants, and 5+ variants means each gets less than 20% of budget — enough for sampling but not enough for a reliable decision within 7 days. More complex tests are better split into two sequential ones.
 
@@ -423,13 +423,13 @@ See also [kpi-benchmarks.md "How rationale must be written"](kpi-benchmarks.md#h
 
 ## 30. `ab_test_min_window_7d` (new 2026-05-13 — Block 11)
 
-**Rule:** A `task_type='ab_test_setup'` proposal requires `payload.window_days >= 7`. A `task_type='ab_test_decide'` proposal will be blocked if the decision time (`ab_tests.started_at + window_days`) hasn't been reached.
+**Rule:** A `task_type='ab_test_setup'` proposal requires `payload.window_days >= {{ab_test.min_window_days}}`. A `task_type='ab_test_decide'` proposal will be blocked if the decision time (`ab_tests.started_at + window_days`) hasn't been reached.
 
 **Why:** Andromeda needs at least 7 days to split budget stably among variants. Deciding at 3-5 days relies on early-campaign fluctuations — not a real signal. This also aligns with §12 `require_95pct_significance_for_ab` (volume for reliability).
 
 **Implementation:** in `_ab_test_min_window_7d` in [check_guardrails.py](../tools/check_guardrails.py). Two paths:
 1. `ab_test_setup` — checks `payload.window_days >= 7`. fail otherwise.
-2. `ab_test_decide` — checks that `ab_test_id` exists, status='running', and ≥ 7 days have passed since `started_at`. If less → fail with the message "מוקדם מדי, חכה עוד N ימים".
+2. `ab_test_decide` — checks that `ab_test_id` exists, status='running', and ≥ `{{ab_test.min_window_days}}` days have passed since `started_at`. If less → fail with the message "מוקדם מדי, חכה עוד N ימים".
 
 **Exception:** If `cancel_instead=true` is set on `ab_test_decide` — the rule doesn't apply. Cancellation is legitimate at any time.
 
@@ -485,14 +485,14 @@ See also [kpi-benchmarks.md "How rationale must be written"](kpi-benchmarks.md#h
 
 ## 37. `respect_prior_rejections` (new 2026-05-13 PM — feedback loop)
 
-**Rule:** A new proposal that belongs to `(task_type, target_kind, target_id)` that was previously rejected with a substantive reason (not bulk-reset/anti-flood/system) within the last 60 days must satisfy one of two conditions:
+**Rule:** A new proposal that belongs to `(task_type, target_kind, target_id)` that was previously rejected with a substantive reason (not bulk-reset/anti-flood/system) within the last `{{feedback.prior_rejection_lookback_days}}` days must satisfy one of two conditions:
 
 1. **Explicitly cite the prior rejection in the rationale** and describe what changed — example: "ראיתי שדחית הצעה דומה ב-13.5 כי 'אין הסבר איזה שירות אני נותן'. הפעם הקופי ממוקד לשירות `service_tag=influencer_match` שמופיע ב-business_knowledge.products".
 2. **If you can't materially differentiate** from the rejected proposal — skip and write `log_decision rejection rationale="respect_prior_rejection_no_meaningful_change"`.
 
 **Why:** Until 2026-05-13 the agent didn't read prior rejections — it would repeat the same proposal every run. Operator Roi complained: "He doesn't learn that I said no." This is the rule that lifts the agent from a junior who repeats himself to a consultant who remembers.
 
-**Implementation:** in `_respect_prior_rejections` in [check_guardrails.py](../tools/check_guardrails.py). The context fetcher (`_fetch_context`) runs SQL per proposal: how many non-bulk rejections exist in the last 60 days for the same `(task_type, target_kind, target_id)`. The rule reads the count + checks that the current rationale contains at least one of these indicators: `"דחית"`, `"דחיתי"`, `"דחיית"`, `"דחיה קודמת"`, `"הפעם שונה"`, `"השתנה"`, or a mention of a date within the last 60 days.
+**Implementation:** in `_respect_prior_rejections` in [check_guardrails.py](../tools/check_guardrails.py). The context fetcher (`_fetch_context`) runs SQL per proposal: how many non-bulk rejections exist in the last `{{feedback.prior_rejection_lookback_days}}` days for the same `(task_type, target_kind, target_id)`. The rule reads the count + checks that the current rationale contains at least one of these indicators: `"דחית"`, `"דחיתי"`, `"דחיית"`, `"דחיה קודמת"`, `"הפעם שונה"`, `"השתנה"`, or a mention of a date within the lookback window.
 
 **How to replace:** Add a line to the rationale that cites the rejection and explains what changed. If you can't — skip.
 
@@ -550,7 +550,7 @@ At the ad level:
 
 ## 39. `respect_active_plans` (new 2026-05-13 PM — "junior → consultant" #2)
 
-**Rule:** If an active action plan (a forward step from a previous plan) exists on the same `target_id` within the last 21 days, the current proposal must satisfy one of:
+**Rule:** If an active action plan (a forward step from a previous plan) exists on the same `target_id` within the last `{{feedback.active_plan_window_days}}` days, the current proposal must satisfy one of:
 
 1. **Advance the existing plan** — the rationale opens with a sentence that quotes your previous step, states whether its condition was met (or not), and explains how the current proposal is the next step in the plan. Example: _"בריצה מ-7.5 התחייבתי: 'אם הניצול עלה ל-80% — להציע sale_up'. הניצול עלה ל-87%. ההצעה הזאת היא הצעד הבא בתוכנית."_
 2. **Explicitly skip** — if the situation has changed enough that the old plan no longer applies, don't propose a new action and write `log_decision skip rationale="active_plan_superseded — תוכנית X מ-7.5 כבר לא רלוונטית כי [הסיבה]"`.

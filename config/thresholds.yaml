@@ -1,0 +1,262 @@
+# config/thresholds.yaml — single source of truth for tunable rule thresholds.
+#
+# Generated artifacts (do NOT edit by hand — CI rejects drift):
+#   - The "Thresholds — Reference" table in campaigner/CAMPAIGNER.md
+#     (between `<!-- BEGIN GENERATED:thresholds:reference-table -->` markers)
+#   - The schema-version banner in campaigner/CAMPAIGNER.md
+#     (between `<!-- BEGIN GENERATED:thresholds:schema-version -->` markers)
+#   - campaigner/lib/thresholds.py (Python constants module — consumed by
+#     log_decision.py for stamping `thresholds_schema_version` on every row,
+#     and available to check_guardrails.py + other lib code that needs literals)
+#
+# Markdown prompts reference thresholds by name as `{{<dotted.name>}}`.
+# Claude reads the reference table (generated into CAMPAIGNER.md) to know
+# what each placeholder resolves to.
+#
+# Run `make generate` after editing this file.
+# Run `make verify-generated` to check that generated files are in sync.
+#
+# Adding a threshold: pick the right domain, add a block, run `make generate`,
+# then walk the prompts to replace any remaining hardcoded literal with the
+# placeholder. CI's grep-for-literals check will catch missed swaps.
+#
+# Bumping schema_version: any change to the values is a v1.0.x bump (additive
+# / value tweak). Renaming a key or changing a unit is a v1.x.0 bump (schema
+# break — old `agent_decisions` rows may reference removed names).
+
+schema_version: "1.0.0"
+
+# ---------------------------------------------------------------------------
+# Anti-flood proposal caps (CAMPAIGNER.md §Step 5, guardrails.md §2)
+# ---------------------------------------------------------------------------
+anti_flood:
+  budget_tier_small_ils:
+    value: 50
+    unit: ILS
+    description: "Daily-budget ceiling for the small tier — below this the agent caps at `max_proposals_small`."
+  budget_tier_medium_ils:
+    value: 500
+    unit: ILS
+    description: "Daily-budget ceiling for the medium tier — 50–500 caps at `max_proposals_medium`; above caps at `max_proposals_large`."
+  max_proposals_small:
+    value: 2
+    description: "Max proposals/day when `daily_budget_ils < budget_tier_small_ils`."
+  max_proposals_medium:
+    value: 5
+    description: "Max proposals/day when `daily_budget_ils` is between the small and medium tiers."
+  max_proposals_large:
+    value: 10
+    description: "Max proposals/day when `daily_budget_ils > budget_tier_medium_ils`."
+
+# ---------------------------------------------------------------------------
+# Gate 1 — Leading signals (performance-brain.md §4, decision-tree.md §T0)
+# Creative-level, 48h–7d window. Drives kill triggers before CPA stabilizes.
+# ---------------------------------------------------------------------------
+gate_1:
+  hook_rate_good_pct:
+    value: 35
+    unit: "%"
+    description: "Hook rate above this = winner potential. Iterate variants."
+  hook_rate_kill_pct:
+    value: 25
+    unit: "%"
+    description: "Hook rate below this after the evaluation window = kill / add new angle."
+  ctr_good_pct:
+    value: 2
+    unit: "%"
+    description: "CTR above this = leading signal of winner."
+  ctr_kill_pct:
+    value: 1
+    unit: "%"
+    description: "CTR below this with sufficient volume = kill (offer/CTA broken)."
+  thumbstop_good_pct:
+    value: 30
+    unit: "%"
+    description: "Thumb-stop rate above this = winner-grade engagement."
+  thumbstop_kill_pct:
+    value: 20
+    unit: "%"
+    description: "Thumb-stop rate below this after the evaluation window = kill."
+  impressions_floor:
+    value: 1000
+    description: "Per-creative impressions floor for Gate 1 reliability."
+  clicks_floor:
+    value: 50
+    description: "Per-creative clicks floor for CTR reliability."
+  evaluation_window_hours:
+    value: 48
+    unit: hours
+    description: "Time floor before reading Gate 1 signals — earlier reads are Meta-delivery ramp, not signal."
+
+# ---------------------------------------------------------------------------
+# Gate 2 — Lagging signals (performance-brain.md §5, decision-tree.md §T0r/§T1)
+# Campaign-level, post-Learning. The Andromeda-correct decision surface.
+# ---------------------------------------------------------------------------
+gate_2:
+  winner_ratio:
+    value: 0.85
+    unit: "×"
+    description: "Winner-grade: CPA ≤ target × this ratio (with utilization + hook qualifiers)."
+  baseline_band_pct:
+    value: 15
+    unit: "%"
+    description: "Average lane: KPI within ± this percent of target/baseline."
+  expensive_threshold:
+    value: 1.3
+    unit: "×"
+    description: "Loser / expensive-but-stable: CPA > target × this sustained for `expensive_sustained_days`."
+  emergency_threshold:
+    value: 3.0
+    unit: "×"
+    description: "Emergency Pause: CPA > target × this triggers urgent pause regardless of other signals."
+  expensive_sustained_days:
+    value: 5
+    unit: days
+    description: "Days the expensive threshold must hold before the loser lane fires."
+  emergency_zero_conv_days:
+    value: 3
+    unit: days
+    description: "Days at full budget with zero conversions before Emergency Pause fires."
+  fatigue_cpr_multiple:
+    value: 2.0
+    unit: "×"
+    description: "Meta Creative Fatigue flag: current CPR ≥ this × prior-window CPR."
+  ab_test_significance_pct:
+    value: 95
+    unit: "%"
+    description: "Statistical significance required to declare an A/B winner (or volume equivalent)."
+
+# ---------------------------------------------------------------------------
+# Learning phase (performance-brain.md §2, guardrails.md §3 / §18 / §24)
+# ---------------------------------------------------------------------------
+learning:
+  min_conversions_for_exit:
+    value: 50
+    description: "Conversions in 7-day window required to exit LEARNING. Drives `budget_daily_min_ils = CPA × this / 7`."
+  max_days_before_limited:
+    value: 7
+    unit: days
+    description: "Days a campaign can stay below the conversion floor before flipping to LEARNING_LIMITED."
+
+# ---------------------------------------------------------------------------
+# Utilization bands (decision-tree.md §T-1, guardrails.md §19)
+# Meta-spend-vs-budget ratio over the last 7 days. Bands gate downstream lanes.
+# ---------------------------------------------------------------------------
+utilization:
+  severely_under_ceiling:
+    value: 0.50
+    description: "Utilization below this = `severely_under` — Meta refusing to spend the budget."
+  under_ceiling:
+    value: 0.80
+    description: "Utilization below this (and above `severely_under_ceiling`) = `under`."
+  healthy_ceiling:
+    value: 1.05
+    description: "Utilization at or below this = `healthy`. Above = `over` (single-day overspend; Meta will rebalance)."
+  new_creative_floor:
+    value: 0.50
+    description: "Guardrails §19: `new_creative` is rejected when `utilization_7d < this` (the existing pool isn't being seen — adding more variants won't help)."
+
+# ---------------------------------------------------------------------------
+# Scaling (decision-tree.md §T2+/§T_SD, guardrails.md §4/§20/§21/§22/§23)
+# ---------------------------------------------------------------------------
+scaling:
+  scale_up_branch_a_pct:
+    value: 30
+    unit: "%"
+    description: "Strict winner (CPA × `winner_ratio_strict` + hook > Gate-1-good + freq < `solid_strong_freq_ceiling`): scale_up by this."
+  scale_up_branch_b_pct:
+    value: 20
+    unit: "%"
+    description: "Default winner: scale_up by this when the strict-winner conditions aren't fully met."
+  scale_up_branch_c_pct:
+    value: 15
+    unit: "%"
+    description: "Solid-strong (CPA ~target + utilization ≥ `solid_strong_util_floor`): conservative scale_up."
+  scale_up_default_cap_pct:
+    value: 20
+    unit: "%"
+    description: "Guardrails §4: default ceiling on a single daily-budget increase."
+  scale_up_strict_cap_pct:
+    value: 30
+    unit: "%"
+    description: "Guardrails §4: ceiling when hook + frequency + ACTIVE conditions are all met."
+  scale_down_step_pct:
+    value: 15
+    unit: "%"
+    description: "Guardrails §22: max single-step scale_down."
+  cooldown_hours:
+    value: 72
+    unit: hours
+    description: "Router §T0r R0 cooldown — hours since the last campaign edit before another structural change is allowed."
+  cadence_window_days:
+    value: 7
+    unit: days
+    description: "Guardrails §20: max one scale_up per campaign per this many days."
+  marginal_return_min_lift:
+    value: 1.10
+    unit: "×"
+    description: "Guardrails §21: a prior scale_up must have produced ≥ this × prior conversions before another scale_up is allowed."
+  marginal_return_lookback_days:
+    value: 14
+    unit: days
+    description: "Guardrails §21: window over which the prior scale_up's effect is measured."
+  consecutive_scale_down_window_days:
+    value: 14
+    unit: days
+    description: "Guardrails §23: a campaign that had a scale_down within this window cannot get another."
+
+# ---------------------------------------------------------------------------
+# A/B testing (guardrails.md §12/§29/§30)
+# ---------------------------------------------------------------------------
+ab_test:
+  min_variants:
+    value: 2
+    description: "Guardrails §29: minimum creative variants per A/B test."
+  max_variants:
+    value: 4
+    description: "Guardrails §29: maximum creative variants per A/B test (more = sample-per-variant too thin)."
+  min_window_days:
+    value: 7
+    unit: days
+    description: "Guardrails §30: minimum A/B test window before `ab_test_decide` is allowed."
+
+# ---------------------------------------------------------------------------
+# Solid-strong qualifiers (performance-brain.md §5 — Solid-Strong lane,
+# decision-tree.md §T0r R8 / §T2+ Branch C)
+# ---------------------------------------------------------------------------
+solid_strong:
+  util_floor:
+    value: 0.95
+    description: "Solid-strong utilization floor (utilization ≥ this for the lane to qualify)."
+  freq_ceiling:
+    value: 2.5
+    description: "Solid-strong frequency ceiling (freq < this for the lane to qualify)."
+  hook_floor:
+    value: 0.30
+    description: "Solid-strong hook-rate floor (hook > this for the lane to qualify)."
+
+# ---------------------------------------------------------------------------
+# Portfolio rebalance (performance-brain.md §8, decision-tree.md §T11)
+# ---------------------------------------------------------------------------
+portfolio:
+  safety_cap_ils:
+    value: 200
+    unit: ILS
+    description: "Hard ceiling on a single rebalance daily movement."
+  delta_floor_ils:
+    value: 10
+    unit: ILS
+    description: "Floor below which a rebalance is noise — log SKIP."
+
+# ---------------------------------------------------------------------------
+# Feedback / memory (guardrails.md §37 / §39)
+# ---------------------------------------------------------------------------
+feedback:
+  prior_rejection_lookback_days:
+    value: 60
+    unit: days
+    description: "Guardrails §37: window over which prior operator rejections constrain new proposals on the same (task_type, target)."
+  active_plan_window_days:
+    value: 21
+    unit: days
+    description: "Guardrails §39: window over which an active plan binds the agent to advance or explicitly skip."

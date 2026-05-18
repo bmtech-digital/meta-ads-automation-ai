@@ -35,9 +35,9 @@
 ## 2. Learning Phase — מתי לא לגעת
 
 ```
-if conversions_7d < 50 AND days_active <= 7:
+if conversions_7d < {{learning.min_conversions_for_exit}} AND days_active <= {{learning.max_days_before_limited}}:
     status = LEARNING           # DON'T TOUCH — reject any proposal that targets this campaign
-if conversions_7d < 50 AND days_active > 7 AND not volume_trending_up:
+if conversions_7d < {{learning.min_conversions_for_exit}} AND days_active > {{learning.max_days_before_limited}} AND not volume_trending_up:
     status = LEARNING_LIMITED   # options: increase_budget | consolidate_adsets | expand_audience
 else:
     status = ACTIVE              # apply Gate 2 evaluation
@@ -46,7 +46,7 @@ else:
 **חישוב תקציב מינימלי ליציאה מ-Learning:**
 
 ```
-budget_daily_min_ils = (expected_cpa_ils × 50) / 7
+budget_daily_min_ils = (expected_cpa_ils × {{learning.min_conversions_for_exit}}) / {{learning.max_days_before_limited}}
 # דוגמה: CPA יעד ₪100 → תקציב מינימום ₪715/יום
 ```
 
@@ -60,21 +60,21 @@ budget_daily_min_ils = (expected_cpa_ils × 50) / 7
 
 ```
 Gate 1 (leading, creative-level):
-  ✅ ≥ 1,000 חשיפות לכל קריאייטיב
-  ✅ ≥ 50 clicks לכל קריאייטיב (לאמינות CTR)
+  ✅ ≥ {{gate_1.impressions_floor}} חשיפות לכל קריאייטיב
+  ✅ ≥ {{gate_1.clicks_floor}} clicks לכל קריאייטיב (לאמינות CTR)
 
 Gate 2 (lagging, campaign-level):
-  ✅ 50+ המרות (יציאה מ-Learning)
-  ✅ CPA יציב 5-7 ימים
+  ✅ {{learning.min_conversions_for_exit}}+ המרות (יציאה מ-Learning)
+  ✅ CPA יציב {{gate_2.expensive_sustained_days}}-7 ימים
 
 A/B test declarations:
-  ✅ 95% statistical significance
+  ✅ {{gate_2.ab_test_significance_pct}}% statistical significance
 ```
 
 **Time-based safety floor:**
 
 ```
-✅ ≥ 48h מהשינוי המשמעותי האחרון
+✅ ≥ {{gate_1.evaluation_window_hours}}h מהשינוי המשמעותי האחרון
 ```
 
 בלי זה — הסוכן רואה את ה-ramp של Meta delivery ומפרש אותו כטרנד.
@@ -82,8 +82,8 @@ A/B test declarations:
 **חריג — Emergency Kill (התעלם מה-thresholds למעלה):**
 
 ```
-CPA > 3× יעד
-   OR (הוצאה ≥ תקציב יומי מלא AND 0 המרות למשך 3+ ימים)
+CPA > {{gate_2.emergency_threshold}}× יעד
+   OR (הוצאה ≥ תקציב יומי מלא AND 0 המרות למשך {{gate_2.emergency_zero_conv_days}}+ ימים)
    → 🚨 הצעה דחופה (urgency='urgent')
 ```
 
@@ -95,16 +95,16 @@ CPA > 3× יעד
 
 | עדיפות | מדד                 | "טוב" | Kill trigger           |
 | ------ | ------------------- | ----- | ---------------------- |
-| 1      | **Hook Rate (3s)**  | > 35% | < 25% אחרי 48h         |
-| 2      | **CTR** (מוקדם)     | > 2%  | < 1% עם ≥ 1,000 חשיפות |
-| 3      | **Thumb-stop rate** | > 30% | < 20% אחרי 48h         |
+| 1      | **Hook Rate (3s)**  | > {{gate_1.hook_rate_good_pct}}% | < {{gate_1.hook_rate_kill_pct}}% אחרי {{gate_1.evaluation_window_hours}}h         |
+| 2      | **CTR** (מוקדם)     | > {{gate_1.ctr_good_pct}}%  | < {{gate_1.ctr_kill_pct}}% עם ≥ {{gate_1.impressions_floor}} חשיפות |
+| 3      | **Thumb-stop rate** | > {{gate_1.thumbstop_good_pct}}% | < {{gate_1.thumbstop_kill_pct}}% אחרי {{gate_1.evaluation_window_hours}}h         |
 
 **קריאה:**
 
-- Hook > 35% + CTR > 2% → winner potential. Iterate (2-3 וריאנטים דומים).
-- Hook 25-35% + CTR תקין → solid. אל תיגע.
-- Hook < 25% אחרי 48h → kill. הוסף וריאנט עם angle שונה.
-- CTR < 1% עם ≥ 1,000 חשיפות → kill, גם אם hook בסדר (CTA/offer לא עובד).
+- Hook > {{gate_1.hook_rate_good_pct}}% + CTR > {{gate_1.ctr_good_pct}}% → winner potential. Iterate (2-3 וריאנטים דומים).
+- Hook {{gate_1.hook_rate_kill_pct}}-{{gate_1.hook_rate_good_pct}}% + CTR תקין → solid. אל תיגע.
+- Hook < {{gate_1.hook_rate_kill_pct}}% אחרי {{gate_1.evaluation_window_hours}}h → kill. הוסף וריאנט עם angle שונה.
+- CTR < {{gate_1.ctr_kill_pct}}% עם ≥ {{gate_1.impressions_floor}} חשיפות → kill, גם אם hook בסדר (CTA/offer לא עובד).
 
 ---
 
@@ -112,39 +112,39 @@ CPA > 3× יעד
 
 | עדיפות | מדד                             | "טוב"        | Kill trigger              |
 | ------ | ------------------------------- | ------------ | ------------------------- |
-| 1      | **CPA**                         | ≤ יעד        | > 1.3× יעד למשך 5+ ימים   |
+| 1      | **CPA**                         | ≤ יעד        | > {{gate_2.expensive_threshold}}× יעד למשך {{gate_2.expensive_sustained_days}}+ ימים   |
 | 2      | **ROAS**                        | ≥ Break-even | נמוך מרווחיות מינימלית    |
-| 3      | **Meta Creative Fatigue flag**  | לא מסומן     | CPR ≥ 2× baseline היסטורי |
+| 3      | **Meta Creative Fatigue flag**  | לא מסומן     | CPR ≥ {{gate_2.fatigue_cpr_multiple}}× baseline היסטורי |
 | 4      | **Frequency** (monitoring only) | —            | **לא trigger עצמאי**      |
 
 **קריאה:**
 
 ```
-🟢 Winner: CPA ≤ יעד × 0.8 יציב 5-7 ימים + hook > 35%
-   → §T0r R8/R9 → §T2+ Branch A/B (20%/30% scale_up)
+🟢 Winner: CPA ≤ יעד × {{gate_2.winner_ratio}} יציב {{gate_2.expensive_sustained_days}}-7 ימים + hook > {{gate_1.hook_rate_good_pct}}%
+   → §T0r R8/R9 → §T2+ Branch A/B ({{scaling.scale_up_branch_b_pct}}%/{{scaling.scale_up_branch_a_pct}}% scale_up)
    חובה: marginal-return guard + cadence cap לפני שמציעים.
 
-🟢 Solid-Strong: CPA between 0.85-1.05× יעד + utilization ≥ 95% + hook > 30%
-   → §T0r R8 → §T2+ Branch C (+15% scale_up — Roi 2026-05-12)
+🟢 Solid-Strong: CPA between {{gate_2.winner_ratio}}-1.05× יעד + utilization ≥ {{solid_strong.util_floor}} + hook > {{solid_strong.hook_floor}}
+   → §T0r R8 → §T2+ Branch C (+{{scaling.scale_up_branch_c_pct}}% scale_up — Roi 2026-05-12)
    "פוגע ביעד + מקום לצמיחה" — מקרה שלא קיבל ענף עד 2026-05-12.
 
-🟡 Average: KPI ב-baseline ±15%, ללא triggers
+🟡 Average: KPI ב-baseline ±{{gate_2.baseline_band_pct}}%, ללא triggers
    → §T0r → לפי active_creative_count:
      active_count < 5 OR last_add > 7d → §T_PE (creative pool exhausted → firehose)
      active_count ≥ 5 AND recent activity → §T_HO (hands_off — log SKIP, no action)
    **חשוב:** "average + מאגר בריא" = אל תיגע. אל תוסיף קריאייטיבים אוטומטית רק כי 'יש שבוע'.
    זה היה הפטרן הישן שגרם להצעות מיותרות. הוספה רק כשהמאגר באמת התרוקן.
 
-🟠 Expensive-but-stable: CPA between 1.3-3.0× יעד 5+ ימים, ללא fatigue, ללא CTR-low
-   → §T0r R6 default → §T_SD (scale_down -15%)
+🟠 Expensive-but-stable: CPA between {{gate_2.expensive_threshold}}-{{gate_2.emergency_threshold}}× יעד {{gate_2.expensive_sustained_days}}+ ימים, ללא fatigue, ללא CTR-low
+   → §T0r R6 default → §T_SD (scale_down -{{scaling.scale_down_step_pct}}%)
    חדש 2026-05-12 — קודם אופציה זו לא היתה ענף; היה רק "pause או refresh".
 
-🔴 Loser: CPA > 1.3× יעד 5+ ימים
-   AND Creative Fatigue flag (CPR ≥ 2×) → §T1 fatigue → new_creative × 3-5 (לא פאוזה!)
-   AND CTR < 1% → §T1 CTR-low → new_creative עם angle אחר
-   AND CTR > 2% + 0 conv → §T1 LP issue → alert (בעיה בדף הנחיתה)
+🔴 Loser: CPA > {{gate_2.expensive_threshold}}× יעד {{gate_2.expensive_sustained_days}}+ ימים
+   AND Creative Fatigue flag (CPR ≥ {{gate_2.fatigue_cpr_multiple}}×) → §T1 fatigue → new_creative × 3-5 (לא פאוזה!)
+   AND CTR < {{gate_1.ctr_kill_pct}}% → §T1 CTR-low → new_creative עם angle אחר
+   AND CTR > {{gate_1.ctr_good_pct}}% + 0 conv → §T1 LP issue → alert (בעיה בדף הנחיתה)
 
-🚨 Emergency: CPA > 3× יעד OR 3+ ימים 0 conv עם תקציב מלא
+🚨 Emergency: CPA > {{gate_2.emergency_threshold}}× יעד OR {{gate_2.emergency_zero_conv_days}}+ ימים 0 conv עם תקציב מלא
    → §T1 emergency → pause_campaign urgency='urgent'
 
 ℹ️ Frequency > 3 לבד
@@ -164,13 +164,13 @@ Meta מסמנת קריאייטיב כ-fatigued כאשר **CPR (Cost Per Result) 
 
 | חוק שהופקע                         | למה                                          | מה החליף אותו                                              |
 | ---------------------------------- | -------------------------------------------- | ---------------------------------------------------------- |
-| Frequency > 3 = auto-kill          | Andromeda מטרגטת טוב יותר; freq גבוה ≠ שחיקה | Meta Creative Fatigue flag (CPR ≥ 2×)                      |
+| Frequency > 3 = auto-kill          | Andromeda מטרגטת טוב יותר; freq גבוה ≠ שחיקה | Meta Creative Fatigue flag (CPR ≥ {{gate_2.fatigue_cpr_multiple}}×)                      |
 | 1 ad set = 1 ad                    | Andromeda מעדיפה ad sets גדולים              | ad set אחד עם 10+ ads                                      |
 | Horizontal scaling ע"י duplication | duplication מאפס Learning                    | Vertical scaling (budget) בלבד                             |
 | Narrow interest targeting          | Advantage+ עובד טוב יותר broad               | Broad + creative diversity                                 |
 | הסתמכות על single winning creative | מביא לשחיקה מהירה                            | 10-50+ קריאייטיבים מגוונים                                 |
 | Manual pruning ב-5-7 ימים          | Andromeda מחלקת תקציב לא-אחיד במכוון         | Continuous additions; אל תחתוך ידנית לפני Gate 1 threshold |
-| 72h time-based sufficiency         | נפח > זמן                                    | ≥1,000 חשיפות + ≥50 clicks                                 |
+| 72h time-based sufficiency         | נפח > זמן                                    | ≥{{gate_1.impressions_floor}} חשיפות + ≥{{gate_1.clicks_floor}} clicks                                 |
 
 **Guardrail אקטיבי** `no_frequency_only_kill` יפסול אוטומטית כל proposal שה-rationale שלו מסתמך רק על frequency (§14).
 
@@ -238,8 +238,8 @@ Meta מסמנת קריאייטיב כ-fatigued כאשר **CPR (Cost Per Result) 
 
 | תפקיד | סימנים | מה הסוכן מציע |
 |---|---|---|
-| **"רעב לתקציב" (hungry winner)** | `lane = scale_up_candidate` + `utilization_7d ≥ 0.95` + `CPA ≤ target × 0.85` + ACTIVE 7+ ימים + `marginal_return_passed == true` | יעד לקבלת תקציב — הצעת `scale_up` |
-| **"יקר אבל יציב" (expensive stable)** | `lane = scale_down_candidate` + `CPA between 1.3-3.0× target` + ACTIVE 7+ ימים + לא fatigue (יש מסלול אחר) + לא Learning (§24) | מקור לוויתור על תקציב — הצעת `scale_down` -15% |
+| **"רעב לתקציב" (hungry winner)** | `lane = scale_up_candidate` + `utilization_7d ≥ {{solid_strong.util_floor}}` + `CPA ≤ target × {{gate_2.winner_ratio}}` + ACTIVE 7+ ימים + `marginal_return_passed == true` | יעד לקבלת תקציב — הצעת `scale_up` |
+| **"יקר אבל יציב" (expensive stable)** | `lane = scale_down_candidate` + `CPA between {{gate_2.expensive_threshold}}-{{gate_2.emergency_threshold}}× target` + ACTIVE 7+ ימים + לא fatigue (יש מסלול אחר) + לא Learning (§24) | מקור לוויתור על תקציב — הצעת `scale_down` -{{scaling.scale_down_step_pct}}% |
 
 קמפיינים ב-hands_off / learning / cold_start / fatigue / pool_exhausted **אינם** מועמדים — כבר טופלו במסלולים שלהם.
 
@@ -247,13 +247,13 @@ Meta מסמנת קריאייטיב כ-fatigued כאשר **CPR (Cost Per Result) 
 
 ```
 delta_ils = min(
-  expensive.daily_budget_ils × 0.15,   # §22: scale_down ≤ 15%/step
-  winner.daily_budget_ils    × 0.20,   # §3 Branch A: scale_up 20%/step
-  ₪200                                  # safety cap on daily movement
+  expensive.daily_budget_ils × ({{scaling.scale_down_step_pct}} / 100),   # §22: scale_down ≤ {{scaling.scale_down_step_pct}}%/step
+  winner.daily_budget_ils    × ({{scaling.scale_up_branch_b_pct}} / 100), # §3 Branch A: scale_up {{scaling.scale_up_branch_b_pct}}%/step
+  ₪{{portfolio.safety_cap_ils}}                                            # safety cap on daily movement
 )
 ```
 
-הסף התחתון: `delta_ils ≥ ₪10`. מתחת לזה — רעש, log SKIP.
+הסף התחתון: `delta_ils ≥ ₪{{portfolio.delta_floor_ils}}`. מתחת לזה — רעש, log SKIP.
 
 ### למה לא לאחד הכל ב-`portfolio_rebalance` task_type?
 

@@ -36,6 +36,7 @@ campaigner/cli/        campaigner/tools/
 | [`creative.py`](creative.py) | Vertex Imagen client. The only place that imports `google-genai`. | Image generation, model tier selection, GCS upload. |
 | [`baselines.py`](baselines.py) | Compute & query baselines from the `baselines` table. | The math behind §6.4 baseline windows. |
 | [`seasonal.py`](seasonal.py) | Seasonality hints (Israel/Hebrew calendar). | When a campaign should expect lift / drop windows. |
+| [`thresholds.py`](thresholds.py) | **Generated** Python constants for every tunable rule threshold + the `SCHEMA_VERSION` string. Source: [`../../config/thresholds.yaml`](../../config/thresholds.yaml) via [`scripts/generate_from_thresholds.py`](../../scripts/generate_from_thresholds.py). Hand-edits to this file are overwritten by `make generate`. | Consumed by `log_decision.py` for schema-version stamping; available for any future lib/tool code that needs the literal values. |
 
 ## Rules
 
