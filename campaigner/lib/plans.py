@@ -87,6 +87,187 @@ def extract_steps(rationale: str | None) -> list[dict[str, Any]]:
     return out
 
 
+_VALID_OPERATORS = frozenset({">", ">=", "<", "<=", "==", "!="})
+# Dotted name into config/thresholds.yaml — e.g. "gate_2.winner_ratio".
+# Format-only validation; existence is not checked here (cf. CAMPAIGNER.md
+# Thresholds Reference table — the agent is responsible for picking a real name).
+_THRESHOLD_NAME_RX = re.compile(r"^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$")
+
+
+def validate_structured_plan(plan: dict) -> str | None:
+    """Validate the shape of a `propose_task --plan` argument.
+
+    Returns None when valid; a human-readable error string otherwise.
+
+    Required shape (subset; full contract documented in propose_task.py):
+
+        {
+          "trigger": {
+            "metric": str,                # required
+            "operator": str,              # required; in _VALID_OPERATORS
+            "threshold_name": str | None, # optional; dotted thresholds.yaml ref
+            "threshold_value": number | None,  # optional; literal snapshot
+            "sustained_days": int | None, # optional; >= 1
+          },
+          "proposed_action": {
+            "task_type": str,             # required
+            "payload": dict,              # required (can be empty {})
+            "target_kind": str | None,
+            "target_id": str | None,
+          },
+          "owning_flow": str,             # required
+          "action_text": str,             # required (Hebrew operator readback)
+          "step_order": int (default 2),  # optional; >= 2
+          "expires_in_days": int (default 21),  # optional; in [1, 90]
+        }
+    """
+    if not isinstance(plan, dict):
+        return "--plan must be a JSON object"
+    trigger = plan.get("trigger")
+    if not isinstance(trigger, dict):
+        return "--plan.trigger must be a JSON object"
+    metric = trigger.get("metric")
+    if not isinstance(metric, str) or not metric.strip():
+        return "--plan.trigger.metric must be a non-empty string"
+    operator = trigger.get("operator")
+    if operator not in _VALID_OPERATORS:
+        return f"--plan.trigger.operator must be one of {sorted(_VALID_OPERATORS)}"
+    name = trigger.get("threshold_name")
+    if name is not None:
+        if not isinstance(name, str) or not _THRESHOLD_NAME_RX.match(name):
+            return (
+                "--plan.trigger.threshold_name must be a dotted name like "
+                "'gate_2.winner_ratio' (lowercase, snake_case, single dot)"
+            )
+    value = trigger.get("threshold_value")
+    if value is not None and not isinstance(value, int | float):
+        return "--plan.trigger.threshold_value must be a number"
+    if name is None and value is None:
+        return (
+            "--plan.trigger must include either threshold_name or threshold_value "
+            "(use threshold_name for thresholds.yaml-bound rules; threshold_value "
+            "for absolute literals like '30 days')"
+        )
+    sustained = trigger.get("sustained_days")
+    if sustained is not None and (not isinstance(sustained, int) or sustained < 1):
+        return "--plan.trigger.sustained_days must be a positive integer (omit for single-day signals)"
+
+    action = plan.get("proposed_action")
+    if not isinstance(action, dict):
+        return "--plan.proposed_action must be a JSON object"
+    task_type = action.get("task_type")
+    if not isinstance(task_type, str) or not task_type.strip():
+        return "--plan.proposed_action.task_type must be a non-empty string"
+    payload = action.get("payload")
+    if not isinstance(payload, dict):
+        return "--plan.proposed_action.payload must be a JSON object (can be empty)"
+
+    if not isinstance(plan.get("owning_flow"), str) or not plan["owning_flow"].strip():
+        return "--plan.owning_flow must be a non-empty string"
+    if not isinstance(plan.get("action_text"), str) or not plan["action_text"].strip():
+        return "--plan.action_text must be a non-empty Hebrew step description"
+
+    step_order = plan.get("step_order", 2)
+    if not isinstance(step_order, int) or step_order < 2:
+        return "--plan.step_order must be an integer >= 2 (step 1 is the approval itself)"
+    expires_in_days = plan.get("expires_in_days", 21)
+    if not isinstance(expires_in_days, int) or not (1 <= expires_in_days <= 90):
+        return "--plan.expires_in_days must be an integer in [1, 90]"
+    return None
+
+
+def create_structured_row(
+    conn,
+    business_id: str,
+    source_approval_id: str | None,
+    target_kind: str | None,
+    target_id: str | None,
+    plan: dict,
+) -> str:
+    """Insert a structured plans_carryover row from a validated `--plan` arg.
+
+    Caller MUST have run `validate_structured_plan(plan)` first and confirmed
+    it returned None. The function does not re-validate — it trusts the
+    propose_task layer.
+
+    Returns the new plan row's UUID as a string.
+
+    The Hebrew `action_text` from the agent populates `plans_carryover.action_text`
+    so the operator-facing surface stays identical to legacy prose-only rows.
+    The structured columns (metric / operator / threshold_name / etc.) are
+    populated alongside so a future run can evaluate the trigger
+    programmatically without re-parsing the Hebrew.
+    """
+    import json as _json
+
+    trigger = plan["trigger"]
+    action = plan["proposed_action"]
+    step_order = plan.get("step_order", 2)
+    expires_in_days = plan.get("expires_in_days", 21)
+    # We thread a `trigger_condition` Hebrew snippet too — best-effort
+    # human-readable summary if the agent supplied one. If not, derive it
+    # from the structured fields so the existing operator UI surfaces
+    # something legible.
+    trigger_condition = trigger.get("condition_text") or (
+        f"{trigger['metric']} {trigger['operator']} "
+        f"{trigger.get('threshold_name') or trigger.get('threshold_value')}"
+        + (
+            f" (sustained {trigger['sustained_days']}d)"
+            if trigger.get("sustained_days")
+            else ""
+        )
+    )
+
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            INSERT INTO plans_carryover (
+                business_id, source_approval_id,
+                target_kind, target_id,
+                step_order, action_text, trigger_condition,
+                trigger_metric, trigger_operator,
+                trigger_threshold_name, trigger_threshold_value,
+                trigger_sustained_days,
+                proposed_action_payload, proposed_action_task_type,
+                owning_flow, expires_at
+            )
+            VALUES (
+                %s, %s,
+                %s, %s,
+                %s, %s, %s,
+                %s, %s,
+                %s, %s,
+                %s,
+                %s::jsonb, %s,
+                %s, now() + (%s || ' days')::interval
+            )
+            RETURNING id
+            """,
+            (
+                business_id,
+                source_approval_id,
+                target_kind,
+                target_id,
+                step_order,
+                plan["action_text"],
+                trigger_condition[:500] if trigger_condition else None,
+                trigger["metric"],
+                trigger["operator"],
+                trigger.get("threshold_name"),
+                trigger.get("threshold_value"),
+                trigger.get("sustained_days"),
+                _json.dumps(action.get("payload") or {}),
+                action["task_type"],
+                plan["owning_flow"],
+                str(expires_in_days),
+            ),
+        )
+        row = cur.fetchone()
+    if isinstance(row, dict):
+        return str(row["id"])
+    return str(row[0])
+
+
 def persist_from_approval(conn, approval_id: str) -> int:
     """Read the approval, extract forward steps, insert rows into
     plans_carryover. Returns the number of rows inserted.

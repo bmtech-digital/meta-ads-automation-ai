@@ -1,37 +1,29 @@
 """
-tools/load_active_plans.py — lightweight cross-run memory of forward-looking plans.
+tools/load_active_plans.py — cross-run memory of forward-looking plans.
 
-Per hebrew-copy-style §11 rule 6 (added v0.4), every approved/executed proposal's
-`rationale` ends with a `תוכנית:` block:
+Per hebrew-copy-style §11 rule 6, every approved/executed proposal's
+`rationale` ends with a `תוכנית:` block whose steps 2-3 are forward-looking
+("אם הניצול עלה ל-95% — להציע scale_up"). This tool surfaces those steps
+so the agent's next run has memory of conditional commitments it made.
 
-    תוכנית:
-    1. [הפעולה הנוכחית — מה האישור הזה עושה]
-    2. [צעד הבא — אם <תנאי> אז להציע <X>]
-    3. [צעד שני הבא — אופציונלי]
+After PRD step 5 (migration 032) the source of truth is `plans_carryover`
+populated at propose-time via `propose_task --plan`. Step 5 also retired
+the legacy regex-on-rationale path: any rationale whose author skipped
+`--plan` simply has no structured plan to surface. The agent is now bound
+to the structured commitment, not the prose.
 
-Step 1 is the action that was approved. Steps 2-3 are forward-looking, often
-conditional ("אם הניצול עלה ל-80% — להציע ..."). Until now this future-looking
-plan vaporized at run-end: the next run started cold, with no memory that
-"we said if utilization recovers above 80%, propose scale_up."
+For each pending, non-expired row this tool returns:
+  - The Hebrew `action_text` (operator readback, identical to legacy rows)
+  - The structured trigger (metric, operator, threshold_name, threshold_value,
+    sustained_days) when present — populated for rows written via
+    `propose_task --plan`. NULL for legacy rows from
+    `lib.plans.persist_from_approval()`.
+  - The proposed-action `task_type` + payload that would fire when the
+    trigger evaluates true (also populated only for structured rows).
 
-This tool fixes that with **soft memory** (no new table — minimal infrastructure):
-
-  1. For each campaign that is still ACTIVE (or paused < 30 days), find the
-     most recent approval that has a `תוכנית:` block in its rationale and
-     was either executed or approved.
-  2. Extract steps 2-3 (forward-looking) from the rationale text.
-  3. Return them so the agent reads "for campaign X, on date Y, I committed
-     to step 2: <text>" — and decides per-step whether the trigger condition
-     is now met based on the live signals it already collected.
-
-The agent cannot programmatically evaluate Hebrew conditional triggers like
-"אם CPL ירד מתחת ל-150" — but it can read them, and the decision-tree §T0r
-classification + step 2's condition together let the agent answer "yes, the
-condition I set last week is now met" without us building a DSL.
-
-For full plan-carryover (status tracking, automated trigger checks, structured
-step data), migration 023+ would be needed. Soft memory is the v1 — earns trust
-before we invest in heavier infrastructure.
+§39 `respect_active_plans` consumes the same output. The structured
+fields are additive — a row without them still produces a valid plan
+entry (the agent reads `action_text` like before).
 
 Contract: §11.6 (JSON stdout, exit 0/1/2).
 """
@@ -39,7 +31,6 @@ Contract: §11.6 (JSON stdout, exit 0/1/2).
 from __future__ import annotations
 
 import argparse
-import re
 
 from campaigner.lib.config import Config, ConfigError
 from campaigner.lib.db import fetch_all
@@ -50,61 +41,25 @@ from campaigner.tools._contract import (
     with_db_retry,
 )
 
-# Match the תוכנית block — Hebrew letters + the asterisks markdown uses,
-# tolerant of variants (with/without bold markers, with/without trailing colon).
-# Capture everything from "תוכנית" to either end-of-string or next "אישור = "
-# (per §11 rule 7 the footer comes after the plan).
-_PLAN_HEADER_RX = re.compile(
-    r"(?:\*\*)?תוכנית(?:\*\*)?\s*[:：]\s*",
-)
-_FOOTER_RX = re.compile(r"\n\s*אישור\s*[=—:]")
-
-# A plan step: a numbered or bulleted line. We accept "1.", "1)", "1 -" or "• ".
-_STEP_LINE_RX = re.compile(
-    r"^\s*(?:(\d+)\s*[\.\):\-]|[•●▪\-])\s*(.+?)\s*$",
-    re.MULTILINE,
-)
-
-
-def _extract_plan(rationale: str) -> list[str]:
-    """Return the list of step-strings from a rationale's תוכנית block.
-
-    Returns [] if no plan block is present, or if the block is empty/malformed."""
-    if not rationale:
-        return []
-    m = _PLAN_HEADER_RX.search(rationale)
-    if not m:
-        return []
-    after_header = rationale[m.end() :]
-    # End the plan block at the "אישור =" footer if present
-    footer_m = _FOOTER_RX.search(after_header)
-    block = after_header[: footer_m.start()] if footer_m else after_header
-    # Capture numbered/bulleted lines as steps. We keep only non-empty trims.
-    steps = []
-    for sm in _STEP_LINE_RX.finditer(block):
-        text = sm.group(2).strip()
-        # Strip trailing markdown asterisks
-        text = re.sub(r"\*+$", "", text).strip()
-        if text and len(text) > 4:  # filter accidental short lines
-            steps.append(text)
-        if len(steps) >= 5:  # plans are 1-3 steps; cap at 5 for safety
-            break
-    return steps
-
 
 def main() -> None:
     p = argparse.ArgumentParser(
-        description="Surface forward-looking plan steps from prior approvals, so "
-        "the agent has cross-run memory of conditional commitments.",
+        description=(
+            "Surface forward-looking plan steps from prior approvals so the "
+            "agent has cross-run memory of conditional commitments."
+        ),
     )
     p.add_argument("--business-id", required=True)
     p.add_argument(
         "--days",
         type=int,
         default=21,
-        help="Only consider approvals approved/executed in the last N days. Default 21. "
-        "Older plans are stale — the situation has changed enough that the conditional "
-        "isn't meaningful anymore.",
+        help=(
+            "Only consider plans committed in the last N days. Default 21 "
+            "(mirrors plans_carryover.expires_at default). Older plans are "
+            "stale — the situation has changed enough that the conditional "
+            "isn't meaningful anymore."
+        ),
     )
     args = p.parse_args()
 
@@ -114,17 +69,20 @@ def main() -> None:
         emit_validation_error(str(e))
         return
 
-    # DB-first path (migration 023, 2026-05-13 PM): read plans_carryover
-    # directly. This is more robust than re-running regex on every rationale
-    # and exposes lifecycle (status: pending/triggered/superseded/expired).
     try:
-        carryover_rows = with_db_retry(
+        rows = with_db_retry(
             lambda: fetch_all(
                 """
-                SELECT pc.id AS plan_id, pc.source_approval_id, pc.target_kind,
-                       pc.target_id, pc.step_order, pc.action_text,
-                       pc.trigger_condition, pc.status, pc.committed_at,
-                       pc.expires_at, a.task_type
+                SELECT pc.id AS plan_id, pc.source_approval_id,
+                       pc.target_kind, pc.target_id,
+                       pc.step_order, pc.action_text, pc.trigger_condition,
+                       pc.trigger_metric, pc.trigger_operator,
+                       pc.trigger_threshold_name, pc.trigger_threshold_value,
+                       pc.trigger_sustained_days,
+                       pc.proposed_action_payload, pc.proposed_action_task_type,
+                       pc.owning_flow,
+                       pc.committed_at, pc.expires_at,
+                       a.task_type AS source_task_type
                   FROM plans_carryover pc
              LEFT JOIN approvals a ON a.id = pc.source_approval_id
                  WHERE pc.business_id = %s
@@ -142,84 +100,58 @@ def main() -> None:
 
     plans: list[dict] = []
     by_target: dict[tuple, dict] = {}
-    for r in carryover_rows or []:
+    structured_count = 0
+    legacy_count = 0
+    for r in rows or []:
         key = (r.get("target_kind"), r.get("target_id"))
         if key not in by_target:
             committed = r.get("committed_at")
             by_target[key] = {
-                "approval_id": str(r["source_approval_id"])
-                if r.get("source_approval_id")
-                else None,
-                "task_type": r.get("task_type"),
+                "approval_id": (
+                    str(r["source_approval_id"]) if r.get("source_approval_id") else None
+                ),
+                "task_type": r.get("source_task_type"),
                 "target_kind": r.get("target_kind"),
                 "target_id": r.get("target_id"),
                 "status": "approved_or_executed",
                 "committed_on": committed.date().isoformat() if committed else None,
-                "step_1_already_done": "(from plans_carryover — step 1 already executed)",
+                "step_1_already_done": (
+                    "(step 1 already executed — see source approval)"
+                ),
                 "forward_steps": [],
-                "source": "plans_carryover",
             }
-        step_dict = {
+        # Build the per-step entry. Structured trigger fields are surfaced
+        # as a nested `structured_trigger` object when they're populated;
+        # legacy rows just carry `action_text` + `trigger_condition`.
+        step_dict: dict = {
             "plan_id": str(r["plan_id"]),
             "step_order": r["step_order"],
             "action_text": r["action_text"],
             "trigger_condition": r.get("trigger_condition"),
         }
+        if r.get("trigger_metric") and r.get("trigger_operator"):
+            structured_count += 1
+            step_dict["structured_trigger"] = {
+                "metric": r["trigger_metric"],
+                "operator": r["trigger_operator"],
+                "threshold_name": r.get("trigger_threshold_name"),
+                "threshold_value": (
+                    float(r["trigger_threshold_value"])
+                    if r.get("trigger_threshold_value") is not None
+                    else None
+                ),
+                "sustained_days": r.get("trigger_sustained_days"),
+            }
+            if r.get("proposed_action_payload") is not None:
+                step_dict["proposed_action"] = {
+                    "task_type": r.get("proposed_action_task_type"),
+                    "payload": r["proposed_action_payload"],
+                }
+            step_dict["owning_flow"] = r.get("owning_flow")
+        else:
+            legacy_count += 1
         by_target[key]["forward_steps"].append(step_dict)
     plans.extend(by_target.values())
-
-    # Regex fallback for pre-migration approvals OR rationales whose plans
-    # never persisted (e.g. execute_task errored mid-persist). Only include
-    # targets we haven't already covered from the table.
-    if plans is not None:
-        try:
-            fallback_rows = with_db_retry(
-                lambda: fetch_all(
-                    """
-                    SELECT id, task_type, target_kind, target_id, rationale,
-                           approved_at, executed_at, status
-                    FROM approvals
-                    WHERE business_id = %s
-                      AND status IN ('approved', 'executed')
-                      AND coalesce(executed_at, approved_at) > now() - (%s || ' days')::interval
-                      AND id NOT IN (
-                        SELECT source_approval_id FROM plans_carryover
-                         WHERE business_id = %s AND source_approval_id IS NOT NULL
-                      )
-                    ORDER BY coalesce(executed_at, approved_at) DESC
-                    """,
-                    (args.business_id, str(args.days), args.business_id),
-                )
-            )
-        except Exception:
-            fallback_rows = []
-        seen_targets = set(by_target.keys())
-        for r in fallback_rows or []:
-            key = (r.get("target_kind"), r.get("target_id"))
-            if key in seen_targets:
-                continue
-            steps = _extract_plan(r.get("rationale") or "")
-            if not steps:
-                continue
-            forward_steps = steps[1:] if len(steps) > 1 else []
-            if not forward_steps:
-                continue
-            committed_on = r.get("executed_at") or r.get("approved_at")
-            plans.append(
-                {
-                    "approval_id": str(r["id"]),
-                    "task_type": r["task_type"],
-                    "target_kind": r.get("target_kind"),
-                    "target_id": r.get("target_id"),
-                    "status": r["status"],
-                    "committed_on": committed_on.date().isoformat() if committed_on else None,
-                    "step_1_already_done": steps[0],
-                    "forward_steps": [
-                        {"action_text": s, "step_order": i + 2} for i, s in enumerate(forward_steps)
-                    ],
-                    "source": "regex_fallback",
-                }
-            )
 
     emit_success(
         {
@@ -227,11 +159,9 @@ def main() -> None:
             "lookback_days": args.days,
             "plan_count": len(plans),
             "plans": plans,
-            "source_summary": {
-                "plans_carryover_table": sum(
-                    1 for p in plans if p.get("source") == "plans_carryover"
-                ),
-                "regex_fallback": sum(1 for p in plans if p.get("source") == "regex_fallback"),
+            "step_count_summary": {
+                "structured": structured_count,
+                "legacy_prose_only": legacy_count,
             },
         }
     )

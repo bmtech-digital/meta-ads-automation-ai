@@ -576,7 +576,8 @@ APPROVAL_ID=$(python -m campaigner.tools.propose_task \
   --task-type "budget_change" \
   --target-kind campaign --target-id "<meta_id>" \
   --payload '{"new_daily_budget_cents":6500,"old_daily_budget_cents":5000}' \
-  --rationale "<Hebrew: 2-4 sentences>" \
+  --rationale "<Hebrew: 2-4 sentences ending with a תוכנית: line>" \
+  --plan '{"trigger":{"metric":"utilization_7d","operator":">=","threshold_name":"solid_strong.util_floor","sustained_days":5},"proposed_action":{"task_type":"scale_up","payload":{"step_pct":15},"target_kind":"campaign","target_id":"<meta_id>"},"owning_flow":"daily_observe_propose","action_text":"אם הניצול נשמר מעל 95% למשך 5 ימים — להציע scale_up נוסף של 15%"}' \
   --expected-impact '{"expected_cpa_change_pct":-12}' \
   --urgency "medium" \
   | python -c "import sys,json; print(json.load(sys.stdin)['approval_id'])")
@@ -589,6 +590,35 @@ python -m campaigner.tools.log_decision \
   --summary "Proposed budget_change on <id>" \
   --campaign-id "<id>" --outputs "{\"approval_id\":\"$APPROVAL_ID\"}"
 ```
+
+### Step 6.5: Structured plan commitment (PRD step 5 — 2026-05-20)
+
+If your rationale ends with a `תוכנית:` line that names a conditional forward step (e.g. "אם הניצול עלה ל-95% — להציע scale_up"), you **MUST** also pass `--plan` to `propose_task` in the same call (see the Step 6 example above). The `--plan` JSON is the structured form of that Hebrew line — the next run reads it from [`plans_carryover`](../migrations/032_plans_structured_trigger.sql) via [`load_active_plans.py`](tools/load_active_plans.py) and evaluates the trigger against live signals without parsing Hebrew.
+
+Shape (see [`tools/propose_task.py`](tools/propose_task.py) `--plan` help for the full contract):
+
+```json
+{
+  "trigger": {
+    "metric": "utilization_7d",
+    "operator": ">=",
+    "threshold_name": "solid_strong.util_floor",
+    "sustained_days": 5
+  },
+  "proposed_action": {
+    "task_type": "scale_up",
+    "payload": {"step_pct": 15},
+    "target_kind": "campaign",
+    "target_id": "<meta_id>"
+  },
+  "owning_flow": "daily_observe_propose",
+  "action_text": "אם הניצול נשמר מעל 95% למשך 5 ימים — להציע scale_up נוסף של 15%"
+}
+```
+
+Pick `threshold_name` from the **Thresholds — Reference** table above (use the dotted YAML name, not the `{{...}}` placeholder). For triggers that aren't bound to a tunable threshold (e.g. "after 30 days without conversions"), set `threshold_value` to the literal instead and leave `threshold_name` null. The Hebrew line in the rationale stays — it's for the operator; the structured row is for the agent's future self.
+
+A proposal without a `תוכנית:` line skips `--plan` entirely (no plan commitment).
 
 ### Step 7: Exit
 
@@ -1191,11 +1221,11 @@ The new Flow F (Onboarding) runs via `runners/onboarding_chain.sh`. The web side
 | `fetch_paused_campaigns.py` | ✅   | [tools/fetch_paused_campaigns.py](tools/fetch_paused_campaigns.py) — built 2026-05-13 PM for §T_PA Paused Campaign Audit. Lists PAUSED campaigns on the account, pulls last-30d insights, classifies each into `revival_candidate` / `narrow_audience_revival` / `archive_candidate`. Skips campaigns paused > 90 days (default; `--max-days-since-paused`). |
 | `load_feedback_history.py` | ✅   | [tools/load_feedback_history.py](tools/load_feedback_history.py) — **(2026-05-13 PM, feedback loop)** Surfaces meaningful operator rejections (bulk-resets + system reasons filtered). Feeds guardrail §37. Must run in Flow A Step 1.6 before drafting any proposal. |
 | `load_recent_actions_outcomes.py` | ✅ | [tools/load_recent_actions_outcomes.py](tools/load_recent_actions_outcomes.py) — **(2026-05-13 PM, feedback loop)** Before/after Meta-insights delta for each executed approval in the last 30 days. Classifies `improved`/`flat`/`regressed`. Lets the agent learn from its own track record. |
-| `load_active_plans.py` | ✅   | [tools/load_active_plans.py](tools/load_active_plans.py) — **(2026-05-13 PM, feedback loop)** Cross-run plan memory: DB-first (from `plans_carryover` Migration 023) with regex fallback for pre-migration rationales. Returns forward-looking conditional commitments per campaign + `plan_id` for use with `propose_task --triggered-plan-id`. Bound by guardrail §39. |
+| `load_active_plans.py` | ✅   | [tools/load_active_plans.py](tools/load_active_plans.py) — **(PRD step 5, 2026-05-20)** Cross-run plan memory: reads `plans_carryover` only — the legacy regex-on-rationale path is gone. Each forward step carries a `structured_trigger` (metric/operator/threshold_name/sustained_days) when the original proposal passed `--plan` to propose_task; legacy prose-only rows surface as `action_text` + `trigger_condition`. Bound by guardrail §39. |
 | `expire_plans.py` | ✅ | [tools/expire_plans.py](tools/expire_plans.py) — **(2026-05-13 PM, Migration 023)** Flips stale pending `plans_carryover` rows past `expires_at` to `status='expired'`. Idempotent. Hooked at end of `daily_observe_propose.sh` so plan-table hygiene runs every morning. |
 | `draft_new_campaign_payload.py` | ✅ | [tools/draft_new_campaign_payload.py](tools/draft_new_campaign_payload.py) — **(2026-05-13 PM)** "Consultant fills the form" — composes a complete `new_campaign` payload that passes guardrail §38, by reading `businesses` + `business_knowledge` and merging with caller-supplied intent (objective + budget + creative + copy). Returns `validation_notes` for soft coaching (e.g. budget-vs-formula-minimum warning). |
 | `log_decision.py`            | ✅     | [tools/log_decision.py](tools/log_decision.py), with retry                                                                                      |
-| `propose_task.py`            | ✅     | [tools/propose_task.py](tools/propose_task.py), with retry                                                                                      |
+| `propose_task.py`            | ✅     | [tools/propose_task.py](tools/propose_task.py), with retry. **(PRD step 5, 2026-05-20)** Now accepts `--plan` — when the rationale ends with a Hebrew `תוכנית:` conditional commitment, pass the structured form alongside; a `plans_carryover` row is written in the same call so the next run reads the commitment from the table instead of parsing Hebrew. See Flow A Step 6.5. |
 | `propose_audience.py`        | ✅     | [tools/propose_audience.py](tools/propose_audience.py) — **(2026-05-13, Phase 1)** Typed wrapper for the three audience task_types. Use this INSTEAD of `propose_task` when drafting `create_custom_audience` / `create_saved_audience` / `create_lookalike` — per-task argparse surface (e.g. `--subtype`, `--origin-audience-id`, `--ratio`) plus pre-validation against Phase-1 subtype allowlist + lookalike seed-size minimum (≥ 100 from `meta_audiences`). |
 | `sync_audiences.py`          | ✅     | [tools/sync_audiences.py](tools/sync_audiences.py) — **(2026-05-13, Phase 1)** Mirror Custom + Lookalike + Saved audiences from Meta into `meta_audiences`. Idempotent. Run before any audience-bearing proposal so `propose_audience` + guardrail §35 can resolve seed sizes. |
 | `list_audiences.py`          | ✅     | [tools/list_audiences.py](tools/list_audiences.py) — **(2026-05-13, Phase 1)** Read the local `meta_audiences` mirror. Filters: `--kind`, `--subtype`, `--include-archived`, `--min-count`. Already wired into Flow A Step 1 above. |

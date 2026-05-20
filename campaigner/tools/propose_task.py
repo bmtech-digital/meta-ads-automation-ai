@@ -404,6 +404,21 @@ def main() -> None:
         ),
     )
     p.add_argument(
+        "--plan",
+        default=None,
+        help=(
+            "JSON object — when set, the agent is committing to a forward-looking plan "
+            "alongside this proposal. A row is inserted into plans_carryover with the "
+            "structured trigger so a future run can evaluate it without parsing Hebrew. "
+            "Required when the rationale ends with a `תוכנית: ...` line that names a "
+            "conditional commitment (PRD step 5). "
+            "Shape: {trigger:{metric,operator,threshold_name?,threshold_value?,sustained_days?}, "
+            "proposed_action:{task_type,payload,target_kind?,target_id?}, "
+            "owning_flow, action_text, step_order?, expires_in_days?}. "
+            "See lib/plans.validate_structured_plan for the full contract."
+        ),
+    )
+    p.add_argument(
         "--operator-questions",
         default=None,
         help=(
@@ -459,6 +474,15 @@ def main() -> None:
                 f"--operator-questions max 2 entries (got {len(operator_questions)})"
             )
 
+    plan_arg = parse_json_arg(args.plan, "plan")
+    if plan_arg is not None:
+        from campaigner.lib.plans import validate_structured_plan
+
+        err = validate_structured_plan(plan_arg)
+        if err is not None:
+            emit_validation_error(err)
+            return
+
     expires_at = datetime.now(UTC) + timedelta(hours=args.expires_in_hours)
 
     try:
@@ -513,19 +537,37 @@ def main() -> None:
     # if it fails (the plan stays pending and §39 will fire again next run
     # forcing the agent to address it — fail-safe direction).
     triggered_plan_id = None
-    if args.triggered_plan_id:
+    plan_id: str | None = None
+    if args.triggered_plan_id or plan_arg is not None:
         try:
             from campaigner.lib import plans as _plans
             from campaigner.lib.db import get_connection as _gc
 
             with _gc() as conn:
-                _plans.mark_triggered(conn, args.triggered_plan_id, str(row["id"]))
-                triggered_plan_id = args.triggered_plan_id
+                if args.triggered_plan_id:
+                    _plans.mark_triggered(conn, args.triggered_plan_id, str(row["id"]))
+                    triggered_plan_id = args.triggered_plan_id
+                # PRD step 5 — commit the forward-looking plan structurally.
+                # We run this in the same connection scope as mark_triggered
+                # but separately from the approvals insert so a plan-write
+                # failure does NOT roll back the approval (the approval is
+                # the load-bearing artifact; the plan is the audit/memory
+                # surface for the next run).
+                if plan_arg is not None:
+                    plan_id = _plans.create_structured_row(
+                        conn,
+                        business_id=args.business_id,
+                        source_approval_id=str(row["id"]),
+                        target_kind=args.target_kind,
+                        target_id=args.target_id,
+                        plan=plan_arg,
+                    )
         except Exception as exc:  # noqa: BLE001
             import sys as _sys
 
             print(
-                f"plans_carryover mark_triggered failed for {args.triggered_plan_id}: {exc}",
+                f"plans_carryover write failed (triggered_plan_id={args.triggered_plan_id}, "
+                f"plan_arg_provided={plan_arg is not None}): {exc}",
                 file=_sys.stderr,
             )
 
@@ -533,6 +575,7 @@ def main() -> None:
         {
             "approval_id": str(row["id"]),
             "triggered_plan_id": triggered_plan_id,
+            "plan_id": plan_id,
             "business_id": args.business_id,
             "task_type": args.task_type,
             "target_kind": args.target_kind,
