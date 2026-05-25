@@ -51,6 +51,11 @@ import {
   splitCsv,
 } from "@/lib/schemas/business-knowledge";
 import {
+  BusinessKnowledgeFormShell,
+  FieldErrorMessage,
+  type SaveBusinessKnowledgeState,
+} from "./form-shell";
+import {
   estimateCPL,
   matchSubVertical,
   monthOf,
@@ -62,7 +67,10 @@ import {
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "העסק שלי" };
 
-async function saveKnowledgeAction(formData: FormData) {
+async function saveKnowledgeAction(
+  _prev: SaveBusinessKnowledgeState,
+  formData: FormData,
+): Promise<SaveBusinessKnowledgeState> {
   "use server";
   const session = await getAuth().getSession();
   if (!session) redirect("/login?next=/business-knowledge");
@@ -105,10 +113,18 @@ async function saveKnowledgeAction(formData: FormData) {
   });
 
   if (!parsed.success) {
-    const msg = parsed.error.issues
-      .map((i) => `${i.path.join(".")}: ${i.message}`)
-      .join("; ");
-    redirect(`/business-knowledge?error=${encodeURIComponent(msg)}`);
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of parsed.error.issues) {
+      const name = issue.path[0]?.toString() ?? "_form";
+      if (!fieldErrors[name]) fieldErrors[name] = issue.message;
+    }
+    const firstErrorField =
+      parsed.error.issues[0]?.path[0]?.toString() ?? "";
+    return {
+      status: "error",
+      fieldErrors,
+      firstErrorField,
+    };
   }
 
   const d = parsed.data;
@@ -287,8 +303,7 @@ export default async function BusinessKnowledgePage({
 
       <ImportOptions />
 
-      <form
-        id="manual"
+      <BusinessKnowledgeFormShell
         action={saveKnowledgeAction}
         className="flex flex-col gap-6"
       >
@@ -422,6 +437,7 @@ export default async function BusinessKnowledgePage({
                   business.monthly_brief?.deadline_date ?? ""
                 }
               />
+              <FieldErrorMessage name="brief_deadline_date" />
               <p className="text-xs text-muted-foreground">
                 הסוכן יתאים את עוצמת ההמלצות (urgency) ככל שהתאריך מתקרב.
               </p>
@@ -493,6 +509,7 @@ export default async function BusinessKnowledgePage({
                     </option>
                   ))}
                 </select>
+                <FieldErrorMessage name="vertical" />
                 <p className="text-xs text-muted-foreground">
                   KPI נגזר: eCommerce→ROAS · לידים→CPL · Awareness→CPM ·
                   אפליקציה→CPI
@@ -508,6 +525,7 @@ export default async function BusinessKnowledgePage({
                   dir="ltr"
                   className="text-left"
                 />
+                <FieldErrorMessage name="website_url" />
               </div>
             </div>
 
@@ -546,6 +564,7 @@ export default async function BusinessKnowledgePage({
                   max="80"
                   defaultValue={k?.customer_age_min ?? ""}
                 />
+                <FieldErrorMessage name="customer_age_min" />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="customer_age_max">גיל לקוח (עד)</Label>
@@ -557,6 +576,7 @@ export default async function BusinessKnowledgePage({
                   max="80"
                   defaultValue={k?.customer_age_max ?? ""}
                 />
+                <FieldErrorMessage name="customer_age_max" />
               </div>
               <div className="flex flex-col gap-2">
                 <Label htmlFor="delivery_time_days">זמן אספקה (ימים)</Label>
@@ -567,6 +587,7 @@ export default async function BusinessKnowledgePage({
                   min="0"
                   defaultValue={k?.delivery_time_days ?? ""}
                 />
+                <FieldErrorMessage name="delivery_time_days" />
               </div>
             </div>
 
@@ -694,7 +715,7 @@ export default async function BusinessKnowledgePage({
             השינויים יוחלו על הריצה הבאה של הסוכן.
           </span>
         </div>
-      </form>
+      </BusinessKnowledgeFormShell>
     </Shell>
   );
 }
