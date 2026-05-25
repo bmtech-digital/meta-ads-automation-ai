@@ -133,9 +133,11 @@ export default async function GalleryPage() {
 
   return (
     <Shell active="/gallery" width="wide">
-      {/* The editorial masthead is rendered inside GalleryClient so the
-          design carries one consistent voice — chapter marks, TOC filter,
-          contact-sheet grid. The shared <PageHeader> sits this page out. */}
+      <PageHeader
+        eyebrow="קריאייטיב"
+        title="נכסי קריאייטיב"
+        subtitle="כל וריאציה שהסוכן ייצר או שהעלית. מטריקות חיות נמשכות מ-Meta — אסט שעדיין לא צבר 1,000 חשיפות מסומן כ-'אוסף נתונים'."
+      />
       <GalleryClient
         assets={assets}
         creativeUsage={creativeUsage}

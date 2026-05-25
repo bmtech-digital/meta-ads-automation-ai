@@ -20,27 +20,40 @@ const SOURCE_LABEL_HE: Record<CreativeAssetSource, string> = {
   manual_upload: "העלאה ידנית",
 };
 
-/**
- * Lifecycle — small mono-caps inline marker beside the frame index. Reads
- * like a print "status code" rather than a coloured stamp. Only winning
- * adds a thin underline accent in brand amber.
- */
-const LIFECYCLE_LABEL: Record<
+// Lifecycle pill — small, quiet, semantic. Winning is the only loud state and
+// even that's a tinted pill with a 1px ring, not a glow halo. Everything else
+// uses the same neutral language so the grid reads as a calm working surface,
+// not a hall of coloured frames.
+const LIFECYCLE_PILL: Record<
   Lifecycle,
-  { he: string; tone: string }
+  { label: string; className: string }
 > = {
-  draft: { he: "draft", tone: "text-muted-foreground" },
-  live: { he: "live", tone: "text-success" },
-  winning: { he: "winner", tone: "text-success" },
-  fatiguing: { he: "fatigue", tone: "text-warning" },
-  killed: { he: "killed", tone: "text-muted-foreground/70" },
+  draft: {
+    label: "טיוטה",
+    className: "bg-muted text-muted-foreground border-border",
+  },
+  live: {
+    label: "חי",
+    className: "bg-success/10 text-success border-success/25",
+  },
+  winning: {
+    label: "מנצח",
+    className: "bg-success/15 text-success border-success/45",
+  },
+  fatiguing: {
+    label: "מתעייף",
+    className: "bg-warning/10 text-warning border-warning/30",
+  },
+  killed: {
+    label: "כבוי",
+    className: "bg-muted/60 text-muted-foreground border-border opacity-70",
+  },
 };
 
-/**
- * Single quiet placeholder. Every tile without a thumbnail reads as the
- * same muted surface with a serif "?" — like a missing-plate slug in a
- * print contact sheet.
- */
+// Single quiet placeholder — no rainbow palette. Every tile that lacks a
+// thumbnail reads as the same calm sage-tinted surface, with a small mark to
+// indicate "static" vs "video". Consistent surface tone = the grid scans as
+// a working list, not decorated art.
 function TilePlaceholder({ asset }: { asset: CreativeAsset }) {
   const kindLabel =
     asset.kind === "video"
@@ -48,16 +61,20 @@ function TilePlaceholder({ asset }: { asset: CreativeAsset }) {
         ? `Video · ${Math.round(Number(asset.duration_seconds))}s`
         : "Video"
       : asset.kind === "image"
-        ? "Still"
+        ? "Static"
         : asset.kind;
   return (
-    <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-muted text-muted-foreground">
-      <span aria-hidden className="font-editorial text-[44px] italic">
-        ?
+    <div
+      className="flex h-full w-full flex-col items-center justify-center gap-1.5 bg-muted text-[10.5px] font-mono uppercase tracking-[0.12em] text-muted-foreground"
+      style={{
+        backgroundImage:
+          "repeating-linear-gradient(45deg, hsl(var(--muted-foreground) / 0.04) 0 8px, transparent 8px 16px)",
+      }}
+    >
+      <span className="text-[14px] tracking-normal text-muted-foreground/70" aria-hidden>
+        ◢◣
       </span>
-      <span className="font-mono text-[10px] uppercase tracking-[0.18em]">
-        {kindLabel}
-      </span>
+      <span>{kindLabel}</span>
     </div>
   );
 }
@@ -72,19 +89,6 @@ function isNew(asset: CreativeAsset): boolean {
   if (!Number.isFinite(t)) return false;
   const days = (Date.now() - t) / (1000 * 60 * 60 * 24);
   return days <= 7;
-}
-
-function formatAssetDate(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  try {
-    return new Date(iso).toLocaleDateString("he-IL", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  } catch {
-    return null;
-  }
 }
 
 interface AssetCampaign {
@@ -117,7 +121,9 @@ interface MediaThumbnailProps {
 function MediaThumbnail({ asset }: MediaThumbnailProps) {
   const [videoError, setVideoError] = useState<string | null>(null);
 
-  if (!asset.storage_url) return <TilePlaceholder asset={asset} />;
+  if (!asset.storage_url) {
+    return <TilePlaceholder asset={asset} />;
+  }
 
   if (asset.kind === "image") {
     return (
@@ -134,19 +140,17 @@ function MediaThumbnail({ asset }: MediaThumbnailProps) {
     if (videoError) {
       return (
         <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-muted px-4 py-3 text-center text-[11px] text-foreground">
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-warning">
-            לא ניתן לנגן
-          </span>
-          <span className="font-mono text-[9.5px] text-muted-foreground" dir="auto">
+          <span className="font-semibold text-warning">לא ניתן לנגן</span>
+          <span className="text-[10px] text-muted-foreground" dir="auto">
             {videoError}
           </span>
           <a
             href={asset.storage_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded-sm border border-border bg-card px-2 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-foreground hover:bg-secondary"
+            className="rounded bg-card px-2 py-1 text-[10px] text-foreground hover:bg-secondary"
           >
-            פתח קובץ ↗
+            פתח בכרטיסיה חדשה ↗
           </a>
         </div>
       );
@@ -181,7 +185,6 @@ interface AssetTileProps {
   asset: CreativeAsset;
   ads: MetaAdWithCreative[];
   usage: CreativeUsage;
-  index?: number;
   showCampaignChip?: boolean;
   showDelete?: boolean;
   footer?: React.ReactNode;
@@ -191,7 +194,6 @@ export function AssetTile({
   asset,
   ads,
   usage,
-  index,
   showCampaignChip = true,
   showDelete = true,
   footer,
@@ -205,7 +207,6 @@ export function AssetTile({
   const ctr = readNumber(asset.performance_snapshot?.ctr);
   const hookRate = readNumber(asset.performance_snapshot?.hook_rate);
   const spend = readNumber(asset.performance_snapshot?.spend);
-  const dateLabel = formatAssetDate(asset.created_at);
 
   async function onDelete() {
     if (!confirm("למחוק את הנכס?")) return;
@@ -225,91 +226,69 @@ export function AssetTile({
     });
   }
 
-  const lifecycleLabel = LIFECYCLE_LABEL[lifecycle];
-  const isWinner = lifecycle === "winning";
+  const lifecyclePill = LIFECYCLE_PILL[lifecycle];
   const isLearning =
     lifecycle === "live" && ctr == null && hookRate == null && spend == null;
   const hasMetrics = ctr != null || hookRate != null || spend != null;
 
   return (
-    <article className="group flex flex-col gap-3">
-      {/* Frame — hairline border, no rings. Hover shifts the border to a
-          full strength, with no shadow, like turning the page of a folio. */}
-      <div className="relative aspect-square w-full overflow-hidden rounded-sm border border-border/60 bg-card transition-colors duration-200 hover:border-border">
+    <div className="group flex flex-col gap-2.5">
+      {/* Hairline border, never a coloured ring. Hover lifts by 2px (design
+          system §10 Cards) with a subtle medium shadow that whispers. */}
+      <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-border/60 bg-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-ds-md">
         <MediaThumbnail asset={asset} />
 
         {isNew(asset) ? (
-          <span className="absolute end-2 top-2 inline-flex items-center rounded-sm border border-brand-400/40 bg-brand-400/15 px-1.5 py-[2px] font-mono text-[9.5px] font-semibold uppercase tracking-[0.18em] text-brand-400">
-            new
+          <span className="absolute end-2 top-2 inline-flex items-center rounded-md border border-brand-400/40 bg-brand-400/15 px-1.5 py-[3px] text-[10px] font-semibold uppercase tracking-[0.12em] text-brand-400">
+            חדש
           </span>
         ) : null}
 
-        {isWinner ? (
-          <span className="absolute start-2 top-2 rounded-sm border border-success/35 bg-success/15 px-1.5 py-[2px] font-mono text-[9.5px] font-semibold uppercase tracking-[0.18em] text-success">
-            winner
-          </span>
-        ) : null}
+        <span
+          className={`absolute start-2 top-2 inline-flex items-center rounded-md border px-1.5 py-[3px] text-[10px] font-semibold ${lifecyclePill.className}`}
+        >
+          {lifecyclePill.label}
+        </span>
       </div>
 
       <div className="flex flex-col gap-1.5 px-0.5">
-        {/* Index + lifecycle stamp row */}
-        <div className="flex items-baseline justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          <div className="flex items-baseline gap-2.5">
-            {typeof index === "number" ? (
-              <span className="mono-ltr tabular-nums text-muted-foreground/85">
-                № {String(index).padStart(2, "0")}
-              </span>
-            ) : null}
-            <span
-              className={`${lifecycleLabel.tone} ${isWinner ? "border-b border-brand-400 pb-0.5" : ""}`}
+        <div className="flex items-baseline justify-between gap-2">
+          {asset.storage_url ? (
+            <a
+              href={asset.storage_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="truncate text-[13px] font-medium text-foreground hover:underline"
+              title={`${asset.original_filename ?? asset.id} — לחץ לפתיחה בכרטיסיה חדשה`}
             >
-              {lifecycleLabel.he}
-            </span>
-          </div>
+              {asset.original_filename ?? "—"}
+            </a>
+          ) : (
+            <h4
+              className="truncate text-[13px] font-medium text-foreground"
+              title={asset.original_filename ?? asset.id}
+            >
+              {asset.original_filename ?? "—"}
+            </h4>
+          )}
           {asset.aspect_ratio ? (
-            <span className="mono-ltr">{asset.aspect_ratio}</span>
+            <span className="mono-ltr shrink-0 text-[10px] text-muted-foreground">
+              {asset.aspect_ratio}
+            </span>
           ) : null}
         </div>
 
-        {/* Title — filename or generated name */}
-        {asset.storage_url ? (
-          <a
-            href={asset.storage_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="truncate text-[13px] font-medium leading-snug text-foreground hover:underline"
-            title={`${asset.original_filename ?? asset.id} — פתח בכרטיסיה חדשה`}
-          >
-            {asset.original_filename ?? "—"}
-          </a>
-        ) : (
-          <h4
-            className="truncate text-[13px] font-medium leading-snug text-foreground"
-            title={asset.original_filename ?? asset.id}
-          >
-            {asset.original_filename ?? "—"}
-          </h4>
-        )}
-
-        {/* Editorial subline — date + ratios in serif italic */}
-        {dateLabel ? (
-          <span className="font-editorial text-[11px] italic text-muted-foreground">
-            {dateLabel}
-          </span>
-        ) : null}
-
-        {/* Status row — one line max */}
+        {/* Status row — one line max. Learning, metrics, or "needs hookup". */}
         {isLearning ? (
-          <div className="mt-0.5 inline-flex items-center gap-1.5 self-start font-mono text-[10px] uppercase tracking-[0.16em] text-warning">
+          <div className="inline-flex items-center gap-1.5 self-start rounded-md border border-warning/25 bg-warning/10 px-2 py-1 text-[10.5px] font-medium text-warning">
             <span
               aria-hidden
-              className="h-1.5 w-1.5 animate-pulse-soft rounded-full bg-warning"
+              className="inline-block h-1.5 w-1.5 animate-pulse-soft rounded-full bg-warning"
             />
-            <span>אוסף נתונים</span>
-            <span className="text-muted-foreground/70">· &lt;1k impr</span>
+            אוסף נתונים — פחות מ-1,000 חשיפות
           </div>
         ) : hasMetrics ? (
-          <div className="mono-ltr mt-0.5 flex flex-wrap items-baseline gap-x-3 font-mono text-[10.5px] tabular-nums text-muted-foreground">
+          <div className="mono-ltr flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10.5px] text-muted-foreground">
             {ctr != null ? (
               <span>
                 CTR <span className="text-foreground">{ctr.toFixed(2)}%</span>
@@ -317,38 +296,37 @@ export function AssetTile({
             ) : null}
             {hookRate != null ? (
               <span>
-                Hook{" "}
-                <span className="text-foreground">{hookRate.toFixed(0)}%</span>
+                Hook <span className="text-foreground">{hookRate.toFixed(0)}%</span>
               </span>
             ) : null}
             {spend != null ? (
               <span>
-                ₪<span className="text-foreground">{spend.toFixed(0)}</span>
+                <span className="text-foreground">₪{spend.toFixed(0)}</span>
               </span>
             ) : null}
           </div>
         ) : lifecycle === "draft" ? (
-          <span className="font-editorial text-[11px] italic text-muted-foreground/85">
+          <div className="text-[10.5px] text-muted-foreground">
             עוד לא רץ — צריך לחבר לקמפיין
-          </span>
+          </div>
         ) : null}
 
-        {/* Hover-revealed chips — tags + campaigns */}
+        {/* Secondary chips — visible on hover only so the resting grid stays calm. */}
         <div className="flex flex-col gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           {asset.service_tag || asset.marketing_angle || asset.generated_by ? (
-            <div className="flex flex-wrap gap-1 font-mono text-[9.5px] uppercase tracking-[0.16em]">
+            <div className="flex flex-wrap gap-1 text-[10px]">
               {asset.service_tag ? (
-                <span className="rounded-sm border border-border bg-muted px-1.5 py-[2px] text-muted-foreground">
+                <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 text-muted-foreground">
                   {asset.service_tag}
                 </span>
               ) : null}
               {asset.marketing_angle ? (
-                <span className="rounded-sm border border-border bg-muted px-1.5 py-[2px] text-muted-foreground">
+                <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 text-muted-foreground">
                   {asset.marketing_angle}
                 </span>
               ) : null}
               {asset.generated_by ? (
-                <span className="rounded-sm border border-border bg-muted px-1.5 py-[2px] text-muted-foreground">
+                <span className="rounded-md border border-border bg-muted px-1.5 py-0.5 text-muted-foreground">
                   {SOURCE_LABEL_HE[asset.generated_by]}
                 </span>
               ) : null}
@@ -363,12 +341,10 @@ export function AssetTile({
                   href={`https://www.facebook.com/adsmanager/manage/campaigns?act=&selected_campaign_ids=${c.id}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 rounded-sm border border-border bg-muted px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.14em] text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                  className="inline-flex items-center gap-1 rounded-md border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground hover:border-foreground/30 hover:text-foreground"
                   title={`${c.name} · ${c.effective_status ?? ""}`}
                 >
-                  <span className="max-w-[140px] truncate normal-case tracking-normal">
-                    {c.name}
-                  </span>
+                  <span className="max-w-[140px] truncate">{c.name}</span>
                   <span className="mono-ltr opacity-60">
                     #{shortCampaignId(c.id)}
                   </span>
@@ -381,11 +357,7 @@ export function AssetTile({
 
         {footer}
 
-        {err ? (
-          <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-destructive">
-            {err}
-          </p>
-        ) : null}
+        {err ? <p className="text-[11px] text-destructive">{err}</p> : null}
         {showDelete ? (
           <Button
             variant="ghost"
@@ -397,13 +369,13 @@ export function AssetTile({
                 ? "נכס חי במטא — לא ניתן למחוק"
                 : undefined
             }
-            className="h-6 justify-start gap-1 px-0 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+            className="h-6 justify-start gap-1 px-1 text-[10.5px] text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
           >
             <Trash2 className="h-3 w-3" />
             {pending ? "מוחק..." : "מחק"}
           </Button>
         ) : null}
       </div>
-    </article>
+    </div>
   );
 }

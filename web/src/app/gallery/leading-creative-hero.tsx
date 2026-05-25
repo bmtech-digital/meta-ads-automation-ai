@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpLeft, Copy } from "lucide-react";
+import { Sparkles, Copy } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type {
   LiveMetaCampaignGroup,
@@ -10,11 +10,14 @@ import type {
 } from "./scoring";
 
 /**
- * Cover Story — the single highest-scoring live creative across all active
- * campaigns. The whole composition reads like the cover spread of a
- * magazine: a marquee Roman numeral ("I."), an "Above-the-fold" kicker,
- * a portrait frame with the creative, a metric anatomy that names each
- * number, and a one-sentence dek explaining the agent's recommendation.
+ * Hero card — the single highest-scoring live creative across all active
+ * campaigns, with key metrics and a one-click CTA to duplicate the winning
+ * approach to other live campaigns.
+ *
+ * The card sits on the surface with a single 3px brand accent rule on the
+ * leading edge (per design system §10 "Cards → Accent-rule"). No halo glow,
+ * no neon ring. The "מנצח השבוע" eyebrow + a small Sparkles glyph carry the
+ * "this is special" signal — colour and weight, not effects.
  *
  * The duplicate CTA writes a `new_creative` approval per target campaign;
  * nothing publishes until the operator approves each one, per HITL.
@@ -31,123 +34,75 @@ export function LeadingCreativeHero({
   }, [groups, winner]);
 
   if (!winner || !winner.performance) return null;
+  const m = winner.performance.metrics;
+
   if (winner.performance.grade === "learning") return null;
 
-  const m = winner.performance.metrics;
   const rawThumb = winner.thumbnail_url ?? winner.image_url;
   const thumb = rawThumb
     ? `/api/gallery/organic-thumbnail?src=meta&url=${encodeURIComponent(rawThumb)}`
     : null;
   const isVideo = !!winner.video_id;
-  const displayName = winner.name
-    ? extractDisplayName(winner.name)
-    : `Creative · #${winner.creative_id.slice(-6)}`;
+  const durationLabel = isVideo ? "Video" : "Static";
 
   return (
-    <section className="relative">
-      {/* Top kicker bar — date stripe + section name */}
-      <div className="mb-5 flex flex-wrap items-baseline gap-x-4 gap-y-1 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
-        <span className="text-brand-400">Cover Story</span>
-        <span aria-hidden className="h-px w-8 bg-border" />
-        <span>Performance leader · this week</span>
-        <span aria-hidden className="ms-auto h-px w-12 bg-border" />
-        <span className="mono-ltr">SCORE · {winner.performance.score}</span>
-      </div>
+    <section className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-ds-sm">
+      {/* Accent rule on the leading edge — design system §10 Cards. */}
+      <span
+        aria-hidden
+        className="absolute inset-y-0 start-0 w-[3px] bg-brand-400"
+      />
 
-      <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-[auto_minmax(0,420px)_minmax(0,1fr)] lg:items-stretch">
-        {/* Marquee numeral — the visual anchor */}
-        <div className="hidden flex-col items-end justify-start gap-3 ps-0 pe-2 lg:flex">
-          <span
-            aria-hidden
-            className="font-editorial text-[160px] font-medium leading-[0.78] tracking-[-0.04em] text-brand-400/85"
-          >
-            I.
-          </span>
-          <span className="font-mono text-[9.5px] uppercase tracking-[0.22em] text-muted-foreground">
-            issue · {currentIssueShort()}
-          </span>
-        </div>
-
-        {/* Portrait frame */}
-        <figure className="group relative w-full overflow-hidden rounded-md border border-border bg-card shadow-ds-md">
-          <div className="relative aspect-[4/5] w-full overflow-hidden">
-            {thumb ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={thumb}
-                  alt={displayName}
-                  className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.02]"
-                  referrerPolicy="no-referrer"
-                  loading="lazy"
-                />
-                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/55 via-transparent to-transparent" />
-              </>
-            ) : (
-              <HeroPlaceholder kindLabel={isVideo ? "Video" : "Static"} />
-            )}
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
+        <div className="flex flex-col gap-5 p-6 lg:p-8">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-400/30 bg-brand-400/10 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand-400">
+              <Sparkles className="h-3 w-3" />
+              מנצח השבוע
+            </span>
           </div>
 
-          {/* Plate caption */}
-          <figcaption className="flex items-center justify-between gap-3 border-t border-border bg-card px-4 py-2.5 text-[10.5px]">
-            <span className="font-mono uppercase tracking-[0.18em] text-muted-foreground">
-              Plate 01 · {isVideo ? "video" : "still"}
-            </span>
-            <span className="mono-ltr text-muted-foreground">
-              #{winner.creative_id.slice(-10)}
-            </span>
-          </figcaption>
-        </figure>
-
-        {/* Editorial body */}
-        <div className="flex flex-col gap-7 lg:py-1">
-          <div className="flex flex-col gap-2">
-            <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
-              הקריאייטיב המוביל השבוע
+          <div className="flex flex-col gap-1.5">
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground">
+              הקריאייטיב המוביל
             </span>
             <h2
-              className="line-clamp-3 font-display text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] text-foreground lg:text-[30px]"
+              className="line-clamp-2 text-[20px] font-semibold leading-snug text-foreground lg:text-[22px]"
               title={winner.name ?? winner.creative_id}
               dir="auto"
             >
-              {displayName}
+              {winner.name ? extractDisplayName(winner.name) : `Creative · #${winner.creative_id.slice(-6)}`}
             </h2>
-            <p
-              className="font-editorial text-[14px] italic leading-snug text-muted-foreground"
-              dir="auto"
-            >
-              קמפיין: <span className="not-italic">{winner.campaign_name}</span>
-              <span className="mx-2 text-border">·</span>
-              <span className="mono-ltr not-italic">#{winner.campaign_id.slice(-8)}</span>
-            </p>
+            <span className="mono-ltr text-[11px] text-muted-foreground">
+              #{winner.creative_id.slice(-12)}
+            </span>
           </div>
 
-          {/* Metric anatomy — labelled diagram style */}
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
+          <div className="mono-ltr flex flex-wrap items-end gap-x-8 gap-y-3">
             {m.spend != null && m.spend > 0 ? (
-              <MetricCell label="הוצאה" value={`₪${m.spend.toFixed(0)}`} />
+              <Metric label="הוצאה" value={`₪${m.spend.toFixed(0)}`} />
             ) : null}
             {m.hook_rate != null ? (
-              <MetricCell
+              <Metric
                 label="Hook"
                 value={`${m.hook_rate.toFixed(0)}%`}
                 hint={m.hook_rate >= 30 ? "מעל הסף 30%" : undefined}
               />
             ) : null}
             {m.ctr != null ? (
-              <MetricCell
+              <Metric
                 label="CTR"
                 value={`${m.ctr.toFixed(2)}%`}
-                hint={m.ctr >= 1.5 ? "מעל הממוצע" : undefined}
+                hint={m.ctr >= 1.5 ? "+ מעל הממוצע" : undefined}
               />
             ) : null}
             {m.impressions != null && m.impressions >= 1000 ? (
-              <MetricCell
+              <Metric
                 label="חשיפות"
                 value={m.impressions.toLocaleString("en")}
               />
             ) : null}
-          </dl>
+          </div>
 
           {winner.performance.reasons.length > 0 ? (
             <p
@@ -158,7 +113,7 @@ export function LeadingCreativeHero({
             </p>
           ) : null}
 
-          <div className="flex flex-wrap items-center gap-3 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
             {otherCampaignCount > 0 ? (
               <DuplicateButton
                 creativeId={winner.creative_id}
@@ -170,15 +125,39 @@ export function LeadingCreativeHero({
                 אין קמפיינים פעילים נוספים לשכפול אליהם
               </span>
             )}
-            <Link
-              href={`https://www.facebook.com/adsmanager/manage/ads/edit?selected_ad_ids=${winner.ad_id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group/details inline-flex items-center gap-1.5 text-[12.5px] font-medium text-foreground transition-colors hover:text-brand-400"
-            >
-              פרטים מלאים ב-Ads Manager
-              <ArrowUpLeft className="h-3.5 w-3.5 transition-transform group-hover/details:-translate-x-0.5 group-hover/details:-translate-y-0.5" />
-            </Link>
+            <Button asChild variant="outline" size="sm">
+              <Link
+                href={`https://www.facebook.com/adsmanager/manage/ads/edit?selected_ad_ids=${winner.ad_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                פרטים מלאים
+              </Link>
+            </Button>
+          </div>
+        </div>
+
+        <div className="relative bg-muted/40 lg:bg-transparent">
+          <div className="relative h-full min-h-[260px] w-full overflow-hidden">
+            {thumb ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={thumb}
+                  alt={winner.name ?? "leading creative"}
+                  className="h-full w-full object-cover"
+                  referrerPolicy="no-referrer"
+                  loading="lazy"
+                />
+                {isVideo ? (
+                  <span className="absolute bottom-3 start-3 rounded-md border border-white/15 bg-black/65 px-2 py-0.5 text-[11px] font-medium text-white">
+                    ▶ {durationLabel}
+                  </span>
+                ) : null}
+              </>
+            ) : (
+              <HeroPlaceholder kindLabel={durationLabel} />
+            )}
           </div>
         </div>
       </div>
@@ -186,7 +165,7 @@ export function LeadingCreativeHero({
   );
 }
 
-function MetricCell({
+function Metric({
   label,
   value,
   hint,
@@ -196,17 +175,15 @@ function MetricCell({
   hint?: string;
 }) {
   return (
-    <div className="border-t border-border pt-3">
-      <dt className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+    <div className="flex flex-col gap-1">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
         {label}
-      </dt>
-      <dd className="mono-ltr mt-1.5 text-[26px] font-medium leading-none tracking-[-0.025em] tabular-nums text-foreground">
+      </span>
+      <span className="text-[22px] font-semibold leading-none tracking-[-0.01em] text-foreground">
         {value}
-      </dd>
+      </span>
       {hint ? (
-        <span className="mt-1.5 inline-block font-editorial text-[10.5px] italic text-success">
-          ↑ {hint}
-        </span>
+        <span className="text-[10.5px] font-medium text-success">{hint}</span>
       ) : null}
     </div>
   );
@@ -214,14 +191,18 @@ function MetricCell({
 
 function HeroPlaceholder({ kindLabel }: { kindLabel: string }) {
   return (
-    <div className="flex h-full w-full items-center justify-center bg-muted">
-      <div className="flex flex-col items-center gap-3 text-muted-foreground">
-        <span className="font-editorial text-[64px] italic" aria-hidden>
-          ?
+    <div
+      className="flex h-full min-h-[260px] w-full items-center justify-center bg-muted text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground"
+      style={{
+        backgroundImage:
+          "repeating-linear-gradient(45deg, hsl(var(--muted-foreground) / 0.05) 0 10px, transparent 10px 20px)",
+      }}
+    >
+      <div className="flex flex-col items-center gap-2">
+        <span className="text-[22px] text-muted-foreground/70" aria-hidden>
+          ◢◣
         </span>
-        <span className="font-mono text-[10.5px] uppercase tracking-[0.22em]">
-          {kindLabel}
-        </span>
+        <span>{kindLabel}</span>
       </div>
     </div>
   );
@@ -319,8 +300,10 @@ function pickWinner(
   return best;
 }
 
-// Creative names from the agent often have a date-stamp + hex ID suffix —
-// strip it so the title reads as headline copy.
+// Creative names from the agent often have a date-stamp + hex ID suffix
+// ("…בזמן אמת -2026-05-18-4ccb78b3e3348a178bde89b86e2fe1e5"). Strip it for
+// the headline — the standalone creative-id chip below the title carries
+// the same information cleanly.
 function extractDisplayName(raw: string): string {
   return raw
     .replace(/[\s\-_·]*\d{4}-\d{2}-\d{2}[\s\-_·]*[0-9a-f]{16,}\s*$/i, "")
@@ -346,10 +329,4 @@ function buildHeroBlurb(
     parts.push(`Hook rate ${m.hook_rate.toFixed(0)}% — מעל הסף של 30%.`);
   }
   return parts.join(" ");
-}
-
-function currentIssueShort(): string {
-  const d = new Date();
-  const months = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-  return `${months[d.getMonth()]} ${String(d.getFullYear()).slice(-2)}`;
 }
