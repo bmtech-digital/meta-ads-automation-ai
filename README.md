@@ -19,7 +19,7 @@ A **human reviewer** (terminal CLI or web dashboard) approves or rejects every p
 ## Architecture in one screen
 
 ```
-                          Cloud Scheduler (cron)
+                          Kubernetes CronJob (Hetzner k3s)
                                   │
                                   ▼
                        runners/*.sh  ─►  claude -p (headless)
@@ -66,7 +66,7 @@ git clone <this-repo> && cd meta-ads-automation-ai
 
 # 2. Configure
 cp .env.example .env                            # fill in real values
-gcloud auth application-default login           # one-time GCP auth
+gcloud auth application-default login           # one-time GCP auth (only for Vertex AI Imagen)
 
 # 3. Boot the local stack (Postgres + Mongo + Redis + campaigner shell)
 make dev
@@ -95,8 +95,9 @@ Full setup walkthrough: [`docs/ONBOARDING.md`](docs/ONBOARDING.md).
 | Data + HITL queue       | Postgres (Supabase target)                                  |
 | Web dashboard           | Next.js 15 + Tailwind + shadcn/ui (RTL Hebrew)              |
 | Webhook receiver        | Flask (Lead Ads → Trello)                                   |
-| Container orchestration | Docker Compose (local), GKE CronJobs (production)           |
-| CI/CD                   | GitHub Actions ([`.github/workflows/`](.github/workflows/)) |
+| Container orchestration | Docker Compose (local), Hetzner k3s (production)            |
+| Image registry          | GitHub Container Registry (`ghcr.io/roihala/campaigner-*`)  |
+| CI/CD                   | GitHub Actions ([`.github/workflows/`](.github/workflows/)) — push to `main` → build + deploy to Hetzner; see [`docs/CI_CD.md`](docs/CI_CD.md) |
 
 **MVP cost:** ~$25/month per business (Claude ~$23, Imagen ~$1.60).
 
@@ -117,8 +118,8 @@ meta-ads-automation-ai/
 ├── web/                    ← Next.js dashboard
 ├── webhook/                ← Flask Lead Ads → Trello receiver
 ├── dockerfiles/            ← Per-service Docker definitions
-├── kubefiles/              ← Kubernetes manifests for GKE
-├── docs/                   ← Architecture, personality, evaluation, plans
+├── kubefiles/              ← README pointer; canonical k3s manifests live in the operator's Hetzner infra repo
+├── docs/                   ← Architecture, personality, evaluation, plans, CI/CD
 └── legacy/                 ← Archived upstream-fork scripts (reference only)
 ```
 

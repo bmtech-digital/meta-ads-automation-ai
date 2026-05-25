@@ -16,7 +16,7 @@ Quick index:
 
 - [`campaigner/CLAUDE.md`](campaigner/CLAUDE.md) + per-subfolder (`tools/`, `lib/`, `prompts/`, `cli/`)
 - [`runners/CLAUDE.md`](runners/CLAUDE.md), [`scripts/CLAUDE.md`](scripts/CLAUDE.md), [`tests/CLAUDE.md`](tests/CLAUDE.md)
-- [`dockerfiles/CLAUDE.md`](dockerfiles/CLAUDE.md), [`kubefiles/CLAUDE.md`](kubefiles/CLAUDE.md)
+- [`dockerfiles/CLAUDE.md`](dockerfiles/CLAUDE.md), [`kubefiles/README.md`](kubefiles/README.md)
 - [`web/CLAUDE.md`](web/CLAUDE.md) + per-subfolder (`src/app/`, `src/components/`, `src/lib/`)
 - [`webhook/CLAUDE.md`](webhook/CLAUDE.md)
 
@@ -42,7 +42,7 @@ These are extracted from `CLAUDE.md` so any agent that only reads `AGENTS.md` st
 | Add a new prompt rule | [`campaigner/prompts/CLAUDE.md`](campaigner/prompts/CLAUDE.md) + the canonical doc the rule belongs to |
 | Add a new cron flow | [`runners/CLAUDE.md`](runners/CLAUDE.md) "Adding a new runner" |
 | Run tests | [`tests/CLAUDE.md`](tests/CLAUDE.md) |
-| Deploy | [`Makefile`](Makefile) targets, [`kubefiles/CLAUDE.md`](kubefiles/CLAUDE.md) |
+| Deploy | `git push origin main` → see [`docs/CI_CD.md`](docs/CI_CD.md). Operator hand-deploy: [`Makefile`](Makefile) targets. |
 
 ## Code style
 
@@ -52,7 +52,7 @@ These are extracted from `CLAUDE.md` so any agent that only reads `AGENTS.md` st
 
 ## CI
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs lint + test for both Python and Web on every PR. [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) deploys to GKE on push-to-main. Don't merge with red CI.
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs lint + test for both Python and Web on every PR. [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) deploys to Hetzner k3s on push-to-main — see [`docs/CI_CD.md`](docs/CI_CD.md). Don't merge with red CI.
 
 ## What this file is NOT
 

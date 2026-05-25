@@ -9,8 +9,8 @@ A small Flask server that receives Meta Lead Ads webhook notifications and creat
 | | |
 |---|---|
 | Framework | Flask |
-| Image | `campaigner-webhook` (built from [`../dockerfiles/webhook.dockerfile`](../dockerfiles/webhook.dockerfile)) |
-| Deployed | [`../kubefiles/webhook_deployment.yaml`](../kubefiles/webhook_deployment.yaml) |
+| Image | `ghcr.io/roihala/campaigner-webhook` (built from [`../dockerfiles/webhook.dockerfile`](../dockerfiles/webhook.dockerfile)) |
+| Deployed | k3s Deployment in the `campaigner` namespace on Hetzner; manifest in the operator's Hetzner infra repo (`setup/hetzner/manifests/campaigner/03-webhook.yaml`). Currently `replicas: 0` — scaled up only when Meta webhooks are wired. See [`../kubefiles/README.md`](../kubefiles/README.md). |
 | Entrypoint | [`app.py`](app.py) |
 
 ## What it does
@@ -44,14 +44,17 @@ All read at import time (line ~23 of [`app.py`](app.py)). Missing env crashes on
 1. **HMAC verification on every POST.** Never skip `verify_signature(...)` — Meta retries on 5xx, so a verification bypass becomes a forge-anything endpoint.
 2. **Idempotency** — Meta retries the same `lead_id`. Either dedupe in this service (currently relies on Trello returning the same card if invoked twice with the same idempotency key) or accept that duplicate cards are possible and document it.
 3. **No Postgres dependency.** Keep the deployment lean — it's stateless and trivially horizontally scalable. Adding Postgres makes it part of the agent's blast radius.
-4. **Secrets via k8s `Secret`** — see [`../kubefiles/secrets_template.yaml`](../kubefiles/secrets_template.yaml). Don't add a separate webhook-only secret pattern.
+4. **Secrets via k8s `Secret`** — SOPS-encrypted in the operator's Hetzner infra repo (`setup/hetzner/secrets/campaigner/`), applied out-of-band. Don't add a separate webhook-only secret pattern.
 
 ## Deploy
 
+Built + rolled by CI on every push to `main` — see [`../docs/CI_CD.md`](../docs/CI_CD.md). The webhook image is bumped even when replicas: 0, so a future scale-up automatically picks up the latest SHA.
+
 ```bash
-make webhook              # build + push + apply + restart
-make webhook_logs         # tail logs
-make webhook_restart      # rollout restart only
+# Local emergency hand-deploy (operator only, when CI is down)
+make build_webhook                # build + push the image
+make deploy_webhook               # bump image tag (no rollout — replicas: 0)
+make webhook_logs                 # tail logs (only meaningful when scaled up)
 ```
 
 ## Where truth lives
@@ -61,4 +64,5 @@ make webhook_restart      # rollout restart only
 | Meta webhook subscription setup | [Meta Webhooks docs](https://developers.facebook.com/docs/graph-api/webhooks) (external) + Meta App config |
 | App review / privacy / data deletion language | [`../docs/plans/meta-app-review-*.md`](../docs/plans/) |
 | Why Trello (not Slack / Linear / something else) | Aiweon ops choice — see [`../docs/plans/decisions-log.md`](../docs/plans/decisions-log.md) if a decision row exists |
-| Deployment manifest | [`../kubefiles/webhook_deployment.yaml`](../kubefiles/webhook_deployment.yaml) |
+| Deployment manifest | Operator's Hetzner infra repo (`setup/hetzner/manifests/campaigner/03-webhook.yaml`); see [`../kubefiles/README.md`](../kubefiles/README.md) |
+| CI/CD flow | [`../docs/CI_CD.md`](../docs/CI_CD.md) |

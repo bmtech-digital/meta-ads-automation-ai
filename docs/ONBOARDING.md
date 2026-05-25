@@ -43,7 +43,7 @@ That's ~90 minutes of reading. Don't write code before you've done this once.
 - **Git**. We use GitHub.
 - **Python 3.11** locally (only for IDE language server — actual execution is in Docker).
 - **Node 22** locally if you'll touch the web frontend.
-- **gcloud CLI** for GCP auth (Vertex Imagen).
+- **gcloud CLI** — local-dev only, for ADC auth so the workstation can call Vertex AI Imagen. Not needed for deployment (production runs on Hetzner k3s; the Vertex AI service-account JSON is provisioned by the operator from the Hetzner infra repo).
 - An IDE that respects [`.editorconfig`](../.editorconfig). VS Code, Cursor, JetBrains all do.
 
 ### First-time setup
@@ -61,9 +61,12 @@ cd meta-ads-automation-ai
 cp .env.example .env       # if you only have the example
 # … then fill in real values from the secret share
 
-# 3. GCP auth (Vertex Imagen)
+# 3. GCP auth (Vertex AI Imagen — local dev only)
 gcloud auth application-default login
 # Use the bemtech project: bemtech-478413
+# This is purely for invoking Vertex AI Imagen from your workstation during dev.
+# Production CronJobs read a service-account JSON mounted from the
+# gcp-vertexai-credentials Secret — provisioned by the operator, not by you.
 
 # 4. Spin up local stack
 make dev                   # postgres + mongo + redis + campaigner shell
@@ -157,7 +160,7 @@ Common cases:
 | Add a new schema table or column | New numbered file in [`migrations/`](../migrations/) — never edit an applied migration |
 | Add a new web route | [`web/src/app/`](../web/src/app/) — read [`web/src/app/CLAUDE.md`](../web/src/app/CLAUDE.md) |
 | Add a new UI component | [`web/src/components/`](../web/src/components/) — see [`web/src/components/CLAUDE.md`](../web/src/components/CLAUDE.md) |
-| Tweak a cron schedule | [`kubefiles/agent_cronjob_*.yaml`](../kubefiles/) — and update the schedule note in [`runners/CLAUDE.md`](../runners/CLAUDE.md) |
+| Tweak a cron schedule | CronJob manifests live in the operator's Hetzner infra repo (`setup/hetzner/manifests/campaigner/04-cronjob-*.yaml`); coordinate with the operator. Update the schedule note in [`runners/CLAUDE.md`](../runners/CLAUDE.md) and [`config/flows.yaml`](../config/flows.yaml). See [`kubefiles/README.md`](../kubefiles/README.md). |
 | Update Hebrew copy style | [`campaigner/prompts/hebrew-copy-style.md`](../campaigner/prompts/hebrew-copy-style.md) |
 
 ### The non-negotiable rules
@@ -226,10 +229,11 @@ cd web && pnpm install && pnpm dev
 pnpm test       # vitest
 pnpm test:e2e   # playwright
 
-# Deploy (only if you're authorized)
-make agent      # build + push + apply CronJobs
-make web
-make webhook
+# Deploy — normal path
+git push origin main          # GitHub Actions builds + deploys to Hetzner k3s (see docs/CI_CD.md)
+
+# Deploy — emergency hand-deploy (when CI is down, operator only)
+make build deploy             # build all 3 images and roll all workloads
 ```
 
 ## Troubleshooting

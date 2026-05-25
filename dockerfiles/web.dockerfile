@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 #
 # Campaigner web (Next.js 15 standalone). Build context: ./web
-# Image: us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-web
+# Image: ghcr.io/roihala/campaigner-web
 
 ARG NODE_VERSION=22-alpine
 

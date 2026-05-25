@@ -10,9 +10,9 @@
 # phase=error on any failure. The frontend uses this to detect "3 consecutive
 # failures" (spec §10.8).
 #
-# Prereqs: BUSINESS_ID, ANTHROPIC_API_KEY, META_* env vars set. When running
-# on Cloud Run Jobs, these are fetched from Secret Manager by the job entrypoint
-# before this script is invoked.
+# Prereqs: BUSINESS_ID, ANTHROPIC_API_KEY, META_* env vars set. In production
+# on Hetzner k3s, these are populated from SOPS-encrypted k8s Secrets mounted
+# into the CronJob pod (see docs/CI_CD.md).
 #
 # Exit codes:
 #   0 — success (observe-propose completed, heartbeat end written)

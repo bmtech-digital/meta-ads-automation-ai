@@ -24,7 +24,9 @@ git clone https://github.com/<org>/meta-ads-automation-ai && cd meta-ads-automat
 
 # 2. Set up env
 cp .env.example .env                            # fill in real values
-gcloud auth application-default login           # one-time GCP auth for Vertex
+gcloud auth application-default login           # local-dev only — for Vertex AI Imagen calls from your workstation
+                                                # (production gets Vertex creds via the gcp-vertexai-credentials
+                                                # Secret, mounted by the operator from the Hetzner infra repo)
 
 # 3. Spin up the local stack
 make dev                                        # postgres, mongo, redis, campaigner
@@ -106,7 +108,7 @@ Before opening:
 - ✅ If touching prompts: tested against [`tests/golden/`](tests/golden/).
 - ✅ If touching the schema: added a new numbered migration; old ones untouched.
 - ✅ If adding a new tool: catalog updated in [`campaigner/tools/CLAUDE.md`](campaigner/tools/CLAUDE.md) and readiness flipped in [`campaigner/CAMPAIGNER.md`](campaigner/CAMPAIGNER.md).
-- ✅ If adding a new agent flow / runner: matching CronJob in [`kubefiles/`](kubefiles/) and Makefile target.
+- ✅ If adding a new agent flow / runner: matching CronJob in the operator's Hetzner infra repo (`setup/hetzner/manifests/campaigner/`) and the `CRONJOBS` list in the [Makefile](Makefile) updated. Coordinate with the operator — application repos don't ship cluster manifests; see [`kubefiles/README.md`](kubefiles/README.md).
 
 PR description must answer:
 
@@ -125,7 +127,7 @@ Open an issue with:
 
 ## Security
 
-- Never commit credentials. `.env`, GCP service account JSON, Meta access tokens are all gitignored.
+- Never commit credentials. `.env`, GCP service-account JSON (Vertex AI), Meta access tokens are all gitignored. Production secrets live as SOPS-encrypted YAMLs in the operator's Hetzner infra repo, never in this repo and never in GitHub Actions secrets (the sole exception is `GHCR_PAT`).
 - Token rotation: Meta access tokens expire ~60 days. See [`docs/plans/task-2.3-keys-and-quotas.md`](docs/plans/task-2.3-keys-and-quotas.md).
 - Report vulnerabilities privately — email the project owner; do not open a public issue.
 

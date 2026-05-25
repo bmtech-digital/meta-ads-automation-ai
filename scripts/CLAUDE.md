@@ -8,9 +8,9 @@ Operator-run scripts. Different from [`../runners/`](../runners/) (cron) and [`.
 
 | Folder | Caller | Purpose |
 |---|---|---|
-| `runners/` | cron / Cloud Scheduler | Production agent flows |
+| `runners/` | k8s CronJob controller (Hetzner k3s) | Production agent flows |
 | `campaigner/cli/` | operator at terminal | Manage approvals queue |
-| `scripts/` (here) | operator, occasionally CI | One-off setup, validation, deploy, migrations |
+| `scripts/` (here) | operator, occasionally CI | One-off setup, validation, codegen, migrations |
 
 ## Catalog
 
@@ -34,10 +34,13 @@ Operator-run scripts. Different from [`../runners/`](../runners/) (cron) and [`.
 
 ### Deploy
 
-| Script | Purpose |
-|---|---|
-| [`build_and_push_images.sh`](build_and_push_images.sh) | Build + push the three images (agent, web, webhook). Wrapper over the [Makefile](../Makefile) targets. |
-| [`deploy_prod.sh`](deploy_prod.sh) | Apply k8s manifests against the configured cluster. Equivalent to `make agent web webhook`. Use the Makefile in normal flow; this script is for CI. |
+There are **no deploy scripts in this folder anymore.**
+
+- Normal path: `git push origin main` → GitHub Actions builds + deploys to Hetzner k3s. See [`../docs/CI_CD.md`](../docs/CI_CD.md).
+- Emergency hand-deploy (operator, when CI is down): `make build deploy` from the repo root.
+- Structural cluster state (Deployments, CronJobs, Secrets, Ingress) is operator-managed from the Hetzner infra repo via `setup/hetzner/manifests/campaigner/apply.sh`. See [`../kubefiles/README.md`](../kubefiles/README.md).
+
+The legacy `build_and_push_images.sh` and `deploy_prod.sh` scripts were removed when the GCP/GKE deployment retired (2026-05).
 
 ## How operators are expected to run things
 
@@ -70,6 +73,6 @@ Some scripts (`bootstrap_local_db.sh`, `validate_local_env.py`) run on the **hos
 | Question | Read |
 |---|---|
 | Migration system internals | [`../migrations/README.md`](../migrations/README.md) |
-| Credential setup (Anthropic / GCP / Meta) | [`../docs/plans/task-2.3-keys-and-quotas.md`](../docs/plans/task-2.3-keys-and-quotas.md) |
-| Deploy targets + cluster naming | [Makefile](../Makefile) (the `# --- GCP Configuration ---` block) |
-| Why GCP credentials are ADC, not service account JSON | [root CLAUDE.md "GCP Authentication"](../CLAUDE.md#gcp-authentication) |
+| Credential setup (Anthropic / GCP-for-Vertex / Meta) | [`../docs/plans/task-2.3-keys-and-quotas.md`](../docs/plans/task-2.3-keys-and-quotas.md) |
+| Deploy targets + cluster naming | [`../docs/CI_CD.md`](../docs/CI_CD.md) + [Makefile](../Makefile) (the `# --- Production cluster config ---` block) |
+| Why local-dev uses ADC (not a service-account JSON) for Vertex | [root CLAUDE.md "Setup & Configuration"](../CLAUDE.md#setup--configuration) |

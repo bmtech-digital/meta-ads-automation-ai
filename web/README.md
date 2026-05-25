@@ -68,19 +68,20 @@ pnpm test:e2e
 docker build -f web/Dockerfile.k8s -t campaigner-web:local web
 ```
 
-## Deploy (NOT executed in Phase 0)
+## Deploy
 
-Phase 0 ships the manifests, not the deploy. When backend Phase 5 is live and
-Supabase is chosen:
+The web image is built and rolled by CI on every push to `main`. See
+[`../docs/CI_CD.md`](../docs/CI_CD.md) for the full flow.
 
-```bash
-kustomize build web/k8s/overlays/staging  # dry-render, verify
-kubectl apply -k web/k8s/overlays/staging # push to GKE
-```
+- Cluster: `bemtech-hetzner-k3s` (Hetzner k3s)
+- Namespace: `campaigner`
+- Registry: `ghcr.io/roihala/campaigner-web`
 
-- Cluster: `generic-agent-cluster` in `bemtech-478413`
-- Namespace: `campaigner` (prod) / `campaigner-staging` (staging)
-- Registry: `us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-web`
+Structural manifests (Deployment, Service, Ingress, cert-manager Certificate)
+live in the operator's Hetzner infra repo at
+`~/projects/bemtech/setup/hetzner/manifests/campaigner/`. The `web/k8s/`
+kustomize overlays in this repo predate the Hetzner migration and are
+unused — kept only for reference. See [`../kubefiles/README.md`](../kubefiles/README.md).
 
 ## Directory map
 
@@ -115,4 +116,3 @@ web/
 - Decision history (Phase 4)
 - RLS policies (enabled in migrations but no multi-tenant policies — Phase 2, after Supabase)
 - CI path filter for `web/**` (task 3.1 extension — added once scaffold is stable)
-- GKE deploy (manifests exist; `kubectl apply` not executed)

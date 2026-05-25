@@ -4,7 +4,7 @@
 
 ## What this folder is
 
-Bash scripts, one per flow. Each wraps a single `claude -p` headless invocation with environment validation, heartbeats, and exit-code discipline. Seven are cron entrypoints (the seam between Cloud Scheduler / cron and the agent), wired via [`../config/flows.yaml`](../config/flows.yaml); one (Flow E) is operator-initiated; the remaining auxiliary scripts (`weekly_audience_refresh.sh`, `weekly_digest.sh`, `onboarding_chain.sh`) predate the registry and are not yet declared there.
+Bash scripts, one per flow. Each wraps a single `claude -p` headless invocation with environment validation, heartbeats, and exit-code discipline. Seven are cron entrypoints (the seam between the k3s `CronJob` controller and the agent), wired via [`../config/flows.yaml`](../config/flows.yaml); one (Flow E) is operator-initiated; the remaining auxiliary scripts (`weekly_audience_refresh.sh`, `weekly_digest.sh`, `onboarding_chain.sh`) predate the registry and are not yet declared there.
 
 | Script | Flow | Schedule (Asia/Jerusalem) |
 |---|---|---|
@@ -18,7 +18,7 @@ Bash scripts, one per flow. Each wraps a single `claude -p` headless invocation 
 | [`daily_ab_test_decisions.sh`](daily_ab_test_decisions.sh) | G — for every A/B test past its `planned_end_at`, propose `ab_test_decide` with the evaluated winner | 09:30 daily |
 | [`midday_health_check.sh`](midday_health_check.sh) | H — short midday check; emergency-pause candidates + tracking-health drift only (does NOT redo full Flow A) | 13:00 daily |
 
-The matching k8s `CronJob` manifests live in [`../kubefiles/`](../kubefiles/) (`agent_cronjob_*.yaml`).
+The matching k8s `CronJob` manifests live in the operator's Hetzner infra repo at `~/projects/bemtech/setup/hetzner/manifests/campaigner/04-cronjob-*.yaml` — see [`../kubefiles/README.md`](../kubefiles/README.md). The names match the `CRONJOBS` list in [`../Makefile`](../Makefile).
 
 ## The runner contract
 
@@ -48,7 +48,7 @@ Every runner does these five things, in this order. If you write a new runner, c
 
 1. **Don't unilaterally.** Each flow needs spec alignment first (CAMPAIGNER.md flow section + table at top + this folder's catalog + a matching k8s CronJob). The current set is Flow A/B/C/D — A=daily, B=every-15-min, C+D=weekly. Adding a fifth flow needs an operator decision, not an agent decision.
 2. If the spec adds one (e.g. monthly review, ad hoc backfill), copy `daily_observe_propose.sh` byte-for-byte and change three things: `FLOW=...`, the `claude -p` prompt, and the runtime expectations comment block at the top.
-3. Add a matching `kubefiles/agent_cronjob_<flow>.yaml` and wire it in the [Makefile](../Makefile) `agent_deploy` target.
+3. Coordinate with the operator to add a matching CronJob manifest in `setup/hetzner/manifests/campaigner/`, and add the CronJob name to the `CRONJOBS` list in the [Makefile](../Makefile) so `make deploy` bumps its image.
 4. Update [root CLAUDE.md "Architecture"](../CLAUDE.md#architecture-mvp--claude-code-native) and `CAMPAIGNER.md` flow table.
 
 ## Triggering manually
@@ -69,5 +69,5 @@ The CLI [`campaigner run <flow>`](../campaigner/cli/__main__.py) shells to these
 |---|---|
 | What each flow does | [`../campaigner/CAMPAIGNER.md`](../campaigner/CAMPAIGNER.md) Flow A / B / C |
 | Heartbeat schema | [`../migrations/007_heartbeats.sql`](../migrations/007_heartbeats.sql) + spec §10.8 |
-| Cron schedule of record | [`../kubefiles/agent_cronjob_*.yaml`](../kubefiles/) |
+| Cron schedule of record | [`../config/flows.yaml`](../config/flows.yaml) (source) → CronJob manifests in the operator's Hetzner infra repo |
 | Operator manual trigger | [Makefile](../Makefile) `agent_run_once` |

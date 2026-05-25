@@ -14,7 +14,7 @@ Eight flows (seven on cron, one operator-initiated). One business (Aiweon, MVP).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                       CLOUD SCHEDULER (GKE CronJobs)                        │
+│                    Kubernetes CronJobs (Hetzner k3s)                        │
 │  Flow A (09:00 IL) · B (every 15m) · C/D (Mon 10/11) · F (Sun 08:00)        │
 │  G (09:30 daily) · H (13:00 daily). Wired via config/flows.yaml.            │
 └──────────────────────┬──────────────────────────────────────────────────────┘
@@ -128,9 +128,11 @@ The repo is a **monorepo** with three deployable services:
 
 | Service | Path | Image | Deployment | What it does |
 |---|---|---|---|---|
-| **agent** | `campaigner/` + `runners/` + `migrations/` + `scripts/` + `config/` | `campaigner-agent` | 7 GKE CronJobs | The flows above (wired via [`config/flows.yaml`](../config/flows.yaml)) |
-| **web** | `web/` | `campaigner-web` | GKE Deployment + Ingress | Hebrew dashboard for approvals + business profile |
-| **webhook** | `webhook/` | `campaigner-webhook` | GKE Deployment | Lead Ads → Trello receiver (narrow-scope, NOT the agent) |
+| **agent** | `campaigner/` + `runners/` + `migrations/` + `scripts/` + `config/` | `ghcr.io/roihala/campaigner-agent` | 7 k3s CronJobs | The flows above (wired via [`config/flows.yaml`](../config/flows.yaml)) |
+| **web** | `web/` | `ghcr.io/roihala/campaigner-web` | k3s Deployment + ingress-nginx + cert-manager | Hebrew dashboard for approvals + business profile |
+| **webhook** | `webhook/` | `ghcr.io/roihala/campaigner-webhook` | k3s Deployment (scaled to 0) | Lead Ads → Trello receiver (narrow-scope, NOT the agent) |
+
+Cluster: `bemtech-hetzner-k3s` (single Hetzner k3s cluster, multi-tenant by namespace). Structural manifests live in the operator's Hetzner infra repo (`~/projects/bemtech/setup/hetzner/manifests/campaigner/`) — see [`../kubefiles/README.md`](../kubefiles/README.md). CI ([`docs/CI_CD.md`](CI_CD.md)) only mutates image tags.
 
 Per-folder agent-facing context lives in `*/CLAUDE.md`. See the [navigation map](../CLAUDE.md#-per-folder-navigation-claudemd-in-every-working-directory) in root `CLAUDE.md`.
 
@@ -144,7 +146,7 @@ Per-folder agent-facing context lives in `*/CLAUDE.md`. See the [navigation map]
 | **Hebrew rationale, English summary** | Operators read rationales (Hebrew = Aiweon team's first language). Cron logs are tailed by ops/CI (English = standard). |
 | **Dual-mode adapter (web)** | The remote DB target was undecided when the web scaffold landed. `WEB_DB_MODE=local-postgres\|supabase` lets us flip when the §1.4 decision lands without code rewrite. |
 | **Single-SDK ownership in `campaigner/lib/`** | `facebook-business` is imported only in `meta_client.py`; `google-genai` only in `creative.py`; `psycopg` only in `db.py`. Tools call the lib; the lib owns the SDK. Reduces blast radius of SDK bugs/upgrades. |
-| **GKE shared with `generic_agent`** | Same cluster (`generic-agent-cluster`), same registry. One bemtech-internal cluster, multi-tenanted by namespace. `campaigner` namespace is ours. |
+| **Hetzner k3s shared with `generic_agent`** | Same cluster (`bemtech-hetzner-k3s`), same registry (GHCR). One bemtech-internal cluster, multi-tenanted by namespace. `campaigner` namespace is ours. Migrated off GKE 2026-05; see [`../../setup/hetzner/CLAUDE.md`](../../setup/hetzner/CLAUDE.md). |
 | **Supabase as remote target** | Decided 2026-04-20 (`fudqwgrdgzteamtnydbt`). Local dev runs Postgres in Docker; remote will run Supabase. Same SQL, different connection string. |
 
 ## What's in v2 (deferred)
