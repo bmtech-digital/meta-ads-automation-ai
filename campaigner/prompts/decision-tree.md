@@ -19,6 +19,8 @@
 ## §T-1 — Budget Utilization Gate (must run first)
 
 > **Source:** "Check utilization before the budget setting." Red flag: budget utilization < 50% means Meta is refusing to spend the current budget — do not suggest raising it; find out why Meta will not spend what it already has. Implements M3 in [decision-map.md](../../docs/plans/decision-map.md).
+>
+> **Capability note (Migration 033, 2026-05-25):** when `utilization_7d < 0.5` the `new_creative` capability arrives blocked in `CAPABILITIES_JSON` with `blocked_by=["utilization_7d_at_least_50"]`. The agent still runs §T-1 — but for any `creative_refresh_candidate` finding under this state, emit `decision_type='observation_blocked'` with `outputs.would_propose` (the would-be `new_creative` payload) and `outputs.blocked_by=["utilization_7d_at_least_50"]`. The diagnosis surfaces to the operator as "delivery bottleneck — fix audience/budget first, then unblock new_creative." Do **not** emit `decision_type='skip'` — that silences the finding.
 > **Why first:** אם Meta מוציאה רק 30% מהתקציב, ה־5,100 חשיפות שראית ב-30 יום הם תוצאה של underspending, לא תוצאה של ביצוע. אבחון קריאייטיב במקרה הזה הוא טיפול בסימפטום ולא בסיבה.
 
 **חישוב (per-campaign):**
@@ -591,6 +593,8 @@ scale_down הוא ענף **דיאגנוסטי-שמרני** — "יקר אבל ע
 ```
 
 ב-UI, ה-SKIP-ים האלה יוצגו כ"החלטות שקופות" — קלפי "הסוכן בדק את X והחליט לא לגעת כי Y". זה שונה משקט מוחלט.
+
+> **Capability note (Migration 033, 2026-05-25):** `post_edit_cooldown`, `learning_phase`, `noise_single_day_spike`, `calendar_anomaly` remain `decision_type='skip'` — these are legitimate "no action this run, by design" branches, not silenced findings. They do not have an actionable diagnosis behind them. `sustained_over_no_winner`, however, IS a finding: log it as `observation_blocked` with `outputs.would_propose={"task_type":"scale_down", "payload":{...}}` and `outputs.blocked_by=["winner_signal_missing"]` so the operator sees "I'd lean toward scale_down here but the campaign isn't a clear winner — your call." Same logic for any `hands_off` branch where the agent had a thought but the action is gated.
 
 ---
 

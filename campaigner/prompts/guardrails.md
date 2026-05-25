@@ -203,6 +203,8 @@ A jump > `{{scaling.scale_up_strict_cap_pct}}`% → rejection.
 
 **Implementation:** `check_guardrails._verify_tracking_infrastructure`. The agent passes `tracking_health_status` (from `check_tracking_health.py` output, Step 0.5 in Flow A) via `--state`.
 
+**Category B (Migration 033, 2026-05-25):** this rule is in `CATEGORY_B_RULES` in `check_guardrails.py` — the proposal is still blocked, but the agent should **also** log an `observation_blocked` decision capturing the would-be payload so the operator sees the diagnosis (e.g. "scale_up wanted on הראל לידים — blocked by tracking_verified"). The Category B output channel of `check_guardrails` returns the violation under `category_b_violations` so the agent's prompt can route it correctly. See `campaigner/CAMPAIGNER.md` § Capabilities.
+
 ---
 
 ## 18. `enforce_budget_formula` (linked to backend PRD E1 #12)
@@ -359,6 +361,8 @@ The guardrail adds **three content checks** on the rationale so the operator see
 
 See also [kpi-benchmarks.md "How rationale must be written"](kpi-benchmarks.md#how-set_kpi_target-rationale-must-be-written) — the full wording guidance.
 
+**Category B (Migration 033, 2026-05-25):** when this rule fires, the agent should also emit `observation_blocked` with `outputs.would_propose` = the rejected `set_kpi_target` payload + `outputs.blocked_by=["research_sources_at_least_2"]` or `["matched_terms_present"]`. The operator sees "agent has a KPI target in mind for [service] but needs more research" instead of nothing.
+
 ---
 
 ## 27. `no_competitor_hallucinations` (new 2026-05-13 — Flow D)
@@ -406,6 +410,8 @@ See also [kpi-benchmarks.md "How rationale must be written"](kpi-benchmarks.md#h
 **Explicit override:** Add `source_preference: 'generate_new'` to `payload`. Use only with justification — e.g. all N gallery assets were rejected in learning cycles, or the new campaign's angle is materially different from anything available.
 
 **Implementation:** in `_prefer_gallery_over_generation` in [check_guardrails.py](../tools/check_guardrails.py). The context fetcher (`_fetch_context`) runs the SQL for `viable_unused_gallery_count_for_channel` when the payload contains `channel`. Otherwise — `skip`.
+
+**Category B (Migration 033, 2026-05-25):** when this rule rejects `new_creative` because viable redeploy candidates exist, the agent should emit `observation_blocked` with `outputs.would_propose` containing the would-be `new_creative` payload + `outputs.blocked_by=["redeploy_candidates_present"]` and a sibling `proposal` for the recommended `redeploy_creative`. The operator sees both: "I held off generating new; here's what I'd redeploy instead."
 
 ---
 
@@ -497,6 +503,8 @@ See also [kpi-benchmarks.md "How rationale must be written"](kpi-benchmarks.md#h
 **How to replace:** Add a line to the rationale that cites the rejection and explains what changed. If you can't — skip.
 
 **The tool that feeds the context:** [tools/load_feedback_history.py](../tools/load_feedback_history.py) — must run in Flow A Step 1.6 before proposing. If it didn't run, the guardrail returns `skipped:true`.
+
+**Category B (Migration 033, 2026-05-25):** when this rule blocks a re-proposal, emit `observation_blocked` summarizing what changed since the prior rejection (`outputs.blocked_by=["prior_rejection_within_cooldown"]`, `outputs.would_propose` = the rejected payload, `outputs.notes_he` describing the new signal). The operator sees that the agent is *aware* of the prior rejection and can decide whether to manually unblock — rather than the agent silently skipping every run.
 
 ---
 

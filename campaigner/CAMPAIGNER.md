@@ -168,6 +168,51 @@ Reuse `$RUN_ID` for every `log_decision` and `propose_task` call in this invocat
 
 ---
 
+## Capabilities (CAPABILITIES_JSON — Migration 033)
+
+Every cron runner now computes a `CAPABILITIES_JSON` envelope at the top of the script (via `python -m campaigner.tools.compute_capabilities`) and passes it into this invocation as part of the prompt. **You do not derive capabilities; you read them.** This replaces the prior pattern of having the LLM re-check tracking/KPI/research preconditions every run (which it was getting wrong — see `docs/todos/capability-gated-decision-flow.md`).
+
+Shape of the envelope (truncated):
+
+```json
+{
+  "capabilities": [
+    {"name": "scale_up", "available": false, "blocked_by": ["tracking_verified"], "reason_he": "אימות מעקב חסר"},
+    {"name": "objective_mismatch_alert", "available": true, "blocked_by": [], "reason_he": "..."},
+    ...
+  ],
+  "blocked_count": 4,
+  "available_count": 9,
+  "state_summary": {"tracking_status":"unverified", "primary_kpi":"cpl", ...}
+}
+```
+
+**Binding rules:**
+
+1. **Do not propose** a `task_type` whose capability is `available=false`. The mapping from `task_type` → capability matches the `name` field (e.g. `scale_up` → `scale_up`; `alert` → the most specific `*_alert` capability; `set_kpi_target` → `set_kpi_target`).
+2. **Do not skip the diagnosis** when a capability is blocked. Diagnose as you would normally. For each finding whose `task_type` is unavailable, emit `decision_type='observation_blocked'` (instead of `proposal`) with the shape below.
+3. The Category A guardrails in `prompts/guardrails.md` (budget jump cap, no learning touch, no low-res creative, etc.) still apply to any proposal you DO make. Category B premise gates (§17, §26, §28, §37) are now satisfied/blocked by the capabilities envelope — `check_guardrails` returns them grouped under `category_b_violations` so you can route them to `observation_blocked` if you somehow ended up calling it for a blocked capability.
+
+**`observation_blocked` shape:**
+
+```bash
+python -m campaigner.tools.log_decision \
+  --business-id "$BUSINESS_ID" --run-id "$RUN_ID" \
+  --graph-name observe_propose --node-name <where_the_finding_was_made> \
+  --decision-type observation_blocked \
+  --summary "<Hebrew: what I found, one line>" \
+  --rationale "<Hebrew: why it matters and what unblocks it>" \
+  --outputs '{
+    "finding_type": "objective_mismatch" | "staged_scale_up" | "creative_fatigue" | ...,
+    "blocked_by": ["tracking_verified" | "primary_kpi_set" | "research_sources_at_least_2" | ...],
+    "would_propose": { "task_type": "scale_up", "payload": { ... } },
+    "summary_he": "..."
+  }' \
+  --campaign-id <campaign_id if scoped to a campaign>
+```
+
+Operators see these rows on `/runs/[run_id]` and on the home "last scan" card as **"ready when you unblock me"** insights. They are NOT written to the `approvals` table.
+
 ## Flow A — Observe-Propose
 
 ### Step −1: Skip-on-no-change gate (added 2026-05-17 — focused-run lever #3)
@@ -236,10 +281,10 @@ python -m campaigner.tools.log_decision \
 
 - `status == "healthy"` → continue to Step 1 normally.
 - `status == "partial"` or `status == "unverified"` or `status == "unknown"` →
-  - **Do NOT propose** any task_type listed in `blocks_proposals` (always `new_campaign`, `scale_up`, `new_creative`, `expand_audience`). These would burn spend on a measurement infrastructure that won't return conversion signals.
+  - **Do NOT propose** any task_type listed in `blocks_proposals` (always `new_campaign`, `scale_up`, `new_creative`, `expand_audience`). These would burn spend on a measurement infrastructure that won't return conversion signals. `CAPABILITIES_JSON` already reflects this — the matching capability entries arrive with `available=false, blocked_by=["tracking_verified"]`. When you would have proposed one of these, route the finding to `observation_blocked` per the Capabilities section above.
   - **Allowed:** `pause_campaign` (emergency only), `alert`, `set_kpi_target`, `verify_pixel_capi`.
-  - Emit a `set_kpi_target`-style proposal of `task_type='verify_pixel_capi'` (the existing tracking-verification approval flow) so the operator has a queued action item. If a `pending` row already exists for this business, log a `skip` decision with rationale `tracking_unhealthy_proposal_already_pending` instead of duplicating.
-  - Continue to Step 1 anyway for observation purposes, but every diagnose decision in Step 2 must include a `tracking_status: <status>` field in its `inputs` so the operator sees that the diagnosis was made against unverified data.
+  - Emit a `verify_pixel_capi` proposal (pass `--finding-key "verify_pixel_capi:business"` so dedup is structural — no need to log skip rows when a pending one already exists; `propose_task` will return `skipped=true`).
+  - Continue to Step 1 anyway for **full diagnosis**, not just observation. The `objective_mismatch` / `creative_fatigue` / `pool_misalignment` findings you make in Step 2 are surfaced as `alert` proposals (with `--finding-key`) or `observation_blocked` rows — never silently swallowed. Every diagnose decision in Step 2 must include a `tracking_status: <status>` field in its `inputs`.
 
 The check is **operator-attested-state**: it reads `business_knowledge.tracking_verified` + the four supporting fields (Pixel ID, CAPI configured, AEM events, domain verified). v2 will add a live Meta Pixel event-rate / match-quality check — but the operator-attested flag covers the 90% Day-Zero case.
 
@@ -263,28 +308,27 @@ python -m campaigner.tools.log_decision \
 - `health_band == "watch"` → continue, but every structural proposal (`scale_up` / `new_creative` / `new_campaign`) must echo the relevant `signals` in its rationale so the operator sees the risk.
 - `health_band == "critical"` → propose `alert` (urgency=urgent) per critical signal. Do NOT propose spend-increasing actions until the operator resolves the underlying issue. Triggers include `account_status != ACTIVE`, `disable_reason` set, `spend_cap <5% remaining`, `5+ rejected ads in 30d`.
 
-### Step 0.7: Diagnostic-skip gate (added 2026-05-17 — focused-run lever #2)
+### Step 0.7: Diagnostic continuation under blocked capabilities (rewritten 2026-05-25 — Migration 033)
 
-**Before Step 1.** When the pre-flight gates have already blocked every structural proposal type, running the full Step 1+ diagnosis is pure cache-read waste — 15+ tool turns producing data the agent can't act on. Short-circuit instead.
+**Before Step 1.** When pre-flight gates have blocked every *spend-touching* capability (`scale_up`, `new_creative`, `expand_audience`, `new_campaign`), prior behavior was to skip Steps 1–6 entirely. That silenced findings the operator still needs to see — `objective_mismatch`, `staged_scale_up_candidate`, `pool_misalignment`, `creative_fatigue`. New behavior:
 
-**Skip Step 1–6 and go straight to summary** when **all** of the following hold:
+**Always run Steps 1–6 for the diagnosis.** What changes is the *output channel*:
 
-- Step 0.5 `tracking_status` is `partial` / `unverified` / `unknown` (blocks `scale_up`, `new_creative`, `expand_audience`, `new_campaign`), **and**
-- Step 0.6 `health_band` is `critical` **or** there are zero `ACTIVE` campaigns on the account, **and**
-- No `pending` approval already covers the blocking issue (avoid re-asking the operator the same question).
+- For any finding whose `task_type` corresponds to a `CAPABILITIES_JSON` entry with `available=false` → emit `decision_type='observation_blocked'` instead of `proposal`. Include the would-be payload under `outputs.would_propose` so the operator can preview it.
+- For findings whose capability IS available (the structural alerts — `objective_mismatch_alert`, `creative_fatigue_alert`, `pool_misalignment_alert`, `set_monthly_budget_alert`, `emergency_pause`) → emit a normal `proposal` via `propose_task --task-type alert ...`. **Use `--finding-key` to dedup** — see the rule below.
+- Emit the appropriate Step 0.5 / 0.6 alerts (`verify_pixel_capi`, `alert` for critical health) as proposals — these are what the operator needs to act on first.
 
-When the skip condition fires:
+**Finding-key dedup (binding):** every proposal MUST pass `--finding-key "<finding_type>:<target_id_or_'business'>"`. This is how `propose_task` decides whether a pending approval already covers the same finding. Examples:
 
-1. Emit the appropriate Step 0.5 / 0.6 alerts (`verify_pixel_capi`, `alert` for critical health) — these are what the operator needs to act on.
-2. Log a `skip` decision with `node_name='diagnostic_skip'`, `summary=`"דילגתי על Step 1+ — אין על מה לפעול עד שהחסם <X> נפתר"`, and `outputs={"reason": "blocked_state", "blocking_gates": [...], "skipped_steps": ["1","2","3","4","5","6"]}`.
-3. Skip directly to **Flow A summary** at the bottom of this section. Do **not** fetch insights, baselines, audiences, feedback history, or active plans — none of them affect what you can propose right now.
+- `onboarding_incomplete:business`
+- `objective_mismatch:23842050717520440`
+- `set_monthly_budget:business`
+- `staged_scale_up:23.4-suc-ai`
+- `creative_fatigue:6843125094850`
 
-**Do NOT skip** (continue normally) if:
-- Tracking is `healthy` (even if other things are bad — the agent can still act on conversions data).
-- Account is `watch` but at least 1 campaign is `ACTIVE` (the agent can still propose `pause_campaign` or `set_kpi_target` based on per-campaign signals).
-- Step 0 returned `overrun` — pace is itself the action; the agent must still locate which campaigns are over-pacing in Step 1.
+Two different findings about the same campaign (e.g. `objective_mismatch` and `staged_scale_up`) MUST get distinct `finding_key`s and will coexist in the queue. Dedup matches structurally — no more "any pending alert on this business hides everything."
 
-This gate is a **diagnostic filter, not a guardrail**. It doesn't change what's allowed — it just stops the agent from re-deriving why-nothing-can-happen when the pre-flight checks already determined nothing can happen.
+**When `compute_state_hash`-style optimization is genuinely warranted** (no campaigns active, full account suspended, nothing observable): emit one `observation` row stating "no actionable state — same as last run at $TIMESTAMP" and skip to summary. This is the only legitimate fast-exit; the previous "diagnostic_skip on blocked tracking" path is removed.
 
 ### Step 1: Pull signals
 

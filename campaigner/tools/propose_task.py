@@ -16,7 +16,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 from campaigner.lib.config import Config, ConfigError
-from campaigner.lib.db import get_connection
+from campaigner.lib.db import fetch_one, get_connection
 from campaigner.tools._contract import (
     emit_runtime_error,
     emit_success,
@@ -24,6 +24,23 @@ from campaigner.tools._contract import (
     parse_json_arg,
     with_db_retry,
 )
+
+
+def _fetch_existing_finding(business_id: str, finding_key: str) -> dict | None:
+    """Return the most-recent pending approval for (business, finding_key), or
+    None. Migration 033 dedup primitive."""
+    return fetch_one(
+        """
+        SELECT id, status, created_at
+          FROM approvals
+         WHERE business_id = %s
+           AND finding_key = %s
+           AND status = 'pending'
+         ORDER BY created_at DESC
+         LIMIT 1
+        """,
+        (business_id, finding_key),
+    )
 
 # Per spec §10.4 comment on `task_type`. Two groups:
 #   * Ad-management — mutate campaigns/adsets/ads on the ad account.
@@ -419,6 +436,21 @@ def main() -> None:
         ),
     )
     p.add_argument(
+        "--finding-key",
+        default=None,
+        help=(
+            "Stable identifier for the (finding_type, target) pair this proposal "
+            "addresses — e.g. 'objective_mismatch:23.4-suc-ai' or 'set_monthly_budget:business'. "
+            "Used by structural dedup: if a pending approval already carries this "
+            "finding_key, the insert is skipped and we emit a JSON object with "
+            "skipped=true + existing_approval_id. Lets distinct findings coexist "
+            "(onboarding_incomplete, objective_mismatch, set_monthly_budget, ...) "
+            "where the historical vibe-based dedup conflated them. Optional — when "
+            "omitted, dedup falls through to the legacy (business_id, task_type, "
+            "target_id) check at insert time. Added 2026-05-25 (Migration 033)."
+        ),
+    )
+    p.add_argument(
         "--operator-questions",
         default=None,
         help=(
@@ -491,6 +523,31 @@ def main() -> None:
         emit_validation_error(str(e))
         return
 
+    # Migration 033 — structural dedup by finding_key. If the agent declared
+    # one and a pending approval already carries it, return the existing
+    # approval's id with skipped=true instead of inserting a duplicate.
+    if args.finding_key:
+        existing = with_db_retry(
+            lambda: _fetch_existing_finding(args.business_id, args.finding_key)
+        )
+        if existing is not None:
+            emit_success(
+                {
+                    "approval_id": str(existing["id"]),
+                    "business_id": args.business_id,
+                    "task_type": args.task_type,
+                    "target_kind": args.target_kind,
+                    "target_id": args.target_id,
+                    "status": existing["status"],
+                    "urgency": args.urgency,
+                    "created_at": existing["created_at"].isoformat(),
+                    "skipped": True,
+                    "dedup_reason": "existing_finding_key",
+                    "finding_key": args.finding_key,
+                }
+            )
+            return
+
     def _do_insert() -> dict:
         with get_connection() as conn, conn.cursor() as cur:
             cur.execute(
@@ -499,13 +556,15 @@ def main() -> None:
                     business_id, created_by_run_id, task_type,
                     target_kind, target_id,
                     payload, rationale, expected_impact,
-                    urgency, expires_at, scheduled_for, operator_questions
+                    urgency, expires_at, scheduled_for, operator_questions,
+                    finding_key
                 )
                 VALUES (
                     %s, %s, %s,
                     %s, %s,
                     %s::jsonb, %s, %s::jsonb,
-                    %s, %s, %s, %s::jsonb
+                    %s, %s, %s, %s::jsonb,
+                    %s
                 )
                 RETURNING id, status, created_at, expires_at, scheduled_for
                 """,
@@ -522,6 +581,7 @@ def main() -> None:
                     expires_at,
                     scheduled_for_dt,
                     json.dumps(operator_questions) if operator_questions is not None else None,
+                    args.finding_key,
                 ),
             )
             return cur.fetchone()
@@ -585,6 +645,8 @@ def main() -> None:
             "created_at": row["created_at"].isoformat(),
             "expires_at": row["expires_at"].isoformat(),
             "scheduled_for": row["scheduled_for"].isoformat() if row["scheduled_for"] else None,
+            "finding_key": args.finding_key,
+            "skipped": False,
         }
     )
 
