@@ -26,6 +26,7 @@ If you find yourself adding domain knowledge to `ui/Button` ("orange when budget
 | [`shell.tsx`](shell.tsx) | Page chrome wrapping nav + main + RTL container | — |
 | [`decision-row.tsx`](decision-row.tsx) | One `agent_decisions` row, formatted | parent passes the row |
 | [`budget-health-card.tsx`](budget-health-card.tsx) | Per-campaign pacing + utilization | parent passes the metrics |
+| [`last-scan-card.tsx`](last-scan-card.tsx) | Home-page summary of latest `observe_propose` run — gate chips (budget/tracking/account) + top finding + CTA to `/runs/[run_id]`. Uses [`../lib/runs-summary.ts`](../lib/runs-summary.ts). | parent passes the `RunSummaryRow` + full decision trail |
 | [`run-now-button.tsx`](run-now-button.tsx) | Triggers a runner via `/api/runners/trigger/` | client component, `fetch` |
 | [`theme-provider.tsx`](theme-provider.tsx) / [`theme-toggle.tsx`](theme-toggle.tsx) | Dark mode | client component, localStorage |
 | [`user-menu.tsx`](user-menu.tsx) | Profile dropdown, logout | parent passes user info |

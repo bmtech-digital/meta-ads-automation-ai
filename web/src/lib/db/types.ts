@@ -369,6 +369,27 @@ export interface AgentDecision {
   confidence: number | null;
 }
 
+/**
+ * Aggregate snapshot of a single agent run — one row per distinct
+ * `agent_decisions.run_id`. Used by the /runs index and the home-page
+ * "last scan" card to summarize a scan without dragging in every decision.
+ * The detail page (`/runs/[run_id]`) still loads the full decision trail
+ * via `listDecisionsForRun`.
+ */
+export interface RunSummaryRow {
+  run_id: string;
+  graph_name: string;
+  started_at: string;
+  ended_at: string;
+  decision_count: number;
+  proposal_count: number;
+  skip_count: number;
+  rejection_count: number;
+  error_count: number;
+  /** Distinct campaigns the run touched (via `agent_decisions.campaign_id`). */
+  campaigns_touched: number;
+}
+
 // ---- Meta integration (Path B — OAuth) ---------------------------------
 // Shapes mirror migration 011_meta_connections.sql. See
 // `docs/plans/meta-integration-readiness.md` §2 + schemas/meta-connection.ts
@@ -713,6 +734,17 @@ export interface DataClient {
     businessId: string,
     runId: string,
   ): Promise<AgentDecision[]>;
+  /**
+   * One row per distinct `run_id` for a business, newest first. Drives the
+   * /runs index and the home-page "last scan" card per
+   * `docs/todos/surface-runs-detail.md`. `graphName` filters to a single graph
+   * (typically `observe_propose`) so weekly creative / research runs don't
+   * crowd out the daily-scan summary.
+   */
+  listRunsForBusiness(
+    businessId: string,
+    opts: { graphName?: string; limit?: number },
+  ): Promise<RunSummaryRow[]>;
   approveApproval(id: string, approvedBy: string): Promise<void>;
   rejectApproval(id: string, reason: string): Promise<void>;
   unapproveApproval(id: string): Promise<{ reverted: boolean }>;

@@ -8,6 +8,7 @@ import {
   InboxIcon,
   TargetIcon,
   KnowledgeIcon,
+  HistoryIcon,
 } from "@/components/brand/icons";
 import {
   Menu,
@@ -41,8 +42,9 @@ type NavLink = {
 };
 
 /**
- * Top Nav links — consolidated 12 → 8 in the 2026-05-17 redesign. Each link
- * may carry sibling routes via SubNav inside the destination page:
+ * Top Nav links — consolidated 12 → 8 in the 2026-05-17 redesign; /runs added
+ * 2026-05-25 (surface-runs-detail.md), bringing the total to 9. Each link may
+ * carry sibling routes via SubNav inside the destination page:
  *   /campaigns  → + /ab-tests, /plans
  *   /audiences  → + /leads
  *   /settings   → + /integrations
@@ -51,6 +53,7 @@ type NavLink = {
 const LINKS: NavLink[] = [
   { href: "/", label: "דשבורד", Icon: SignalIcon },
   { href: "/approvals", label: "הצעות", Icon: InboxIcon },
+  { href: "/runs", label: "ריצות", Icon: HistoryIcon },
   { href: "/campaigns", label: "קמפיינים", Icon: TargetIcon },
   { href: "/business-knowledge", label: "העסק שלי", Icon: KnowledgeIcon },
   { href: "/gallery", label: "קריאייטיב", Icon: ImagesIcon as IconCmp },

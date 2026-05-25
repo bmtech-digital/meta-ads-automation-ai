@@ -7,6 +7,7 @@ import { Shell, PageHeader, SectionHeader } from "@/components/shell";
 import { PulseDot } from "@/components/brand/icons";
 import { RunNowButton } from "@/components/run-now-button";
 import { BudgetHealthCard } from "@/components/budget-health-card";
+import { LastScanCard } from "@/components/last-scan-card";
 import { CountUp } from "@/components/count-up";
 import { Sparkline, synthSpendTrend } from "@/components/sparkline";
 import { getActiveBusiness } from "@/lib/active-business";
@@ -110,6 +111,21 @@ export default async function HomePage() {
   const pendingApprovals = business
     ? await db.listPendingApprovals(business.id)
     : [];
+  // Latest `observe_propose` run for the LastScanCard. Pull the
+  // summary row + full decision trail in parallel — the helper
+  // extracts gates and top finding from the trail.
+  const latestRunSummary = business
+    ? (
+        await db.listRunsForBusiness(business.id, {
+          graphName: "observe_propose",
+          limit: 1,
+        })
+      )[0] ?? null
+    : null;
+  const latestRunDecisions =
+    business && latestRunSummary
+      ? await db.listDecisionsForRun(business.id, latestRunSummary.run_id)
+      : [];
   const inboxPreview = pendingApprovals.slice(0, INBOX_PREVIEW_LIMIT);
   const inboxRemainder = Math.max(
     0,
@@ -202,6 +218,13 @@ export default async function HomePage() {
           />
 
           <BudgetHealthCard business={business} decision={budgetHealth} />
+
+          {latestRunSummary ? (
+            <LastScanCard
+              run={latestRunSummary}
+              decisions={latestRunDecisions}
+            />
+          ) : null}
 
           <ApprovalsInbox
             preview={inboxPreview}

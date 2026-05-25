@@ -23,6 +23,7 @@ import type {
   MonthlyReport,
   PrimaryKpi,
   RecordApiCallInput,
+  RunSummaryRow,
   SeasonalHints,
   UpsertAdAccountInput,
   UpsertConnectionInput,
@@ -766,6 +767,48 @@ export const localPostgresClient: DataClient = {
         WHERE business_id = $1 AND run_id = $2
         ORDER BY created_at ASC`,
       [businessId, runId],
+    );
+    return rows;
+  },
+
+  async listRunsForBusiness(
+    businessId: string,
+    opts: { graphName?: string; limit?: number },
+  ): Promise<RunSummaryRow[]> {
+    const limit = Math.min(Math.max(opts.limit ?? 30, 1), 200);
+    // Single aggregate query — one row per run_id, computed entirely in
+    // Postgres. `graph_name` is taken via MAX() because every row in a
+    // run shares the same graph_name (the runner sets it once); MAX is
+    // a no-op selector that keeps the GROUP BY honest.
+    const { rows } = await getPool().query<{
+      run_id: string;
+      graph_name: string;
+      started_at: string;
+      ended_at: string;
+      decision_count: number;
+      proposal_count: number;
+      skip_count: number;
+      rejection_count: number;
+      error_count: number;
+      campaigns_touched: number;
+    }>(
+      `SELECT run_id::text,
+              MAX(graph_name) AS graph_name,
+              MIN(created_at)::text AS started_at,
+              MAX(created_at)::text AS ended_at,
+              COUNT(*)::int AS decision_count,
+              COUNT(*) FILTER (WHERE decision_type = 'proposal')::int  AS proposal_count,
+              COUNT(*) FILTER (WHERE decision_type = 'skip')::int      AS skip_count,
+              COUNT(*) FILTER (WHERE decision_type = 'rejection')::int AS rejection_count,
+              COUNT(*) FILTER (WHERE decision_type = 'error')::int     AS error_count,
+              COUNT(DISTINCT campaign_id)::int AS campaigns_touched
+         FROM agent_decisions
+        WHERE business_id = $1
+          AND ($2::text IS NULL OR graph_name = $2)
+        GROUP BY run_id
+        ORDER BY MAX(created_at) DESC
+        LIMIT $3`,
+      [businessId, opts.graphName ?? null, limit],
     );
     return rows;
   },

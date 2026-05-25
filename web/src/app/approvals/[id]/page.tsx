@@ -294,6 +294,14 @@ export default async function ApprovalDetailPage({
                   צפה בקמפיין ↗
                 </Link>
               ) : null}
+              {approval.created_by_run_id ? (
+                <Link
+                  href={`/runs/${approval.created_by_run_id}`}
+                  className="text-xs text-primary underline-offset-2 hover:underline"
+                >
+                  צפה בריצה ↗
+                </Link>
+              ) : null}
             </div>
           </CardHeader>
           <CardContent className="flex flex-col gap-5">
