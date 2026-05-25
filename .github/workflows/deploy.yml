@@ -1,10 +1,10 @@
 # Deploy campaigner to Hetzner k3s on every push to main.
-# Pattern: build all 3 images on GH-hosted runners → push to GHCR → deploy from
+# Pattern: build all 3 images on GH-hosted runners â push to GHCR â deploy from
 # in-cluster self-hosted runner (gh-runner-campaigner pod in the gh-runners
 # namespace). Documented in docs/CI_CD.md.
 #
 # Triggers: push to main ONLY. No workflow_dispatch, no PR. Push to main = ship.
-# A "full deployment" runs every time — all 3 images rebuilt, web rolled,
+# A "full deployment" runs every time â all 3 images rebuilt, web rolled,
 # webhook image bumped (replicas: 0 so no rollout), all 7 CronJobs bumped,
 # DB migrations re-applied idempotently, smoke test asserts /api/health == 200.
 #
@@ -14,7 +14,7 @@
 # mutates image tags + applies migrations.
 #
 # Required GitHub Actions secrets:
-#   GHCR_PAT — PAT owned by `roihala` with `write:packages`. Same token is
+#   GHCR_PAT â PAT owned by `roihala` with `write:packages`. Same token is
 #              mounted into the in-cluster runner via the SOPS-encrypted
 #              gh-runners/gh-runner-pat Secret on the Hetzner side.
 
@@ -25,9 +25,9 @@ on:
     branches: [main]
 
 env:
-  GHCR_IMAGE_AGENT: ghcr.io/roihala/campaigner-agent
-  GHCR_IMAGE_WEB: ghcr.io/roihala/campaigner-web
-  GHCR_IMAGE_WEBHOOK: ghcr.io/roihala/campaigner-webhook
+  GHCR_IMAGE_AGENT: ghcr.io/bmtech-digital/campaigner-agent
+  GHCR_IMAGE_WEB: ghcr.io/bmtech-digital/campaigner-web
+  GHCR_IMAGE_WEBHOOK: ghcr.io/bmtech-digital/campaigner-webhook
   NAMESPACE: campaigner
   SMOKE_URL: https://campaigner.aiweon.co.il
 
@@ -44,7 +44,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: roihala
+          username: bmtech-digital
           password: ${{ secrets.GHCR_PAT }}
 
       - name: Build and push agent image
@@ -69,7 +69,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: roihala
+          username: bmtech-digital
           password: ${{ secrets.GHCR_PAT }}
 
       - name: Build and push web image
@@ -94,7 +94,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
-          username: roihala
+          username: bmtech-digital
           password: ${{ secrets.GHCR_PAT }}
 
       - name: Build and push webhook image
@@ -113,19 +113,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # myoung34/github-runner image doesn't ship kubectl — install it
+      # myoung34/github-runner image doesn't ship kubectl â install it
       # fresh on each run. Cluster auth is implicit via the in-cluster
-      # ServiceAccount (gh-runner-campaigner) — kubectl auto-discovers it
+      # ServiceAccount (gh-runner-campaigner) â kubectl auto-discovers it
       # via /var/run/secrets/kubernetes.io/serviceaccount.
       - uses: azure/setup-kubectl@v4
 
       - name: Apply migrations (idempotent)
         # Tolerates "already exists" / "duplicate" so re-runs don't fail.
         # Any other error aborts the deploy. Migrations are checked out from
-        # the same git SHA we're deploying — schema and code stay in lockstep.
+        # the same git SHA we're deploying â schema and code stay in lockstep.
         run: |
           for f in $(ls migrations/*.sql | sort); do
-            printf "  → %s … " "$(basename "$f")"
+            printf "  â %s â¦ " "$(basename "$f")"
             if kubectl exec -n "$NAMESPACE" -i postgres-0 -- \
                  psql -U campaigner -d campaigner_dev -v ON_ERROR_STOP=1 -q < "$f" \
                  2>/tmp/mig-err.txt; then
@@ -146,7 +146,7 @@ jobs:
             -n "$NAMESPACE"
           kubectl rollout status deployment/web -n "$NAMESPACE" --timeout=300s
 
-      - name: "Update webhook Deployment image (replicas: 0 — no rollout to wait for)"
+      - name: "Update webhook Deployment image (replicas: 0 â no rollout to wait for)"
         # Bumping the image even at replicas: 0 means a future scale-up picks
         # up the latest SHA automatically.
         run: |
@@ -167,7 +167,7 @@ jobs:
             agent-weekly-competitive-research \
             agent-weekly-self-audit
           do
-            echo "  → $cj"
+            echo "  â $cj"
             kubectl set image cronjob/"$cj" \
               agent="$GHCR_IMAGE_AGENT:${GITHUB_SHA}" \
               -n "$NAMESPACE"
@@ -177,7 +177,7 @@ jobs:
     needs: deploy
     runs-on: ubuntu-latest
     steps:
-      - name: Web /api/health → 200
+      - name: Web /api/health â 200
         # Retries cover the rollout's last-pod-transition window.
         run: |
           code=$(curl -sS --retry 5 --retry-delay 10 -o /tmp/body.txt \
