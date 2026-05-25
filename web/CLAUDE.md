@@ -62,11 +62,25 @@ E2E lives in [`e2e/`](e2e/). Unit tests are colocated as `<file>.test.ts` next t
 | [`e2e/`](e2e/) | Playwright specs | — |
 | [`public/`](public/) | Static assets (brand, icons) | — |
 
+## Design system
+
+Visual design follows the **"Warm Industrial Editorial"** system. Source-of-truth is [`../docs/design/aiweon-handoff/project/design-system.html`](../docs/design/aiweon-handoff/project/design-system.html) — open in a browser to see every token + pattern. Implementation lives in three files:
+
+| File | Owns |
+|---|---|
+| [`src/app/globals.css`](src/app/globals.css) | All design-system CSS variables (`--brand`, `--bg-primary`, `--sage`, type/radius/shadow/motion), Hebrew RTL font swaps, component classes (`.btn`, `.agent-card`, `.bubble`, `.topbar .pill`, etc.), shadcn HSL aliases derived from the same palette. |
+| [`tailwind.config.ts`](tailwind.config.ts) | Tailwind utilities — `font-display`/`font-sans`/`font-mono`/`font-editorial`, `text-hero|h1|h2|h3|h4`, `bg-brand-*`, `bg-sage-*`, design-system shadows. |
+| [`src/app/layout.tsx`](src/app/layout.tsx) | Loads the five brand fonts via `next/font`. |
+
+**Naming caveat:** the brand amber lives under `--brand` (not `--accent` — that collides with shadcn's neutral hover-bg token).
+
+When changing visual design, edit `globals.css`/`tailwind.config.ts` rather than introducing one-off styles in components. If a new pattern is needed, propose adding it to the design-system source first.
+
 ## Conventions
 
 1. **Hebrew + RTL by default.** `<html lang="he" dir="rtl">` in [`src/app/layout.tsx`](src/app/layout.tsx). Don't add `dir="ltr"` to component containers unless it's a code block or a number-only display.
 2. **Server components by default.** Add `"use client"` only when the component genuinely needs state, effects, or browser APIs. Components without `"use client"` can fetch directly from `src/lib/db/`.
-3. **Assistant + Geist + Geist Mono as the three brand fonts.** All loaded once in `layout.tsx` via `next/font`. Assistant = Hebrew display/UI, Geist = Latin sans, Geist Mono = numbers/IDs/code. Don't import other fonts ad-hoc. (Heebo was the previous brand font — no longer in use; see [`../docs/DESIGN.md`](../docs/DESIGN.md) Typography.)
+3. **Five brand fonts loaded once.** Outfit (Latin display), Rubik (Latin + Hebrew body), Heebo (Hebrew display), Frank Ruhl Libre (Hebrew editorial), JetBrains Mono (code/IDs). All via `next/font` in `layout.tsx`, exposed as CSS variables in `globals.css`. Don't import other fonts ad-hoc.
 4. **No CSS files outside `globals.css`.** Tailwind for everything. Custom CSS goes into `globals.css` with a comment explaining why a utility class wasn't enough.
 5. **Image uploads** go to `web/uploads/` in dev (gitignored) or to object storage in prod (currently still the GCS gallery bucket; eventual move to Hetzner Object Storage tracked separately). The same dual-mode pattern applies — see [`src/lib/storage.ts`](src/lib/storage.ts).
 6. **API routes are thin.** [`src/app/api/`](src/app/api/) handlers should validate with Zod, call into `src/lib/db/`, and return JSON. Business logic doesn't belong in route handlers.

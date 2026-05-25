@@ -14,6 +14,7 @@ The seam between Next.js (the app) and the outside world (Postgres, Supabase, Me
 | [`auth/`](auth/) | Dual-mode auth adapter — `dev-cookie` (active) + `supabase` (stub) |
 | [`schemas/`](schemas/) | Zod schemas shared between server and client |
 | [`approvals-display.ts`](approvals-display.ts) + [`approvals-fmt.ts`](approvals-fmt.ts) | Pure formatters for approvals (Hebrew strings, badges, urgency colors) |
+| [`runs-summary.ts`](runs-summary.ts) | Pure helper that reduces a run's `AgentDecision[]` trail to gates (budget/tracking/account), per-campaign lanes, counts, and a single "top finding". Powers [`../components/last-scan-card.tsx`](../components/last-scan-card.tsx) and the `/runs` index. |
 | [`token-expiry.ts`](token-expiry.ts) | Meta token expiry math + warnings |
 | [`kpi.ts`](kpi.ts) | KPI snapshot formatters |
 | [`meta.ts`](meta.ts) | Light Meta API helpers (read-only — list ad accounts, etc.). Heavy lifting is the Python agent's job. |

@@ -19,6 +19,11 @@ import { getAuth } from "@/lib/auth";
 import { getDataClient } from "@/lib/db";
 import type { AgentDecision, DecisionType } from "@/lib/db/types";
 import { relativeHe, taskTypeLabel } from "@/lib/approvals-fmt";
+import { isDebugMode } from "@/lib/debug";
+import { buildRunNarrative, groupDecisions } from "@/lib/runs-summary";
+import { RunNarrative } from "@/components/run-narrative";
+import { RunDecisionGroups } from "@/components/run-decision-groups";
+import { RunStory } from "@/components/run-story";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +107,10 @@ export default async function RunDetailPage({
     0,
   );
 
+  const debug = isDebugMode();
+  const narrative = debug ? buildRunNarrative(decisions) : null;
+  const groups = debug ? groupDecisions(decisions) : null;
+
   const right = (
     <Link href="/approvals">
       <Button variant="outline" size="sm">
@@ -119,6 +128,8 @@ export default async function RunDetailPage({
       />
 
       <div className="flex flex-col gap-6">
+        <RunStory decisions={decisions} />
+        {narrative ? <RunNarrative narrative={narrative} /> : null}
         {hasErrors ? (
           <Card className="border-red-300/60 bg-red-50/40 dark:border-red-900/50 dark:bg-red-900/10">
             <CardHeader>
@@ -133,57 +144,59 @@ export default async function RunDetailPage({
           </Card>
         ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>סיכום הריצה</CardTitle>
-            <CardDescription>
-              {decisions.length} החלטות · {formatDuration(durationMs)} מקצה לקצה
-              {llmModels.length > 0 ? ` · ${llmModels.join(", ")}` : ""}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-5">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <Stat label="החלטות" value={decisions.length.toString()} />
-              <Stat label="משך כולל" value={formatDuration(durationMs)} />
-              <Stat
-                label="טוקנים (in/out)"
-                value={
-                  totalTokensIn + totalTokensOut > 0
-                    ? `${totalTokensIn.toLocaleString("he-IL")} / ${totalTokensOut.toLocaleString("he-IL")}`
-                    : "—"
-                }
-              />
-              <Stat
-                label="סך latency"
-                value={
-                  totalLatencyMs > 0 ? formatDuration(totalLatencyMs) : "—"
-                }
-              />
-            </div>
-
-            <div>
-              <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
-                התפלגות לפי סוג החלטה
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {DECISION_ORDER.filter((t) => typeCounts.has(t)).map((t) => (
-                  <span
-                    key={t}
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${DECISION_STYLES[t]}`}
-                  >
-                    {DECISION_LABEL_HE[t]} · {typeCounts.get(t)}
-                  </span>
-                ))}
+        {debug ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>סיכום הריצה</CardTitle>
+              <CardDescription>
+                {decisions.length} החלטות · {formatDuration(durationMs)} מקצה לקצה
+                {llmModels.length > 0 ? ` · ${llmModels.join(", ")}` : ""}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-5">
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                <Stat label="החלטות" value={decisions.length.toString()} />
+                <Stat label="משך כולל" value={formatDuration(durationMs)} />
+                <Stat
+                  label="טוקנים (in/out)"
+                  value={
+                    totalTokensIn + totalTokensOut > 0
+                      ? `${totalTokensIn.toLocaleString("he-IL")} / ${totalTokensOut.toLocaleString("he-IL")}`
+                      : "—"
+                  }
+                />
+                <Stat
+                  label="סך latency"
+                  value={
+                    totalLatencyMs > 0 ? formatDuration(totalLatencyMs) : "—"
+                  }
+                />
               </div>
-            </div>
 
-            {guardrailHits > 0 ? (
-              <div className="rounded-md border border-amber-300/60 bg-amber-50/60 p-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-900/15 dark:text-amber-200">
-                🛡 {guardrailHits} guardrail violations בריצה הזו
+              <div>
+                <h3 className="mb-2 text-sm font-semibold text-muted-foreground">
+                  התפלגות לפי סוג החלטה
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {DECISION_ORDER.filter((t) => typeCounts.has(t)).map((t) => (
+                    <span
+                      key={t}
+                      className={`rounded-full px-3 py-1 text-xs font-medium ${DECISION_STYLES[t]}`}
+                    >
+                      {DECISION_LABEL_HE[t]} · {typeCounts.get(t)}
+                    </span>
+                  ))}
+                </div>
               </div>
-            ) : null}
-          </CardContent>
-        </Card>
+
+              {guardrailHits > 0 ? (
+                <div className="rounded-md border border-amber-300/60 bg-amber-50/60 p-3 text-sm text-amber-900 dark:border-amber-700/50 dark:bg-amber-900/15 dark:text-amber-200">
+                  🛡 {guardrailHits} guardrail violations בריצה הזו
+                </div>
+              ) : null}
+            </CardContent>
+          </Card>
+        ) : null}
 
         {relatedApprovals.length > 0 ? (
           <Card>
@@ -253,24 +266,28 @@ export default async function RunDetailPage({
           </Card>
         ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>כל ההחלטות ({decisions.length})</CardTitle>
-            <CardDescription>כרונולוגי, מוקדם לאחרון.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ol className="flex flex-col gap-3">
-              {decisions.map((d) => (
-                <DecisionRow
-                  key={d.id}
-                  d={d}
-                  showRunLink={false}
-                  showApprovalLink={true}
-                />
-              ))}
-            </ol>
-          </CardContent>
-        </Card>
+        {groups ? <RunDecisionGroups groups={groups} /> : null}
+
+        {debug ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>כל ההחלטות ({decisions.length})</CardTitle>
+              <CardDescription>כרונולוגי, מוקדם לאחרון.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ol className="flex flex-col gap-3">
+                {decisions.map((d) => (
+                  <DecisionRow
+                    key={d.id}
+                    d={d}
+                    showRunLink={false}
+                    showApprovalLink={true}
+                  />
+                ))}
+              </ol>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </Shell>
   );

@@ -275,6 +275,13 @@ export interface Approval {
   operator_response: Record<string, string | string[]> | null;
   /** When operator submitted MCQ answers. NULL until response is recorded. */
   answered_at: string | null;
+  /**
+   * Stable structural identifier for the (finding_type, target) pair this
+   * approval addresses. Added 2026-05-25 (Migration 033). NULL on legacy
+   * rows. Drives structural dedup at `propose_task` time: a pending row
+   * with the same finding_key blocks a duplicate insert.
+   */
+  finding_key: string | null;
 }
 
 export type HeartbeatFlow =
@@ -338,6 +345,15 @@ export interface CreativeAssetCreate {
 
 export type DecisionType =
   | "observation"
+  /**
+   * Added 2026-05-25 (Migration 033): the agent identified a finding but the
+   * capability needed to act is blocked (tracking unverified, KPI target not
+   * set, etc.). The diagnosis is surfaced — the action is not. `outputs`
+   * carries `finding_type`, `blocked_by` (list of capability requirement
+   * names), and `would_propose` (the payload the agent *would* have sent to
+   * propose_task). See `docs/todos/capability-gated-decision-flow.md`.
+   */
+  | "observation_blocked"
   | "diagnosis"
   | "proposal"
   | "rejection"
@@ -367,6 +383,33 @@ export interface AgentDecision {
   latency_ms: number | null;
   guardrail_violations: string[] | null;
   confidence: number | null;
+}
+
+/**
+ * Aggregate snapshot of a single agent run — one row per distinct
+ * `agent_decisions.run_id`. Used by the /runs index and the home-page
+ * "last scan" card to summarize a scan without dragging in every decision.
+ * The detail page (`/runs/[run_id]`) still loads the full decision trail
+ * via `listDecisionsForRun`.
+ */
+export interface RunSummaryRow {
+  run_id: string;
+  graph_name: string;
+  started_at: string;
+  ended_at: string;
+  decision_count: number;
+  proposal_count: number;
+  skip_count: number;
+  rejection_count: number;
+  error_count: number;
+  /**
+   * Findings the agent surfaced but couldn't act on because a capability is
+   * blocked (tracking unverified, KPI target not set, etc.). Added 2026-05-25
+   * with Migration 033 — see `docs/todos/capability-gated-decision-flow.md`.
+   */
+  observation_blocked_count: number;
+  /** Distinct campaigns the run touched (via `agent_decisions.campaign_id`). */
+  campaigns_touched: number;
 }
 
 // ---- Meta integration (Path B — OAuth) ---------------------------------
@@ -713,6 +756,17 @@ export interface DataClient {
     businessId: string,
     runId: string,
   ): Promise<AgentDecision[]>;
+  /**
+   * One row per distinct `run_id` for a business, newest first. Drives the
+   * /runs index and the home-page "last scan" card per
+   * `docs/todos/surface-runs-detail.md`. `graphName` filters to a single graph
+   * (typically `observe_propose`) so weekly creative / research runs don't
+   * crowd out the daily-scan summary.
+   */
+  listRunsForBusiness(
+    businessId: string,
+    opts: { graphName?: string; limit?: number },
+  ): Promise<RunSummaryRow[]>;
   approveApproval(id: string, approvedBy: string): Promise<void>;
   rejectApproval(id: string, reason: string): Promise<void>;
   unapproveApproval(id: string): Promise<{ reverted: boolean }>;

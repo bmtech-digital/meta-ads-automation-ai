@@ -54,9 +54,17 @@ on_error() {
 }
 trap on_error ERR
 
+# Capability gate (Migration 033) — emergency_pause + tracking-related
+# alerts have no Category B prerequisites, but we still pass the envelope so
+# the agent uses the same observation_blocked discipline for any structural
+# finding it surfaces.
+CAPABILITIES_JSON=$(python -m campaigner.tools.compute_capabilities \
+  --business-id "$BUSINESS_ID" 2>/dev/null \
+  || echo '{"capabilities":[],"blocked_count":0,"available_count":0,"error":"compute_failed"}')
+
 claude -p \
   --output-format json \
-  "BUSINESS_ID=$BUSINESS_ID. Run the midday health check flow per campaigner/CAMPAIGNER.md Flow H. Watch ONLY for emergency-pause candidates (CPL > 3× target intra-day) and tracking-health drift since morning. Do NOT redo Flow A diagnosis."
+  "BUSINESS_ID=$BUSINESS_ID. CAPABILITIES_JSON=$CAPABILITIES_JSON. Run the midday health check flow per campaigner/CAMPAIGNER.md Flow H. Watch ONLY for emergency-pause candidates (CPL > 3× target intra-day) and tracking-health drift since morning. Do NOT redo Flow A diagnosis."
 
 DURATION=$(($(date +%s%3N) - START_TS))
 python -m campaigner.tools.heartbeat \

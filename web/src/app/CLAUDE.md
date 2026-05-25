@@ -10,7 +10,7 @@ Next.js 15 **App Router** routes. One folder per route segment, each with `page.
 
 | Path | Purpose | Auth |
 |---|---|---|
-| `/` ([`page.tsx`](page.tsx)) | Authenticated home — businesses overview, KPI snapshot | required |
+| `/` ([`page.tsx`](page.tsx)) | Authenticated home — businesses overview, KPI snapshot, last-scan card (latest `observe_propose` run → `/runs/[run_id]`) | required |
 | `/login` ([`login/page.tsx`](login/page.tsx)) | Dual-mode login form (cookie OR magic link) | none |
 | `/approvals` ([`approvals/`](approvals/)) | Pending approvals queue + detail view (`[id]/`) | required |
 | `/business-knowledge` ([`business-knowledge/`](business-knowledge/)) | Edit `business_knowledge` row | required |
@@ -19,7 +19,8 @@ Next.js 15 **App Router** routes. One folder per route segment, each with `page.
 | `/history` ([`history/`](history/)) | Decision history (`agent_decisions` rows) | required |
 | `/reports` ([`reports/`](reports/)) | Monthly client-facing reports — index + `[month]/` detail (Block 10, 2026-05-13) | required |
 | `/ab-tests` ([`ab-tests/`](ab-tests/)) | A/B test orchestration — index + `[id]/` detail with variants + winner snapshot (Block 11, 2026-05-13) | required |
-| `/runs/[run_id]/` ([`runs/`](runs/)) | Single-run trail viewer | required |
+| `/runs` ([`runs/page.tsx`](runs/page.tsx)) | Runs index — paginated list of distinct `agent_decisions.run_id` (newest first) with per-row counts (proposals/skips/rejections/errors). Added 2026-05-25 per [`../../../docs/todos/surface-runs-detail.md`](../../../docs/todos/surface-runs-detail.md). | required |
+| `/runs/[run_id]/` ([`runs/[run_id]/`](runs/%5Brun_id%5D/)) | Single-run trail viewer (gates, related approvals/campaigns, full decision list) | required |
 | `/settings` ([`settings/`](settings/)) | Per-business settings (token expiry, baselines confidence) | required |
 | `/api/health/` ([`api/health/`](api/health/)) | Readiness probe for k8s | none |
 | `/api/gallery/` ([`api/gallery/`](api/gallery/)) | Upload + serve creative assets | required |

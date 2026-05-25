@@ -51,12 +51,22 @@ on_error() {
 }
 trap on_error ERR
 
+# ----- capability gate (Migration 033, 2026-05-25) -----
+# Determinstic premise check — what actions can the agent take this run?
+# The agent reads CAPABILITIES_JSON as a fact instead of re-deriving the gates
+# in the LLM (which it got wrong; see docs/todos/capability-gated-decision-flow.md).
+# Non-fatal — if this fails, fall back to an empty capabilities envelope and
+# let the LLM run with no precomputed gates (legacy behavior).
+CAPABILITIES_JSON=$(python -m campaigner.tools.compute_capabilities \
+  --business-id "$BUSINESS_ID" 2>/dev/null \
+  || echo '{"capabilities":[],"blocked_count":0,"available_count":0,"error":"compute_failed"}')
+
 # ----- invoke Claude Code headless -----
 # The prompt tells Claude which flow to execute; it reads CAMPAIGNER.md + prompts/*.md
 # from cwd (which is /app for this runner).
 claude -p \
   --output-format json \
-  "BUSINESS_ID=$BUSINESS_ID. Run the daily observe-propose flow per campaigner/CAMPAIGNER.md."
+  "BUSINESS_ID=$BUSINESS_ID. CAPABILITIES_JSON=$CAPABILITIES_JSON. Run the daily observe-propose flow per campaigner/CAMPAIGNER.md."
 
 # ----- plans_carryover hygiene (Migration 023, 2026-05-13 PM) -----
 # Flip stale pending plans → expired so the audit trail stays clean. Idempotent

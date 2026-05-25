@@ -1,33 +1,59 @@
 import type { Metadata, Viewport } from "next";
-import { Assistant, Geist, Geist_Mono } from "next/font/google";
+import {
+  Outfit,
+  Rubik,
+  Heebo,
+  Frank_Ruhl_Libre,
+  JetBrains_Mono,
+} from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
-// Hebrew display + UI font. Replaces Heebo — slightly more contemporary letter
-// shapes, tighter on the baseline at display sizes. Aiweon brand voice = AI
-// premium, not generic-Heebo SaaS.
-const assistant = Assistant({
-  subsets: ["hebrew", "latin"],
+// Five-family stack from the "Warm Industrial Editorial" design system
+// (docs/design/aiweon-handoff/project/design-system.html, §02 Typography).
+//
+// - Outfit            — Latin display (geometric, condensed at large sizes)
+// - Rubik             — Latin + Hebrew body (humane, excellent legibility)
+// - Heebo             — Hebrew display (pairs visually with Outfit)
+// - Frank Ruhl Libre  — Hebrew editorial / long-form
+// - JetBrains Mono    — code, IDs, numeric labels (tabular figures)
+//
+// globals.css composes these into --font-display / --font-body / --font-mono /
+// --font-display-he / --font-editorial-he, and swaps to the Hebrew stack
+// automatically for any element with lang="he" or dir="rtl".
+
+const outfit = Outfit({
+  subsets: ["latin"],
   display: "swap",
-  variable: "--font-assistant",
+  variable: "--font-outfit",
   weight: ["300", "400", "500", "600", "700", "800"],
 });
 
-// Latin sans for English copy. Used automatically by browsers when Assistant
-// falls back. Designed for product UI — pairs visually with Assistant's grade.
-const geist = Geist({
-  subsets: ["latin"],
+const rubik = Rubik({
+  subsets: ["latin", "hebrew"],
   display: "swap",
-  variable: "--font-geist",
-  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-rubik",
+  weight: ["300", "400", "500", "600", "700", "800"],
 });
 
-// Mono for Meta IDs, ad-account ids, and numeric data. Geist Mono's tabular
-// figures pair with the body sans without looking like a code editor.
-const geistMono = Geist_Mono({
+const heebo = Heebo({
+  subsets: ["latin", "hebrew"],
+  display: "swap",
+  variable: "--font-heebo",
+  weight: ["300", "400", "500", "600", "700", "800"],
+});
+
+const frankRuhl = Frank_Ruhl_Libre({
+  subsets: ["hebrew", "latin"],
+  display: "swap",
+  variable: "--font-frank-ruhl",
+  weight: ["400", "500", "700", "800"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-geist-mono",
+  variable: "--font-jetbrains-mono",
   weight: ["400", "500", "600"],
 });
 
@@ -52,7 +78,6 @@ export const metadata: Metadata = {
     ],
     apple: "/brand/aiweon-mark.png",
   },
-  // Whole product is auth-gated — only /login overrides this to be indexable.
   robots: { index: false, follow: false, nocache: true },
   openGraph: {
     type: "website",
@@ -74,8 +99,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafaf7" },
-    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+    { media: "(prefers-color-scheme: light)", color: "#FAF8F5" },
+    { media: "(prefers-color-scheme: dark)", color: "#101013" },
   ],
   colorScheme: "light dark",
   width: "device-width",
@@ -91,7 +116,7 @@ export default function RootLayout({
     <html
       lang="he"
       dir="rtl"
-      className={`${assistant.variable} ${geist.variable} ${geistMono.variable}`}
+      className={`${outfit.variable} ${rubik.variable} ${heebo.variable} ${frankRuhl.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
       <body className="min-h-screen bg-background text-foreground antialiased">

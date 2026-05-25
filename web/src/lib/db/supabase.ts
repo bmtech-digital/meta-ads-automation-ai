@@ -55,6 +55,7 @@ export const supabaseClient: DataClient = {
   listDecisionsForApproval: async () =>
     notImplemented("listDecisionsForApproval"),
   listDecisionsForRun: async () => notImplemented("listDecisionsForRun"),
+  listRunsForBusiness: async () => notImplemented("listRunsForBusiness"),
   approveApproval: async () => notImplemented("approveApproval"),
   rejectApproval: async () => notImplemented("rejectApproval"),
   unapproveApproval: async () => notImplemented("unapproveApproval"),

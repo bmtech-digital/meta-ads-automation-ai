@@ -94,9 +94,22 @@ export const businessKnowledgeFormSchema = z.object({
     .trim()
     .transform((v) => (v === "" ? null : v))
     .nullable()
-    .refine((v) => v === null || /^https?:\/\/.+/i.test(v), {
-      message: "URL לא תקין (http(s)://...)",
-    }),
+    .transform((v) => (v === null ? null : /^https?:\/\//i.test(v) ? v : `https://${v}`))
+    .refine(
+      (v) => {
+        if (v === null) return true;
+        try {
+          const u = new URL(v);
+          return (
+            (u.protocol === "http:" || u.protocol === "https:") &&
+            u.hostname.includes(".")
+          );
+        } catch {
+          return false;
+        }
+      },
+      { message: "URL לא תקין" },
+    ),
   service_regions: z.array(z.string()).nullable(),
   // Migration 025 — per-business geo (include + exclude). Mirrors Meta's
   // targeting.geo_locations spec. Submitted by GeoTargetingEditor as a

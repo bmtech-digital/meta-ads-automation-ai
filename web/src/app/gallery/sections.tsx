@@ -20,6 +20,12 @@ import {
   type PerformanceGrade,
 } from "./scoring";
 
+/**
+ * Section header — design system §02/§05 "sub-title" pattern: mono caps eyebrow
+ * + a hairline rule that runs to the right edge. Reads as "documentation",
+ * not "fashion brand". The optional count + subtitle live on the same baseline
+ * so the header is one calm row regardless of width.
+ */
 interface SectionHeaderProps {
   title: string;
   subtitle?: string;
@@ -29,19 +35,20 @@ interface SectionHeaderProps {
 
 function SectionHeader({ title, subtitle, count, right }: SectionHeaderProps) {
   return (
-    <div className="flex items-end justify-between gap-4 border-b border-border/40 pb-2">
-      <div className="flex items-baseline gap-2">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+      <div className="flex flex-1 items-center gap-3 min-w-0">
+        <h2 className="font-mono text-[12px] font-medium uppercase tracking-[0.14em] text-foreground/80 whitespace-nowrap">
           {title}
-        </span>
+        </h2>
         {typeof count === "number" ? (
-          <span className="font-tabular text-[11px] text-muted-foreground/70">
+          <span className="mono-ltr text-[11px] text-muted-foreground">
             ({count})
           </span>
         ) : null}
+        <span aria-hidden className="hidden h-px flex-1 bg-border/60 sm:block" />
         {subtitle ? (
-          <span className="hidden text-[11px] text-muted-foreground/70 sm:inline">
-            · {subtitle}
+          <span className="hidden text-[12px] text-muted-foreground sm:inline-block">
+            {subtitle}
           </span>
         ) : null}
       </div>
@@ -65,8 +72,6 @@ export function LiveSection({
   search,
   lifecycleFilter,
 }: LiveSectionProps) {
-  // Apply both axis filters — lifecycle by computed grade/freq, search by
-  // creative name / campaign name / ad id substring (case-insensitive).
   const q = search.trim().toLowerCase();
   const filteredCreatives = useMemo(() => {
     const all: LiveMetaCreative[] = groups.flatMap((g) => g.creatives);
@@ -86,8 +91,6 @@ export function LiveSection({
     });
   }, [groups, lifecycleFilter, q]);
 
-  // Organic posts are always "live" — match the filter when it's "all" or
-  // "live", hide them otherwise. Search applies to caption text.
   const filteredOrganic = useMemo(() => {
     const lifecycleMatch =
       lifecycleFilter === "all" || lifecycleFilter === "live";
@@ -104,20 +107,20 @@ export function LiveSection({
     <section className="flex flex-col gap-6">
       <SectionHeader
         title="באוויר עכשיו"
-        subtitle="כל מה שמשודר עכשיו — פרסומות חיות + פוסטים אורגניים שכבר מפורסמים"
+        subtitle="כל מה שמשודר עכשיו — פרסומות חיות + פוסטים אורגניים"
         count={total}
       />
       {metaError ? (
-        <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[12px] text-warning">
           לא הצלחתי לשלוף נתוני קמפיינים מ-Meta: {metaError}.
-        </p>
+        </div>
       ) : null}
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         <SubsectionHeader
           title="פרסומות חיות"
           count={filteredCreatives.length}
-          subtitle="כל הקריאייטיבים שרצים בקמפיינים פעילים — מ-Ads Manager וגם אלו שעלו דרך הגלרייה"
+          subtitle="כל הקריאייטיבים שרצים בקמפיינים פעילים"
         />
         {filteredCreatives.length === 0 ? (
           <EmptyState
@@ -136,7 +139,7 @@ export function LiveSection({
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-4">
         <SubsectionHeader
           title="פוסטים אורגניים"
           count={filteredOrganic.length}
@@ -172,17 +175,35 @@ function SubsectionHeader({
   subtitle: string;
 }) {
   return (
-    <div className="flex items-baseline gap-2 pb-1">
-      <h3 className="text-[13px] font-semibold text-foreground/80">
-        {title}
-      </h3>
-      <span className="font-tabular text-[11px] text-muted-foreground/70">
+    <div className="flex items-baseline gap-3">
+      <h3 className="text-[13.5px] font-medium text-foreground">{title}</h3>
+      <span className="mono-ltr text-[11px] text-muted-foreground">
         ({count})
       </span>
-      <span className="ms-auto hidden text-[11px] text-muted-foreground/70 sm:inline">
+      <span className="ms-auto hidden text-[11.5px] text-muted-foreground sm:inline">
         {subtitle}
       </span>
     </div>
+  );
+}
+
+// Source chip — neutral on resting tile (no Facebook-blue / Instagram-pink),
+// reveals the platform name in a muted pill.
+function SourceChip({ source }: { source: "facebook" | "instagram" }) {
+  const label = source === "facebook" ? "FB" : "IG";
+  return (
+    <span className="inline-flex items-center rounded-md border border-white/15 bg-black/55 px-1.5 py-[3px] text-[10px] font-semibold text-white backdrop-blur-sm">
+      {label}
+    </span>
+  );
+}
+
+function LiveDot() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-md border border-success/30 bg-success/15 px-1.5 py-[3px] text-[10px] font-semibold text-success">
+      <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-soft" />
+      חי
+    </span>
   );
 }
 
@@ -198,81 +219,64 @@ function OrganicLiveTile({ post }: { post: OrganicPost }) {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="group relative overflow-hidden rounded-xl bg-muted shadow-sm ring-1 ring-emerald-300/60 transition-shadow hover:shadow-md">
-        <div className="relative aspect-square w-full">
-          {playing && canPlay ? (
-            <video
-              src={videoSrc ?? undefined}
-              poster={thumb ?? undefined}
-              controls
-              autoPlay
-              playsInline
-              className="h-full w-full bg-slate-900 object-cover"
+      <div className="group relative aspect-square w-full overflow-hidden rounded-xl border border-border/60 bg-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-ds-md">
+        {playing && canPlay ? (
+          <video
+            src={videoSrc ?? undefined}
+            poster={thumb ?? undefined}
+            controls
+            autoPlay
+            playsInline
+            className="h-full w-full bg-muted object-cover"
+          />
+        ) : thumb ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={thumb}
+              alt={post.caption?.slice(0, 80) ?? `${post.source} post`}
+              className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
+              loading="lazy"
             />
-          ) : thumb ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumb}
-                alt={post.caption?.slice(0, 80) ?? `${post.source} post`}
-                className="h-full w-full object-cover"
-                referrerPolicy="no-referrer"
-                loading="lazy"
+            {canPlay ? (
+              <button
+                type="button"
+                onClick={() => setPlaying(true)}
+                aria-label="הפעל וידאו"
+                className="absolute inset-0 cursor-pointer bg-black/0 transition-colors hover:bg-black/15"
               />
-              {canPlay ? (
-                <button
-                  type="button"
-                  onClick={() => setPlaying(true)}
-                  aria-label="הפעל וידאו"
-                  className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors hover:bg-black/20"
-                >
-                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition-transform group-hover:scale-110">
-                    <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current ms-1" aria-hidden>
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </span>
-                </button>
-              ) : null}
-            </>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-slate-900 text-xs text-slate-300">
-              {post.isVideo ? "▶ וידאו אורגני" : "אין תצוגה מקדימה"}
-            </div>
-          )}
-          <span
-            className={`absolute end-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-semibold text-white ${
-              post.source === "facebook" ? "bg-blue-600" : "bg-pink-600"
-            }`}
-          >
-            {post.source === "facebook" ? "FB" : "IG"}
-          </span>
-          <span className="absolute start-2 top-2 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
-            חי
-          </span>
-          {post.isVideo && !playing ? (
-            <span className="absolute bottom-2 start-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
-              ▶ וידאו
-            </span>
-          ) : null}
+            ) : null}
+          </>
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-muted text-[11px] text-muted-foreground">
+            {post.isVideo ? "▶ וידאו אורגני" : "אין תצוגה מקדימה"}
+          </div>
+        )}
+        <div className="absolute end-2 top-2 flex gap-1">
+          <SourceChip source={post.source} />
+        </div>
+        <div className="absolute start-2 top-2">
+          <LiveDot />
         </div>
       </div>
-      <div className="flex flex-col gap-1.5 px-1">
-        <span className="text-[11px] text-muted-foreground">
+      <div className="flex flex-col gap-1.5 px-0.5">
+        <span className="font-mono text-[10.5px] text-muted-foreground">
           {formatPostDate(post.timestamp)}
         </span>
         {post.caption ? (
-          <p className="line-clamp-2 text-xs" dir="auto" title={post.caption}>
+          <p className="line-clamp-2 text-[12.5px] leading-snug text-foreground" dir="auto" title={post.caption}>
             {post.caption}
           </p>
         ) : (
-          <p className="text-xs italic text-muted-foreground">ללא טקסט</p>
+          <p className="text-[12px] italic text-muted-foreground">ללא טקסט</p>
         )}
         {post.permalink ? (
           <a
             href={post.permalink}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] text-blue-600 hover:underline"
+            className="text-[10.5px] text-brand-400 hover:underline"
           >
             פתח ב-{post.source === "facebook" ? "Facebook" : "Instagram"} ↗
           </a>
@@ -294,12 +298,31 @@ function formatPostDate(iso: string): string {
   }
 }
 
-const GRADE_STYLE: Record<PerformanceGrade, { bg: string; text: string; ring: string; label: string }> = {
-  A: { bg: "bg-emerald-500", text: "text-white", ring: "ring-emerald-400", label: "מנצח" },
-  B: { bg: "bg-sky-500", text: "text-white", ring: "ring-sky-400", label: "טוב" },
-  C: { bg: "bg-amber-500", text: "text-white", ring: "ring-amber-400", label: "בינוני" },
-  D: { bg: "bg-red-600", text: "text-white", ring: "ring-red-500", label: "חלש" },
-  learning: { bg: "bg-slate-400", text: "text-white", ring: "ring-slate-400", label: "לומד" },
+// Performance badge — single-line tinted pill in design-system semantic tokens.
+const GRADE_PILL: Record<
+  PerformanceGrade,
+  { className: string; label: string }
+> = {
+  A: {
+    className: "bg-success/15 text-success border-success/35",
+    label: "מנצח",
+  },
+  B: {
+    className: "bg-success/10 text-success border-success/25",
+    label: "טוב",
+  },
+  C: {
+    className: "bg-warning/12 text-warning border-warning/28",
+    label: "בינוני",
+  },
+  D: {
+    className: "bg-destructive/12 text-destructive border-destructive/30",
+    label: "חלש",
+  },
+  learning: {
+    className: "bg-muted text-muted-foreground border-border",
+    label: "לומד",
+  },
 };
 
 function PerformanceBadge({
@@ -309,15 +332,19 @@ function PerformanceBadge({
   grade: PerformanceGrade;
   score: number;
 }) {
-  const s = GRADE_STYLE[grade];
-  const display = grade === "learning" ? "…" : grade;
+  const s = GRADE_PILL[grade];
+  const showScore = grade !== "learning";
   return (
-    <div className={`flex flex-col items-center gap-0.5 rounded-md ${s.bg} px-2 py-1 ${s.text} shadow`}>
-      <span className="text-base font-bold leading-none">{display}</span>
-      {grade !== "learning" ? (
-        <span className="text-[9px] font-mono opacity-90">{score > 0 ? `+${score}` : score}</span>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-md border px-1.5 py-[3px] text-[10px] font-semibold ${s.className}`}
+    >
+      <span>{s.label}</span>
+      {showScore ? (
+        <span className="mono-ltr opacity-70">
+          {score > 0 ? `+${score}` : score}
+        </span>
       ) : null}
-    </div>
+    </span>
   );
 }
 
@@ -332,7 +359,7 @@ function MetricChips({ perf }: { perf: NonNullable<LiveMetaCreative["performance
   if (m.conversions != null && m.conversions > 0) chips.push(`${m.conversions} conv`);
   if (chips.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1 rounded bg-muted/40 px-2 py-1 text-[10px] font-mono text-muted-foreground">
+    <div className="mono-ltr flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10.5px] text-muted-foreground">
       {chips.map((c) => (
         <span key={c}>{c}</span>
       ))}
@@ -365,119 +392,92 @@ function LiveMetaCreativeTile({ creative }: { creative: LiveMetaCreative }) {
   const canPlay = isVideo && !!creative.video_source_url;
   const fromGallery = !!creative.galleryAsset;
   const perf = creative.performance ?? NO_DATA_PERFORMANCE;
-  const ringColor = GRADE_STYLE[perf.grade].ring;
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 px-1 text-[10px]">
+      <div className="flex items-center gap-2 px-0.5 text-[10.5px]">
         <span
-          className="truncate font-semibold text-muted-foreground"
+          className="truncate font-medium text-muted-foreground"
           title={`${creative.campaign_name} · #${creative.campaign_id}`}
         >
           {creative.campaign_name}
         </span>
-        <span className="shrink-0 font-mono text-muted-foreground/70">
+        <span className="mono-ltr shrink-0 text-muted-foreground/70">
           #{creative.campaign_id.slice(-6)}
         </span>
         {creative.campaign_status && creative.campaign_status !== "ACTIVE" ? (
-          <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] text-amber-900">
+          <span className="shrink-0 rounded-md border border-warning/25 bg-warning/10 px-1.5 py-[2px] text-[9.5px] text-warning">
             {creative.campaign_status}
           </span>
         ) : null}
       </div>
 
-      <div
-        className={`group relative overflow-hidden rounded-xl bg-muted shadow-sm ring-2 ${ringColor} transition-shadow hover:shadow-md`}
-      >
-        <div className="relative aspect-square w-full">
-          {playing && canPlay ? (
-            <video
-              src={creative.video_source_url ?? undefined}
-              poster={thumb ?? undefined}
-              controls
-              autoPlay
-              playsInline
-              className="h-full w-full bg-slate-900 object-cover"
+      <div className="group relative aspect-square w-full overflow-hidden rounded-xl border border-border/60 bg-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border hover:shadow-ds-md">
+        {playing && canPlay ? (
+          <video
+            src={creative.video_source_url ?? undefined}
+            poster={thumb ?? undefined}
+            controls
+            autoPlay
+            playsInline
+            className="h-full w-full bg-muted object-cover"
+          />
+        ) : thumb ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={thumb}
+              alt={creative.name ?? `creative ${creative.creative_id}`}
+              className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
+              loading="lazy"
             />
-          ) : thumb ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumb}
-                alt={creative.name ?? `creative ${creative.creative_id}`}
-                className="h-full w-full object-cover"
-                referrerPolicy="no-referrer"
-                loading="lazy"
+            {canPlay ? (
+              <button
+                type="button"
+                onClick={() => setPlaying(true)}
+                aria-label="הפעל וידאו"
+                className="absolute inset-0 cursor-pointer bg-black/0 transition-colors hover:bg-black/15"
               />
-              {canPlay ? (
-                <button
-                  type="button"
-                  onClick={() => setPlaying(true)}
-                  aria-label="הפעל וידאו"
-                  className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors hover:bg-black/20"
-                >
-                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition-transform group-hover:scale-110">
-                    <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current ms-1" aria-hidden>
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </span>
-                </button>
-              ) : null}
-            </>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-slate-900 text-xs text-slate-300">
-              {isVideo ? "▶ וידאו" : "אין תצוגה מקדימה"}
-            </div>
-          )}
-
-          <div className="absolute start-2 top-2">
-            <PerformanceBadge grade={perf.grade} score={perf.score} />
+            ) : null}
+          </>
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-muted text-[11px] text-muted-foreground">
+            {isVideo ? "▶ וידאו" : "אין תצוגה מקדימה"}
           </div>
-          <span className="absolute end-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-            Meta
-          </span>
-          {isVideo && !playing ? (
-            <span className="absolute bottom-2 start-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
-              ▶ וידאו
-            </span>
-          ) : null}
-          {fromGallery ? (
-            <span className="absolute bottom-2 end-2 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-              מהגלרייה
-            </span>
-          ) : null}
+        )}
+
+        <div className="absolute start-2 top-2">
+          <PerformanceBadge grade={perf.grade} score={perf.score} />
         </div>
+        {fromGallery ? (
+          <span className="absolute end-2 top-2 inline-flex items-center rounded-md border border-white/15 bg-black/55 px-1.5 py-[3px] text-[10px] font-semibold text-white backdrop-blur-sm">
+            מהגלרייה
+          </span>
+        ) : null}
+        {isVideo && !playing ? (
+          <span className="absolute bottom-2 start-2 rounded-md border border-white/15 bg-black/65 px-1.5 py-[3px] text-[10px] text-white">
+            ▶ וידאו
+          </span>
+        ) : null}
       </div>
-      <div className="flex flex-col gap-1.5 px-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <h4
-            className="truncate text-sm font-medium text-foreground"
-            title={creative.name ?? creative.creative_id}
-          >
-            {creative.name ?? "ללא שם"}
-          </h4>
-          <span className="shrink-0 text-[10px] text-muted-foreground">
-            {GRADE_STYLE[perf.grade].label}
-          </span>
-        </div>
+
+      <div className="flex flex-col gap-1.5 px-0.5">
+        <h4
+          className="truncate text-[13px] font-medium text-foreground"
+          title={creative.name ?? creative.creative_id}
+        >
+          {creative.name ?? "ללא שם"}
+        </h4>
         <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span className="font-mono">#{creative.creative_id.slice(-9)}</span>
+          <span className="mono-ltr">#{creative.creative_id.slice(-9)}</span>
           {creative.ad_status !== "ACTIVE" ? (
-            <span className="rounded bg-amber-100 px-1 py-0.5 text-amber-900">
+            <span className="rounded-md border border-warning/25 bg-warning/10 px-1.5 py-[2px] text-warning">
               {creative.ad_status}
             </span>
           ) : null}
         </div>
         <MetricChips perf={perf} />
-        {perf.reasons.length > 0 ? (
-          <ul className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
-            {perf.reasons.slice(0, 2).map((r, i) => (
-              <li key={i} className="truncate" title={r}>
-                · {r}
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
     </div>
   );
@@ -580,16 +580,16 @@ function PromoteFooter({
   }
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-amber-200/60 bg-amber-50/50 p-2 dark:border-amber-900/40 dark:bg-amber-950/20">
+    <div className="flex flex-col gap-1.5 rounded-md border border-brand-400/25 bg-brand-400/[0.06] p-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-900 dark:text-amber-300">
+        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-400">
           <Sparkles className="h-3 w-3" />
           Score {score}
         </span>
         {state === "success" ? (
           <Link
             href="/approvals"
-            className="text-[10px] font-medium text-emerald-700 hover:underline"
+            className="text-[10.5px] font-medium text-success hover:underline"
           >
             ✓ נשלח לאישור — פתח את התור
           </Link>
@@ -598,7 +598,7 @@ function PromoteFooter({
             type="button"
             size="sm"
             variant="outline"
-            className="h-6 px-2 text-[10px]"
+            className="h-6 px-2 text-[10.5px]"
             disabled={state === "pending"}
             onClick={onPromote}
           >
@@ -607,12 +607,12 @@ function PromoteFooter({
         )}
       </div>
       {state === "error" && errMsg ? (
-        <p className="text-[10px] text-red-600" dir="auto" title={errMsg}>
+        <p className="text-[10.5px] text-destructive" dir="auto" title={errMsg}>
           שגיאה: {errMsg}
         </p>
       ) : null}
       {reasons.length > 0 ? (
-        <ul className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+        <ul className="flex flex-col gap-0.5 text-[10.5px] text-muted-foreground">
           {reasons.slice(0, 3).map((r, i) => (
             <li key={i} className="truncate" title={r}>
               · {r}
@@ -733,7 +733,7 @@ function SortPicker({
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as ArchiveSort)}
-      className="h-9 rounded-md border border-input bg-background px-3 text-xs"
+      className="h-8 rounded-md border border-border bg-card px-2.5 text-[12px] text-foreground transition-colors hover:border-foreground/30 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-400/25"
       aria-label="מיון"
     >
       {options.map((o) => (
@@ -746,8 +746,6 @@ function SortPicker({
 }
 
 function TileGrid({ children }: { children: React.ReactNode }) {
-  // Looser auto-fill grid per Claude Design — tiles are ~220px wide so the
-  // hero card breathes and individual tiles are scannable from arm's length.
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-x-5 gap-y-7">
       {children}
@@ -757,7 +755,7 @@ function TileGrid({ children }: { children: React.ReactNode }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-border/60 px-4 py-12 text-center text-sm text-muted-foreground">
+    <div className="rounded-xl border border-dashed border-border bg-background/40 px-4 py-12 text-center text-[13px] text-muted-foreground">
       {text}
     </div>
   );

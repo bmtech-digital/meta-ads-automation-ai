@@ -49,6 +49,20 @@ export default async function ApprovalsPage({
   const pending = await db.listPendingApprovals(business.id);
   const budgetHealth = await db.getLatestBudgetHealthDecision(business.id);
 
+  // Surface the most recent observation_blocked rows (Migration 033) so
+  // operators see "agent has something to act on, gated on unblock X" as a
+  // first-class part of the approvals queue — not buried inside /runs.
+  const latestRuns = await db.listRunsForBusiness(business.id, {
+    graphName: "observe_propose",
+    limit: 1,
+  });
+  const latestRun = latestRuns[0] ?? null;
+  const blockedFindings = latestRun
+    ? (await db.listDecisionsForRun(business.id, latestRun.run_id)).filter(
+        (d) => d.decision_type === "observation_blocked",
+      )
+    : [];
+
   return (
     <Shell active="/approvals">
       <PageHeader
@@ -70,6 +84,62 @@ export default async function ApprovalsPage({
 
       <div className="flex flex-col gap-6">
         <BudgetHealthCard business={business} decision={budgetHealth} />
+
+        {blockedFindings.length > 0 && latestRun ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>ממצאים שמחכים להסרת חסם</CardTitle>
+              <CardDescription>
+                הסוכן זיהה את הממצאים האלה בסריקה האחרונה, אבל לא יכול
+                להציע פעולה עד שהחסם יוסר.{" "}
+                <Link
+                  href={`/runs/${latestRun.run_id}`}
+                  className="text-primary underline-offset-2 hover:underline"
+                >
+                  פתח את הריצה ↗
+                </Link>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              {blockedFindings.map((d) => {
+                const out =
+                  d.outputs && typeof d.outputs === "object"
+                    ? (d.outputs as Record<string, unknown>)
+                    : {};
+                const blockedBy = Array.isArray(out.blocked_by)
+                  ? (out.blocked_by as unknown[]).filter(
+                      (x): x is string => typeof x === "string",
+                    )
+                  : [];
+                return (
+                  <div
+                    key={d.id}
+                    className="rounded-md border border-amber-300/60 bg-amber-50/40 px-3 py-2.5 text-[13px] dark:border-amber-900/50 dark:bg-amber-900/10"
+                  >
+                    <div className="font-medium">{d.summary}</div>
+                    {d.rationale ? (
+                      <div className="mt-1 whitespace-pre-wrap text-[12.5px] text-muted-foreground">
+                        {d.rationale}
+                      </div>
+                    ) : null}
+                    {blockedBy.length > 0 ? (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {blockedBy.map((b) => (
+                          <span
+                            key={b}
+                            className="rounded bg-amber-200 px-2 py-0.5 text-[11px] font-mono text-amber-900"
+                          >
+                            🔒 {b}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
+        ) : null}
 
         {pending.length === 0 ? (
           <Card>

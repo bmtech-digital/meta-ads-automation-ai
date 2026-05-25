@@ -250,6 +250,40 @@ def test_log_decision_invalid_decision_type_exits_2(invoke_tool, business_id, ru
     assert r.returncode == 2
 
 
+def test_log_decision_observation_blocked_accepted(invoke_tool, cleanup_run, business_id):
+    """Migration 033 — observation_blocked is a valid decision_type.
+
+    The CHECK constraint added in the migration is the gate; argparse + the
+    VALID_DECISION_TYPES tuple in log_decision.py guard the entrypoint."""
+    r = invoke_tool(
+        "log_decision",
+        "--business-id",
+        business_id,
+        "--run-id",
+        cleanup_run,
+        "--graph-name",
+        "observe_propose",
+        "--node-name",
+        "diagnose",
+        "--decision-type",
+        "observation_blocked",
+        "--summary",
+        "objective_mismatch found on AI agent campaign — blocked by tracking_verified",
+        "--outputs",
+        json.dumps(
+            {
+                "finding_type": "objective_mismatch",
+                "blocked_by": ["tracking_verified"],
+                "would_propose": {"task_type": "alert", "payload": {}},
+                "summary_he": "אי-התאמת מטרה",
+            }
+        ),
+    )
+    assert r.returncode == 0, f"stderr: {r.stderr}"
+    payload = json.loads(r.stdout)
+    assert payload["decision_type"] == "observation_blocked"
+
+
 def test_propose_task_invalid_task_type_exits_2(invoke_tool, business_id, run_id):
     r = invoke_tool(
         "propose_task",
@@ -265,6 +299,72 @@ def test_propose_task_invalid_task_type_exits_2(invoke_tool, business_id, run_id
         "x",
     )
     assert r.returncode == 2
+
+
+def test_propose_task_finding_key_dedups_second_insert(
+    invoke_tool, cleanup_run, business_id
+):
+    """Migration 033 — when a pending approval already carries the same
+    finding_key, the second propose_task call returns the existing approval
+    id and skipped=true instead of inserting a duplicate row.
+    """
+    fk = f"contract-test-finding:{cleanup_run}"
+    common = [
+        "--business-id",
+        business_id,
+        "--run-id",
+        cleanup_run,
+        "--task-type",
+        "alert",
+        "--payload",
+        '{"alert_type":"contract","message":"x","acknowledgment_only":true}',
+        "--rationale",
+        "contract test for finding_key dedup",
+        "--finding-key",
+        fk,
+    ]
+    r1 = invoke_tool("propose_task", *common)
+    assert r1.returncode == 0, f"stderr: {r1.stderr}"
+    p1 = json.loads(r1.stdout)
+    assert p1.get("skipped") is False
+    first_id = p1["approval_id"]
+
+    r2 = invoke_tool("propose_task", *common)
+    assert r2.returncode == 0, f"stderr: {r2.stderr}"
+    p2 = json.loads(r2.stdout)
+    assert p2.get("skipped") is True
+    assert p2.get("dedup_reason") == "existing_finding_key"
+    assert p2["approval_id"] == first_id
+
+
+def test_propose_task_distinct_finding_keys_coexist(
+    invoke_tool, cleanup_run, business_id
+):
+    """Two findings of different types on the same business must NOT dedup
+    against each other. Validates the structural dedup primitive — previously
+    the agent's vibe-based dedup collapsed unrelated findings into one row."""
+    common_args = [
+        "--business-id",
+        business_id,
+        "--run-id",
+        cleanup_run,
+        "--task-type",
+        "alert",
+        "--payload",
+        '{"alert_type":"contract","message":"x","acknowledgment_only":true}',
+        "--rationale",
+        "contract test for distinct finding_keys",
+    ]
+    fk_a = f"finding-a:{cleanup_run}"
+    fk_b = f"finding-b:{cleanup_run}"
+    ra = invoke_tool("propose_task", *common_args, "--finding-key", fk_a)
+    rb = invoke_tool("propose_task", *common_args, "--finding-key", fk_b)
+    assert ra.returncode == 0 and rb.returncode == 0
+    pa = json.loads(ra.stdout)
+    pb = json.loads(rb.stdout)
+    assert pa["approval_id"] != pb["approval_id"]
+    assert pa.get("skipped") is False
+    assert pb.get("skipped") is False
 
 
 # Block 11 (2026-05-13): ab_test_setup + ab_test_decide are valid task_types.

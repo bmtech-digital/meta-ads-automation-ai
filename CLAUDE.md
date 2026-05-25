@@ -21,6 +21,23 @@ These three documents are canonical — **anything you write in code, prompts, o
 
 **Supporting research:** `docs/deep_research/` — raw outputs from multiple AI research tools (Grok, Manus) + `findings-diff.md` mapping research to spec changes.
 
+## 🎨 Design System
+
+The web app and any future surface follow the **"Warm Industrial Editorial"** design system — a portable token + component layer originally authored as a Claude Design handoff. Treat it as canonical for anything visual.
+
+| Asset                                                                                                       | Role                                                                                                                              |
+| ----------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| [`docs/design/aiweon-handoff/project/design-system.html`](docs/design/aiweon-handoff/project/design-system.html) | **Source of truth.** Open in a browser to see every token, component, and pattern (color, type, spacing, buttons, cards, status pills, agent cards, chat bubbles, top-bar pills, full RTL Hebrew coverage). |
+| [`docs/design/aiweon-handoff/README.md`](docs/design/aiweon-handoff/README.md)                              | Handoff context from the original design tool.                                                                                    |
+| [`docs/design/aiweon-handoff/chats/chat1.md`](docs/design/aiweon-handoff/chats/chat1.md)                    | Design conversation — why amber + sage, why the pill top bar, what "subtle" means here. Read before changing the palette.         |
+| [`web/src/app/globals.css`](web/src/app/globals.css)                                                        | **Implementation.** All design-system CSS variables, base styles, component classes, and Tailwind layer mappings.                 |
+| [`web/tailwind.config.ts`](web/tailwind.config.ts)                                                          | Tailwind tokens (font families, scale, radii, shadows, brand/sage colour palettes) wired to the same variables.                   |
+| [`web/src/app/layout.tsx`](web/src/app/layout.tsx)                                                          | Loads the five brand fonts (Outfit · Rubik · Heebo · Frank Ruhl Libre · JetBrains Mono) via `next/font`.                          |
+
+**Naming caveat:** the original design system calls the brand amber `--accent`. In our codebase that name conflicts with shadcn's neutral hover-bg token, so the brand colour lives under `--brand` / `--brand-hover` / `--brand-tint`. The design-system component classes copied into `globals.css` were rewritten accordingly.
+
+**When changing visual design:** update `globals.css` and `tailwind.config.ts`. If you're introducing a pattern that's not in the design-system source, propose adding it there too rather than letting a one-off style fork the system.
+
 ## 🆕 New here? Start with these
 
 | You are…                             | Read                                                             |

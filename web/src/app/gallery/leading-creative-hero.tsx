@@ -10,13 +10,14 @@ import type {
 } from "./scoring";
 
 /**
- * Hero card per Claude Design v3 brief — the single highest-scoring live
- * creative across all active campaigns, with its key metrics and a one-click
- * CTA to ask the agent to duplicate the winning approach to the campaigns
- * that don't yet carry it.
+ * Hero card — the single highest-scoring live creative across all active
+ * campaigns, with key metrics and a one-click CTA to duplicate the winning
+ * approach to other live campaigns.
  *
- * Selection: top creative by performance score across all groups. Tied scores
- * fall back to higher spend (the creative that's actually carrying weight).
+ * The card sits on the surface with a single 3px brand accent rule on the
+ * leading edge (per design system §10 "Cards → Accent-rule"). No halo glow,
+ * no neon ring. The "מנצח השבוע" eyebrow + a small Sparkles glyph carry the
+ * "this is special" signal — colour and weight, not effects.
  *
  * The duplicate CTA writes a `new_creative` approval per target campaign;
  * nothing publishes until the operator approves each one, per HITL.
@@ -35,9 +36,6 @@ export function LeadingCreativeHero({
   if (!winner || !winner.performance) return null;
   const m = winner.performance.metrics;
 
-  // Hero is only meaningful once the winner has crossed the learning
-  // threshold — below 1000 impressions the score is 0 and the grade is
-  // "learning", which means we'd be advertising a verdict we don't have yet.
   if (winner.performance.grade === "learning") return null;
 
   const rawThumb = winner.thumbnail_url ?? winner.image_url;
@@ -48,32 +46,39 @@ export function LeadingCreativeHero({
   const durationLabel = isVideo ? "Video" : "Static";
 
   return (
-    <section className="glass-panel relative overflow-hidden rounded-2xl">
-      {/* "מנצח השבוע" badge — top-end (right in RTL) so it reads first */}
-      <span className="absolute end-5 top-5 z-10 inline-flex items-center gap-1.5 rounded-full bg-brand-500 px-3 py-1 text-[11px] font-semibold text-white shadow-[0_8px_24px_-6px_rgb(245_132_31_/_0.55)]">
-        <Sparkles className="h-3 w-3" />
-        מנצח השבוע
-      </span>
+    <section className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-ds-sm">
+      {/* Accent rule on the leading edge — design system §10 Cards. */}
+      <span
+        aria-hidden
+        className="absolute inset-y-0 start-0 w-[3px] bg-brand-400"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)]">
-        {/* Left column (RTL: text on right, media on left) — eyebrow, title,
-            metrics, reasoning, CTAs. Padding is generous so the card breathes
-            against the surrounding grid. */}
         <div className="flex flex-col gap-5 p-6 lg:p-8">
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-400/30 bg-brand-400/10 px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-brand-400">
+              <Sparkles className="h-3 w-3" />
+              מנצח השבוע
+            </span>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground">
               הקריאייטיב המוביל
             </span>
             <h2
-              className="mono-ltr text-[22px] font-semibold text-foreground lg:text-[26px]"
+              className="line-clamp-2 text-[20px] font-semibold leading-snug text-foreground lg:text-[22px]"
               title={winner.name ?? winner.creative_id}
-              dir="ltr"
+              dir="auto"
             >
-              {winner.name ?? `Creative · #${winner.creative_id.slice(-6)}`}
+              {winner.name ? extractDisplayName(winner.name) : `Creative · #${winner.creative_id.slice(-6)}`}
             </h2>
+            <span className="mono-ltr text-[11px] text-muted-foreground">
+              #{winner.creative_id.slice(-12)}
+            </span>
           </div>
 
-          <div className="mono-ltr flex flex-wrap items-end gap-x-8 gap-y-3 text-foreground">
+          <div className="mono-ltr flex flex-wrap items-end gap-x-8 gap-y-3">
             {m.spend != null && m.spend > 0 ? (
               <Metric label="הוצאה" value={`₪${m.spend.toFixed(0)}`} />
             ) : null}
@@ -101,7 +106,7 @@ export function LeadingCreativeHero({
 
           {winner.performance.reasons.length > 0 ? (
             <p
-              className="max-w-prose text-[13px] leading-relaxed text-muted-foreground"
+              className="max-w-prose text-[13.5px] leading-relaxed text-muted-foreground"
               dir="auto"
             >
               {buildHeroBlurb(winner, otherCampaignCount)}
@@ -132,10 +137,8 @@ export function LeadingCreativeHero({
           </div>
         </div>
 
-        {/* Right column (RTL: media on left) — thumbnail with subtle brand
-            gradient overlay. Aspect 4:5 mirrors the design mock. */}
-        <div className="relative bg-card lg:bg-transparent">
-          <div className="relative h-full min-h-[220px] w-full overflow-hidden lg:aspect-auto">
+        <div className="relative bg-muted/40 lg:bg-transparent">
+          <div className="relative h-full min-h-[260px] w-full overflow-hidden">
             {thumb ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -147,7 +150,7 @@ export function LeadingCreativeHero({
                   loading="lazy"
                 />
                 {isVideo ? (
-                  <span className="absolute bottom-3 start-3 rounded bg-black/70 px-2 py-0.5 text-[11px] font-medium text-white">
+                  <span className="absolute bottom-3 start-3 rounded-md border border-white/15 bg-black/65 px-2 py-0.5 text-[11px] font-medium text-white">
                     ▶ {durationLabel}
                   </span>
                 ) : null}
@@ -172,17 +175,15 @@ function Metric({
   hint?: string;
 }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+    <div className="flex flex-col gap-1">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </span>
-      <span className="text-[24px] font-semibold leading-none text-foreground">
+      <span className="text-[22px] font-semibold leading-none tracking-[-0.01em] text-foreground">
         {value}
       </span>
       {hint ? (
-        <span className="text-[10.5px] font-medium text-emerald-600 dark:text-emerald-400">
-          {hint}
-        </span>
+        <span className="text-[10.5px] font-medium text-success">{hint}</span>
       ) : null}
     </div>
   );
@@ -191,14 +192,14 @@ function Metric({
 function HeroPlaceholder({ kindLabel }: { kindLabel: string }) {
   return (
     <div
-      className="flex h-full min-h-[220px] w-full items-center justify-center text-[11px] font-mono uppercase tracking-[0.08em] text-muted-foreground"
+      className="flex h-full min-h-[260px] w-full items-center justify-center bg-muted text-[11px] font-mono uppercase tracking-[0.12em] text-muted-foreground"
       style={{
         backgroundImage:
-          "repeating-linear-gradient(45deg, hsl(28 91% 54% / 0.10) 0 10px, transparent 10px 20px), linear-gradient(135deg, hsl(28 91% 54% / 0.18), hsl(28 91% 54% / 0.04))",
+          "repeating-linear-gradient(45deg, hsl(var(--muted-foreground) / 0.05) 0 10px, transparent 10px 20px)",
       }}
     >
       <div className="flex flex-col items-center gap-2">
-        <span className="text-[22px] text-brand-500" aria-hidden>
+        <span className="text-[22px] text-muted-foreground/70" aria-hidden>
           ◢◣
         </span>
         <span>{kindLabel}</span>
@@ -250,7 +251,7 @@ function DuplicateButton({
     return (
       <Link
         href="/approvals"
-        className="inline-flex items-center gap-1.5 rounded-md bg-emerald-500/15 px-3.5 py-2 text-[12.5px] font-medium text-emerald-700 hover:bg-emerald-500/20 dark:text-emerald-300"
+        className="inline-flex items-center gap-1.5 rounded-md border border-success/30 bg-success/10 px-3.5 py-2 text-[12.5px] font-medium text-success hover:bg-success/15"
       >
         ✓ נשלח לאישור — פתח את התור
       </Link>
@@ -297,6 +298,17 @@ function pickWinner(
     }
   }
   return best;
+}
+
+// Creative names from the agent often have a date-stamp + hex ID suffix
+// ("…בזמן אמת -2026-05-18-4ccb78b3e3348a178bde89b86e2fe1e5"). Strip it for
+// the headline — the standalone creative-id chip below the title carries
+// the same information cleanly.
+function extractDisplayName(raw: string): string {
+  return raw
+    .replace(/[\s\-_·]*\d{4}-\d{2}-\d{2}[\s\-_·]*[0-9a-f]{16,}\s*$/i, "")
+    .replace(/[\s\-_·]*[0-9a-f]{20,}\s*$/i, "")
+    .trim();
 }
 
 function buildHeroBlurb(

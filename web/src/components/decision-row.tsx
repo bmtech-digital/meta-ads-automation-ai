@@ -4,6 +4,10 @@ import { relativeHe } from "@/lib/approvals-fmt";
 
 export const DECISION_STYLES: Record<DecisionType, string> = {
   observation: "bg-slate-200 text-slate-800",
+  // observation_blocked deliberately uses an amber/yellow palette — distinct
+  // from observation (informational), skip (no work), and rejection (blocked
+  // action). Conveys "we have something to act on, gated on an unblock."
+  observation_blocked: "bg-amber-100 text-amber-900",
   diagnosis: "bg-blue-100 text-blue-800",
   proposal: "bg-green-100 text-green-800",
   rejection: "bg-red-100 text-red-800",
@@ -14,6 +18,7 @@ export const DECISION_STYLES: Record<DecisionType, string> = {
 
 export const DECISION_LABEL_HE: Record<DecisionType, string> = {
   observation: "תצפית",
+  observation_blocked: "תצפית חסומה",
   diagnosis: "אבחון",
   proposal: "הצעה",
   rejection: "דחייה",
@@ -85,6 +90,22 @@ export function DecisionRow({
         <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
           {d.rationale}
         </p>
+      ) : null}
+      {d.decision_type === "observation_blocked" &&
+      d.outputs &&
+      Array.isArray((d.outputs as Record<string, unknown>).blocked_by) ? (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {(
+            (d.outputs as { blocked_by: string[] }).blocked_by ?? []
+          ).map((b) => (
+            <span
+              key={b}
+              className="rounded bg-amber-200 px-2 py-0.5 text-xs text-amber-900"
+            >
+              🔒 {b}
+            </span>
+          ))}
+        </div>
       ) : null}
       {d.guardrail_violations && d.guardrail_violations.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1">

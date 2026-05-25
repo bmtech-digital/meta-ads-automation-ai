@@ -8,6 +8,7 @@ import {
   InboxIcon,
   TargetIcon,
   KnowledgeIcon,
+  HistoryIcon,
 } from "@/components/brand/icons";
 import {
   Menu,
@@ -41,8 +42,9 @@ type NavLink = {
 };
 
 /**
- * Top Nav links — consolidated 12 → 8 in the 2026-05-17 redesign. Each link
- * may carry sibling routes via SubNav inside the destination page:
+ * Top Nav links — consolidated 12 → 8 in the 2026-05-17 redesign; /runs added
+ * 2026-05-25 (surface-runs-detail.md), bringing the total to 9. Each link may
+ * carry sibling routes via SubNav inside the destination page:
  *   /campaigns  → + /ab-tests, /plans
  *   /audiences  → + /leads
  *   /settings   → + /integrations
@@ -51,6 +53,7 @@ type NavLink = {
 const LINKS: NavLink[] = [
   { href: "/", label: "דשבורד", Icon: SignalIcon },
   { href: "/approvals", label: "הצעות", Icon: InboxIcon },
+  { href: "/runs", label: "ריצות", Icon: HistoryIcon },
   { href: "/campaigns", label: "קמפיינים", Icon: TargetIcon },
   { href: "/business-knowledge", label: "העסק שלי", Icon: KnowledgeIcon },
   { href: "/gallery", label: "קריאייטיב", Icon: ImagesIcon as IconCmp },
@@ -65,7 +68,22 @@ const LINKS: NavLink[] = [
  * action pill (left). All three sit on `glass-surface rounded-full` so the
  * page atmosphere shows through behind them.
  */
-export function Nav({ active, right }: { active?: string; right?: ReactNode }) {
+export function Nav({
+  active,
+  right,
+  debug,
+}: {
+  active?: string;
+  right?: ReactNode;
+  /**
+   * True when `DEBUG=true` is set on the server. Reserved for debug-only nav
+   * affordances. Currently unused — the rich run-inspection view is folded
+   * into `/runs` and `/runs/[run_id]` and reachable from the main nav.
+   */
+  debug?: boolean;
+}) {
+  void debug;
+  const links = LINKS;
   return (
     <header className="fixed inset-x-0 top-0 z-40 pt-2 sm:pt-4">
       <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-1.5 px-2 sm:gap-3 sm:px-4">
@@ -90,7 +108,7 @@ export function Nav({ active, right }: { active?: string; right?: ReactNode }) {
           aria-label="ניווט ראשי"
           className="glass-surface hidden items-center gap-0.5 rounded-full px-1 py-1 lg:flex"
         >
-          {LINKS.map((link) => (
+          {links.map((link) => (
             <NavPill key={link.href} link={link} active={active} />
           ))}
         </nav>
@@ -106,7 +124,7 @@ export function Nav({ active, right }: { active?: string; right?: ReactNode }) {
           {right ? (
             <div className="flex items-center gap-0.5">{right}</div>
           ) : null}
-          <MobileNav active={active} />
+          <MobileNav active={active} links={links} />
         </div>
       </div>
     </header>
@@ -139,7 +157,13 @@ function NavPill({ link, active }: { link: NavLink; active?: string }) {
   );
 }
 
-function MobileNav({ active }: { active?: string }) {
+function MobileNav({
+  active,
+  links,
+}: {
+  active?: string;
+  links: NavLink[];
+}) {
   const [open, setOpen] = useState(false);
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -162,7 +186,7 @@ function MobileNav({ active }: { active?: string }) {
           className="flex flex-1 flex-col gap-1 p-3 overflow-y-auto"
           aria-label="ניווט ראשי"
         >
-          {LINKS.map(({ href, label, Icon }) => {
+          {links.map(({ href, label, Icon }) => {
             const isActive = active === href;
             return (
               <Link

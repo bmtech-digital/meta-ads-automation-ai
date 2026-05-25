@@ -2242,6 +2242,21 @@ def _cold_start_front_load_window(prop: dict, state: dict, ctx: dict) -> dict:
     )
 
 
+# Category B rules — premise gates. When these fail, the agent did diagnostic
+# work but the *action* is blocked because the precondition is missing
+# (tracking unverified, no research yet, prior rejection on same target, etc.).
+# The agent's prompt converts these into `observation_blocked` decision rows
+# instead of swallowing the finding — see
+# `docs/todos/capability-gated-decision-flow.md`. Category A rules (everything
+# else in CHECKS) stay as hard rejections — they prevent a specific bad action
+# regardless of what the agent intended.
+CATEGORY_B_RULES = {
+    "verify_tracking_infrastructure",      # §17 — tracking unverified
+    "set_kpi_target_requires_research",    # §26 — insufficient research
+    "prefer_gallery_over_generation",      # §28 — redeploy candidate exists
+    "respect_prior_rejections",            # §37 — rejection cooldown
+}
+
 # Judgment-only: enforced by prompts, not by this tool
 JUDGMENT_ONLY_RULES = [
     "meta_api_rate_limit",
@@ -2809,12 +2824,22 @@ def main() -> None:
     violations = [r for r in results if not r.get("passed")]
     passed = len(violations) == 0
 
+    # Split violations by category so the agent's prompt knows which failures
+    # should become `observation_blocked` decisions (Category B — premise
+    # missing) vs which should stay hard rejections (Category A — safety).
+    # See `docs/todos/capability-gated-decision-flow.md` + CATEGORY_B_RULES.
+    category_b_violations = [v for v in violations if v.get("name") in CATEGORY_B_RULES]
+    category_a_violations = [v for v in violations if v.get("name") not in CATEGORY_B_RULES]
+
     emit_success(
         {
             "business_id": args.business_id,
             "proposal_task_type": proposal.get("task_type"),
             "passed": passed,
             "violations": violations,
+            "category_a_violations": category_a_violations,
+            "category_b_violations": category_b_violations,
+            "category_b_rules": sorted(CATEGORY_B_RULES),
             "checks": results,
             "judgment_only_rules": JUDGMENT_ONLY_RULES,
             "context": ctx,

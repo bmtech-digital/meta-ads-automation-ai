@@ -87,6 +87,9 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       PORT: "3000"
       HOSTNAME: 0.0.0.0
+      # Always-on in dev — gates /runs deep-dive sections (web/src/lib/debug.ts).
+      # Pinned here so it's set even if .env is missing the entry.
+      DEBUG: "true"
       # next build OOMs on this Windows/Docker setup with default Node heap.
       NODE_OPTIONS: "--max-old-space-size=4096"
       # Windows bind mounts don't propagate inotify events into the container,

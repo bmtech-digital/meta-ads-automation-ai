@@ -115,15 +115,16 @@ export function GalleryClient({
       {fbError || igError ? (
         <div className="flex flex-col gap-2">
           {fbError ? (
-            <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <p className="rounded-md border border-warning/25 bg-warning/10 px-3 py-2 text-[12px] text-warning">
               Facebook: {fbError}. בדוק שלטוקן יש{" "}
-              <code>pages_read_engagement</code>.
+              <code className="mono-ltr">pages_read_engagement</code>.
             </p>
           ) : null}
           {igError ? (
-            <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Instagram: {igError}. בדוק שלטוקן יש <code>instagram_basic</code>{" "}
-              ו-<code>pages_show_list</code>.
+            <p className="rounded-md border border-warning/25 bg-warning/10 px-3 py-2 text-[12px] text-warning">
+              Instagram: {igError}. בדוק שלטוקן יש{" "}
+              <code className="mono-ltr">instagram_basic</code> ו-
+              <code className="mono-ltr">pages_show_list</code>.
             </p>
           ) : null}
         </div>
@@ -177,7 +178,7 @@ function UnifiedToolbar({
 }) {
   return (
     <div className="sticky top-24 z-30 flex flex-wrap items-center justify-between gap-3">
-      <div className="glass-surface inline-flex w-fit items-center gap-0.5 rounded-full p-1">
+      <div className="inline-flex w-fit items-center gap-0.5 rounded-full border border-border bg-card p-1 shadow-ds-sm">
         {FILTER_PILLS.map((p) => {
           const isActive = lifecycleFilter === p.id;
           return (
@@ -186,10 +187,10 @@ function UnifiedToolbar({
               type="button"
               onClick={() => onLifecycleFilterChange(p.id)}
               aria-pressed={isActive}
-              className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`rounded-full border px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
                 isActive
-                  ? "bg-brand-500/15 text-foreground"
-                  : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                  ? "border-brand-400/40 bg-brand-400/[0.08] text-brand-400"
+                  : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               {p.label}

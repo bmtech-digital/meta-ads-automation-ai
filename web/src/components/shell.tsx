@@ -1,5 +1,6 @@
 import { Nav } from "@/components/nav";
 import { UserMenu } from "@/components/user-menu";
+import { isDebugMode } from "@/lib/debug";
 import { cn } from "@/lib/utils";
 
 type ShellProps = {
@@ -31,9 +32,10 @@ export function Shell({
       <UserMenu />
     </>
   );
+  const debug = isDebugMode();
   return (
     <>
-      <Nav active={active} right={headerRight} />
+      <Nav active={active} right={headerRight} debug={debug} />
       {/* Header is `fixed` (floating-pills pattern) — main content offsets the
           ~80px header + 24px breathing room with pt-28. */}
       <main

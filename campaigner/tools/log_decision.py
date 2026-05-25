@@ -25,6 +25,11 @@ from campaigner.tools._contract import (
 
 VALID_DECISION_TYPES = (
     "observation",
+    # Added 2026-05-25 (Migration 033): the agent identified a finding but the
+    # capability required to act is blocked. The diagnosis is surfaced; no
+    # approval is created. Carries outputs.finding_type + outputs.blocked_by +
+    # outputs.would_propose so the UI can render "ready when you unblock me."
+    "observation_blocked",
     "diagnosis",
     "proposal",
     "rejection",
