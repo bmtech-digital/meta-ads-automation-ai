@@ -140,7 +140,7 @@ jobs:
             -n "$NAMESPACE"
           kubectl rollout status deployment/web -n "$NAMESPACE" --timeout=300s
 
-      - name: Update webhook Deployment image (replicas: 0 — no rollout to wait for)
+      - name: "Update webhook Deployment image (replicas: 0 — no rollout to wait for)"
         # Bumping the image even at replicas: 0 means a future scale-up picks
         # up the latest SHA automatically.
         run: |
