@@ -48,6 +48,26 @@ function igToOrganic(m: InstagramMedia): OrganicPost {
   };
 }
 
+const HEBREW_MONTH_HE = [
+  "טבת",
+  "שבט",
+  "אדר",
+  "ניסן",
+  "אייר",
+  "סיוון",
+  "תמוז",
+  "אב",
+  "אלול",
+  "תשרי",
+  "חשוון",
+  "כסלו",
+];
+
+function formatIssueDate(d = new Date()): string {
+  const m = HEBREW_MONTH_HE[d.getMonth()] ?? "";
+  return `גיליון ${m} ${d.getFullYear()}`;
+}
+
 export function GalleryClient({
   assets,
   creativeUsage,
@@ -69,9 +89,6 @@ export function GalleryClient({
   igPosts: InstagramMedia[];
   igError: string | null;
 }) {
-  // Text search lives in the global nav (Ctrl/⌘+K). The page keeps only the
-  // lifecycle filter pills — that's the deliberate "filters only, no search"
-  // pattern applied uniformly across tabs.
   const [lifecycleFilter, setLifecycleFilter] =
     useState<LifecycleFilter>("all");
 
@@ -81,8 +98,6 @@ export function GalleryClient({
     return items;
   }, [fbPosts, igPosts]);
 
-  // Computed once — feeds both the leading-creative hero and the Live
-  // section's tile grid, so both stay consistent on the same Meta snapshot.
   const liveGroups = useMemo(
     () =>
       groupLiveMetaCreativesByCampaign(
@@ -94,11 +109,16 @@ export function GalleryClient({
     [creativeUsage, assets, adInsights, videoSources],
   );
 
-  // Filter pill axis — winning/live/fatiguing reach only live tiles; draft
-  // hides the live grid + organic + archive and shows only the priority
-  // queue. "All" shows everything. Hero is only meaningful in "all" / live /
-  // winning views; it would be misleading to celebrate a "winner" while the
-  // operator is intentionally inspecting "fatiguing" or "draft".
+  const totals = useMemo(() => {
+    const live = liveGroups.reduce((n, g) => n + g.creatives.length, 0);
+    const winning = liveGroups.reduce(
+      (n, g) => n + g.creatives.filter((c) => c.performance?.grade === "A").length,
+      0,
+    );
+    const drafts = assets.filter((a) => !a.meta_creative_id).length;
+    return { total: assets.length, live, winning, drafts };
+  }, [assets, liveGroups]);
+
   const showHero = lifecycleFilter === "all" || lifecycleFilter === "live" || lifecycleFilter === "winning";
   const showLive = lifecycleFilter !== "draft";
   const showPriority =
@@ -106,8 +126,9 @@ export function GalleryClient({
   const showArchive = lifecycleFilter === "all";
 
   return (
-    <div className="flex flex-col gap-10">
-      <UnifiedToolbar
+    <div className="flex flex-col gap-12">
+      <GalleryMasthead totals={totals} />
+      <TocFilter
         lifecycleFilter={lifecycleFilter}
         onLifecycleFilterChange={setLifecycleFilter}
       />
@@ -115,15 +136,16 @@ export function GalleryClient({
       {fbError || igError ? (
         <div className="flex flex-col gap-2">
           {fbError ? (
-            <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            <p className="rounded-md border border-warning/25 bg-warning/10 px-3 py-2 text-[12px] text-warning">
               Facebook: {fbError}. בדוק שלטוקן יש{" "}
-              <code>pages_read_engagement</code>.
+              <code className="mono-ltr">pages_read_engagement</code>.
             </p>
           ) : null}
           {igError ? (
-            <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-              Instagram: {igError}. בדוק שלטוקן יש <code>instagram_basic</code>{" "}
-              ו-<code>pages_show_list</code>.
+            <p className="rounded-md border border-warning/25 bg-warning/10 px-3 py-2 text-[12px] text-warning">
+              Instagram: {igError}. בדוק שלטוקן יש{" "}
+              <code className="mono-ltr">instagram_basic</code> ו-
+              <code className="mono-ltr">pages_show_list</code>.
             </p>
           ) : null}
         </div>
@@ -155,6 +177,83 @@ export function GalleryClient({
   );
 }
 
+/**
+ * Editorial masthead — the page reads as a magazine issue. Eyebrow line
+ * gives the "issue marking" (Hebrew month + year). Title carries
+ * unmistakable display weight; a single word lifts into Frank Ruhl Libre
+ * italic to break the regularity. The dek (lede) reads as a magazine
+ * sub-title. A small stat block on the leading edge sits like a print
+ * "in this issue" counter.
+ */
+function GalleryMasthead({
+  totals,
+}: {
+  totals: { total: number; live: number; winning: number; drafts: number };
+}) {
+  return (
+    <header className="grid grid-cols-1 gap-x-12 gap-y-6 border-b border-border/40 pb-10 lg:grid-cols-[1fr_auto] lg:items-end">
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
+          <span className="text-brand-400">קריאייטיב</span>
+          <span aria-hidden className="h-px w-6 bg-border" />
+          <span>{formatIssueDate()}</span>
+          <span aria-hidden className="h-px w-6 bg-border" />
+          <span>VOL. 01 · Aiweon Campaigner</span>
+        </div>
+
+        <h1 className="font-display text-[44px] font-medium leading-[0.95] tracking-[-0.025em] text-foreground lg:text-[56px]">
+          נכסי{" "}
+          <span className="font-editorial italic font-normal text-foreground/95">
+            קריאייטיב
+          </span>
+          .
+        </h1>
+
+        <p className="max-w-[58ch] text-[14px] leading-relaxed text-muted-foreground">
+          לוח־הצופים של כל המודעות שהסוכן ייצר או שהעלית. מטריקות חיות נשאבות
+          מ-Meta — קריאייטיב שעדיין לא צבר 1,000 חשיפות מסומן{" "}
+          <em className="font-editorial italic text-foreground/85">
+            ״אוסף נתונים״
+          </em>
+          , ולא נשפט עדיין.
+        </p>
+      </div>
+
+      <dl className="grid grid-cols-4 gap-x-7 gap-y-1 self-end font-mono text-text-secondary">
+        <StatCell label="סה״כ" value={totals.total} />
+        <StatCell label="חי" value={totals.live} />
+        <StatCell label="מנצחים" value={totals.winning} accent />
+        <StatCell label="טיוטות" value={totals.drafts} />
+      </dl>
+    </header>
+  );
+}
+
+function StatCell({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex flex-col gap-0.5 text-center">
+      <dd
+        className={`mono-ltr text-[26px] font-medium leading-none tracking-[-0.02em] tabular-nums ${
+          accent ? "text-brand-400" : "text-foreground"
+        }`}
+      >
+        {String(value).padStart(2, "0")}
+      </dd>
+      <dt className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+        {label}
+      </dt>
+    </div>
+  );
+}
+
 const FILTER_PILLS: Array<{ id: LifecycleFilter; label: string }> = [
   { id: "all", label: "הכל" },
   { id: "winning", label: "מנצחים" },
@@ -164,11 +263,12 @@ const FILTER_PILLS: Array<{ id: LifecycleFilter; label: string }> = [
 ];
 
 /**
- * Single unified toolbar — lifecycle filter pills + action cluster. Text
- * search lives in the global nav (Ctrl/⌘+K) so the per-tab toolbar is just
- * filters + actions; this is the uniform pattern across the project's tabs.
+ * TOC-style filter strip — reads like the front-matter of a magazine
+ * issue rather than a row of toggle pills. Active filter gets an amber
+ * underline; the rest carry the same mono-caps register so the row
+ * scans as a single editorial line.
  */
-function UnifiedToolbar({
+function TocFilter({
   lifecycleFilter,
   onLifecycleFilterChange,
 }: {
@@ -176,8 +276,11 @@ function UnifiedToolbar({
   onLifecycleFilterChange: (v: LifecycleFilter) => void;
 }) {
   return (
-    <div className="sticky top-24 z-30 flex flex-wrap items-center justify-between gap-3">
-      <div className="glass-surface inline-flex w-fit items-center gap-0.5 rounded-full p-1">
+    <div className="sticky top-24 z-30 -mx-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-2xl border border-border/40 bg-background/70 px-3 py-3 backdrop-blur-md">
+      <nav
+        aria-label="פילטרים"
+        className="flex flex-wrap items-center gap-x-6 gap-y-1"
+      >
         {FILTER_PILLS.map((p) => {
           const isActive = lifecycleFilter === p.id;
           return (
@@ -186,17 +289,25 @@ function UnifiedToolbar({
               type="button"
               onClick={() => onLifecycleFilterChange(p.id)}
               aria-pressed={isActive}
-              className={`rounded-full px-3.5 py-1.5 text-[12.5px] font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`relative pb-1 font-mono text-[11.5px] uppercase tracking-[0.18em] outline-none transition-colors focus-visible:text-foreground ${
                 isActive
-                  ? "bg-brand-500/15 text-foreground"
-                  : "text-muted-foreground hover:bg-foreground/5 hover:text-foreground"
+                  ? "text-brand-400"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {p.label}
+              <span
+                aria-hidden
+                className={`absolute inset-x-0 -bottom-0.5 h-px transition-all ${
+                  isActive
+                    ? "scale-x-100 bg-brand-400"
+                    : "scale-x-0 bg-foreground/30"
+                } origin-center`}
+              />
             </button>
           );
         })}
-      </div>
+      </nav>
 
       <div className="flex flex-wrap items-center gap-2">
         <GenerateWithAgentButton />

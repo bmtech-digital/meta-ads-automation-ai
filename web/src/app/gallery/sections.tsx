@@ -20,33 +20,67 @@ import {
   type PerformanceGrade,
 } from "./scoring";
 
+/**
+ * Section header — chapter mark. The Roman numeral sits as the visual
+ * anchor (Frank Ruhl Libre), with a mono-caps kicker and a display title.
+ * Count plate on the trailing edge formats like a magazine running-head.
+ */
 interface SectionHeaderProps {
+  numeral: string;
+  kicker: string;
   title: string;
   subtitle?: string;
   count?: number;
+  unit?: string;
   right?: React.ReactNode;
 }
 
-function SectionHeader({ title, subtitle, count, right }: SectionHeaderProps) {
+function SectionHeader({
+  numeral,
+  kicker,
+  title,
+  subtitle,
+  count,
+  unit = "frames",
+  right,
+}: SectionHeaderProps) {
   return (
-    <div className="flex items-end justify-between gap-4 border-b border-border/40 pb-2">
-      <div className="flex items-baseline gap-2">
-        <span className="text-[10.5px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-          {title}
+    <header className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-end gap-x-6 gap-y-2 border-b border-border/40 pb-5">
+      <span
+        aria-hidden
+        className="font-editorial text-[64px] font-medium leading-[0.78] tracking-[-0.03em] text-brand-400/85 lg:text-[80px]"
+      >
+        {numeral}
+      </span>
+
+      <div className="flex flex-col gap-1.5 pb-2">
+        <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground">
+          {kicker}
         </span>
-        {typeof count === "number" ? (
-          <span className="font-tabular text-[11px] text-muted-foreground/70">
-            ({count})
-          </span>
-        ) : null}
+        <h2 className="font-display text-[26px] font-semibold leading-none tracking-[-0.015em] text-foreground lg:text-[30px]">
+          {title}
+        </h2>
         {subtitle ? (
-          <span className="hidden text-[11px] text-muted-foreground/70 sm:inline">
-            · {subtitle}
-          </span>
+          <p className="text-[12.5px] leading-snug text-muted-foreground">
+            {subtitle}
+          </p>
         ) : null}
       </div>
-      {right ? <div>{right}</div> : null}
-    </div>
+
+      <div className="flex items-end gap-4 self-end pb-2">
+        {right}
+        {typeof count === "number" ? (
+          <div className="flex flex-col items-end gap-0.5 text-end">
+            <span className="mono-ltr text-[22px] font-medium leading-none tracking-[-0.025em] tabular-nums text-foreground">
+              {String(count).padStart(2, "0")}
+            </span>
+            <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+              {unit}
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </header>
   );
 }
 
@@ -65,8 +99,6 @@ export function LiveSection({
   search,
   lifecycleFilter,
 }: LiveSectionProps) {
-  // Apply both axis filters — lifecycle by computed grade/freq, search by
-  // creative name / campaign name / ad id substring (case-insensitive).
   const q = search.trim().toLowerCase();
   const filteredCreatives = useMemo(() => {
     const all: LiveMetaCreative[] = groups.flatMap((g) => g.creatives);
@@ -74,20 +106,13 @@ export function LiveSection({
       const lc = lifecycleOfLiveMetaCreative(c);
       if (!matchesLifecycleFilter(lc, lifecycleFilter)) return false;
       if (!q) return true;
-      const haystack = [
-        c.name ?? "",
-        c.campaign_name,
-        c.creative_id,
-        c.ad_id,
-      ]
+      const haystack = [c.name ?? "", c.campaign_name, c.creative_id, c.ad_id]
         .join(" ")
         .toLowerCase();
       return haystack.includes(q);
     });
   }, [groups, lifecycleFilter, q]);
 
-  // Organic posts are always "live" — match the filter when it's "all" or
-  // "live", hide them otherwise. Search applies to caption text.
   const filteredOrganic = useMemo(() => {
     const lifecycleMatch =
       lifecycleFilter === "all" || lifecycleFilter === "live";
@@ -101,24 +126,23 @@ export function LiveSection({
   const total = filteredCreatives.length + filteredOrganic.length;
 
   return (
-    <section className="flex flex-col gap-6">
+    <section className="flex flex-col gap-7">
       <SectionHeader
+        numeral="II."
+        kicker="Chapter II — On Air"
         title="באוויר עכשיו"
-        subtitle="כל מה שמשודר עכשיו — פרסומות חיות + פוסטים אורגניים שכבר מפורסמים"
+        subtitle="כל מה שמשודר עכשיו: פרסומות חיות + פוסטים אורגניים שמופיעים בפיד."
         count={total}
       />
+
       {metaError ? (
-        <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <div className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-[12px] text-warning">
           לא הצלחתי לשלוף נתוני קמפיינים מ-Meta: {metaError}.
-        </p>
+        </div>
       ) : null}
 
-      <div className="flex flex-col gap-3">
-        <SubsectionHeader
-          title="פרסומות חיות"
-          count={filteredCreatives.length}
-          subtitle="כל הקריאייטיבים שרצים בקמפיינים פעילים — מ-Ads Manager וגם אלו שעלו דרך הגלרייה"
-        />
+      <div className="flex flex-col gap-5">
+        <SubsectionRule label="פרסומות חיות" count={filteredCreatives.length} />
         {filteredCreatives.length === 0 ? (
           <EmptyState
             text={
@@ -128,20 +152,16 @@ export function LiveSection({
             }
           />
         ) : (
-          <TileGrid>
-            {filteredCreatives.map((c) => (
-              <LiveMetaCreativeTile key={c.creative_id} creative={c} />
+          <ContactSheet>
+            {filteredCreatives.map((c, i) => (
+              <LiveMetaCreativeTile key={c.creative_id} creative={c} index={i + 1} />
             ))}
-          </TileGrid>
+          </ContactSheet>
         )}
       </div>
 
-      <div className="flex flex-col gap-3">
-        <SubsectionHeader
-          title="פוסטים אורגניים"
-          count={filteredOrganic.length}
-          subtitle="פוסטים שפורסמו בעמוד הפייסבוק וב-Instagram Business"
-        />
+      <div className="flex flex-col gap-5">
+        <SubsectionRule label="פוסטים אורגניים" count={filteredOrganic.length} />
         {filteredOrganic.length === 0 ? (
           <EmptyState
             text={
@@ -151,42 +171,112 @@ export function LiveSection({
             }
           />
         ) : (
-          <TileGrid>
-            {filteredOrganic.map((p) => (
-              <OrganicLiveTile key={`${p.source}:${p.id}`} post={p} />
+          <ContactSheet>
+            {filteredOrganic.map((p, i) => (
+              <OrganicLiveTile key={`${p.source}:${p.id}`} post={p} index={i + 1} />
             ))}
-          </TileGrid>
+          </ContactSheet>
         )}
       </div>
     </section>
   );
 }
 
-function SubsectionHeader({
-  title,
-  count,
-  subtitle,
-}: {
-  title: string;
-  count: number;
-  subtitle: string;
-}) {
+function SubsectionRule({ label, count }: { label: string; count: number }) {
   return (
-    <div className="flex items-baseline gap-2 pb-1">
-      <h3 className="text-[13px] font-semibold text-foreground/80">
-        {title}
-      </h3>
-      <span className="font-tabular text-[11px] text-muted-foreground/70">
-        ({count})
+    <div className="flex items-baseline gap-3">
+      <span className="font-mono text-[10.5px] uppercase tracking-[0.18em] text-muted-foreground/80">
+        {label}
       </span>
-      <span className="ms-auto hidden text-[11px] text-muted-foreground/70 sm:inline">
-        {subtitle}
+      <span className="mono-ltr text-[10.5px] tabular-nums text-muted-foreground">
+        ({String(count).padStart(2, "0")})
       </span>
+      <span aria-hidden className="h-px flex-1 bg-border/40" />
     </div>
   );
 }
 
-function OrganicLiveTile({ post }: { post: OrganicPost }) {
+/* ---------- Performance scoreplate (replaces the chunky pill) -------- */
+
+const GRADE_PLATE: Record<
+  PerformanceGrade,
+  { letter: string; tone: string; label: string }
+> = {
+  A: { letter: "A", tone: "bg-success/15 text-success border-success/40", label: "מנצח" },
+  B: { letter: "B", tone: "bg-success/10 text-success border-success/25", label: "טוב" },
+  C: { letter: "C", tone: "bg-warning/12 text-warning border-warning/30", label: "בינוני" },
+  D: { letter: "D", tone: "bg-destructive/12 text-destructive border-destructive/30", label: "חלש" },
+  learning: {
+    letter: "·",
+    tone: "bg-muted text-muted-foreground border-border",
+    label: "לומד",
+  },
+};
+
+function Scoreplate({ grade }: { grade: PerformanceGrade }) {
+  const p = GRADE_PLATE[grade];
+  return (
+    <span
+      className={`inline-flex h-6 w-6 items-center justify-center rounded-sm border font-mono text-[11px] font-medium tracking-tight ${p.tone}`}
+      title={p.label}
+    >
+      {p.letter}
+    </span>
+  );
+}
+
+/* ---------- Source chip for organic posts ---------- */
+
+function SourceChip({ source }: { source: "facebook" | "instagram" }) {
+  return (
+    <span className="inline-flex items-center rounded-sm border border-white/15 bg-black/55 px-1.5 py-[2px] font-mono text-[9.5px] font-medium uppercase tracking-[0.18em] text-white backdrop-blur-sm">
+      {source === "facebook" ? "FB" : "IG"}
+    </span>
+  );
+}
+
+function LiveDot() {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-sm border border-success/30 bg-success/15 px-1.5 py-[2px] font-mono text-[9.5px] font-semibold uppercase tracking-[0.16em] text-success">
+      <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse-soft" />
+      ON AIR
+    </span>
+  );
+}
+
+/* ---------- Contact-sheet tile bodies ---------- */
+
+function ContactFrame({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`relative aspect-square w-full overflow-hidden rounded-sm border border-border/60 bg-card transition-colors duration-200 hover:border-border ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function FrameIndex({ index }: { index: number }) {
+  return (
+    <span className="mono-ltr font-mono text-[10px] tabular-nums tracking-[0.18em] text-muted-foreground/85">
+      № {String(index).padStart(2, "0")}
+    </span>
+  );
+}
+
+function OrganicLiveTile({
+  post,
+  index,
+}: {
+  post: OrganicPost;
+  index: number;
+}) {
   const [playing, setPlaying] = useState(false);
   const thumb = post.thumbnail
     ? `/api/gallery/organic-thumbnail?src=${post.source}&url=${encodeURIComponent(post.thumbnail)}`
@@ -197,88 +287,87 @@ function OrganicLiveTile({ post }: { post: OrganicPost }) {
   const canPlay = post.isVideo && !!videoSrc;
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="group relative overflow-hidden rounded-xl bg-muted shadow-sm ring-1 ring-emerald-300/60 transition-shadow hover:shadow-md">
-        <div className="relative aspect-square w-full">
-          {playing && canPlay ? (
-            <video
-              src={videoSrc ?? undefined}
-              poster={thumb ?? undefined}
-              controls
-              autoPlay
-              playsInline
-              className="h-full w-full bg-slate-900 object-cover"
+    <article className="group flex flex-col gap-3">
+      <ContactFrame>
+        {playing && canPlay ? (
+          <video
+            src={videoSrc ?? undefined}
+            poster={thumb ?? undefined}
+            controls
+            autoPlay
+            playsInline
+            className="h-full w-full bg-muted object-cover"
+          />
+        ) : thumb ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={thumb}
+              alt={post.caption?.slice(0, 80) ?? `${post.source} post`}
+              className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
+              loading="lazy"
             />
-          ) : thumb ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumb}
-                alt={post.caption?.slice(0, 80) ?? `${post.source} post`}
-                className="h-full w-full object-cover"
-                referrerPolicy="no-referrer"
-                loading="lazy"
+            {canPlay ? (
+              <button
+                type="button"
+                onClick={() => setPlaying(true)}
+                aria-label="הפעל וידאו"
+                className="absolute inset-0 cursor-pointer bg-black/0 transition-colors hover:bg-black/15"
               />
-              {canPlay ? (
-                <button
-                  type="button"
-                  onClick={() => setPlaying(true)}
-                  aria-label="הפעל וידאו"
-                  className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors hover:bg-black/20"
-                >
-                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition-transform group-hover:scale-110">
-                    <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current ms-1" aria-hidden>
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </span>
-                </button>
-              ) : null}
-            </>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-slate-900 text-xs text-slate-300">
-              {post.isVideo ? "▶ וידאו אורגני" : "אין תצוגה מקדימה"}
-            </div>
-          )}
-          <span
-            className={`absolute end-2 top-2 rounded px-1.5 py-0.5 text-[10px] font-semibold text-white ${
-              post.source === "facebook" ? "bg-blue-600" : "bg-pink-600"
-            }`}
-          >
-            {post.source === "facebook" ? "FB" : "IG"}
-          </span>
-          <span className="absolute start-2 top-2 rounded-md bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-white shadow">
-            חי
-          </span>
-          {post.isVideo && !playing ? (
-            <span className="absolute bottom-2 start-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
-              ▶ וידאו
-            </span>
-          ) : null}
+            ) : null}
+          </>
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-muted text-[11px] text-muted-foreground">
+            {post.isVideo ? "▶ וידאו אורגני" : "אין תצוגה מקדימה"}
+          </div>
+        )}
+
+        <div className="absolute end-2 top-2">
+          <SourceChip source={post.source} />
         </div>
-      </div>
-      <div className="flex flex-col gap-1.5 px-1">
-        <span className="text-[11px] text-muted-foreground">
-          {formatPostDate(post.timestamp)}
-        </span>
+        <div className="absolute start-2 top-2">
+          <LiveDot />
+        </div>
+        {post.isVideo && !playing ? (
+          <span className="absolute bottom-2 start-2 rounded-sm border border-white/15 bg-black/65 px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.16em] text-white">
+            video
+          </span>
+        ) : null}
+      </ContactFrame>
+
+      <div className="flex flex-col gap-1.5 px-0.5">
+        <div className="flex items-baseline gap-2">
+          <FrameIndex index={index} />
+          <span className="font-editorial text-[11px] italic text-muted-foreground">
+            {formatPostDate(post.timestamp)}
+          </span>
+        </div>
         {post.caption ? (
-          <p className="line-clamp-2 text-xs" dir="auto" title={post.caption}>
+          <p
+            className="line-clamp-2 text-[12.5px] leading-snug text-foreground"
+            dir="auto"
+            title={post.caption}
+          >
             {post.caption}
           </p>
         ) : (
-          <p className="text-xs italic text-muted-foreground">ללא טקסט</p>
+          <p className="font-editorial text-[12px] italic text-muted-foreground">
+            ללא טקסט
+          </p>
         )}
         {post.permalink ? (
           <a
             href={post.permalink}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[11px] text-blue-600 hover:underline"
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-brand-400 transition-colors hover:text-brand-300"
           >
-            פתח ב-{post.source === "facebook" ? "Facebook" : "Instagram"} ↗
+            open in {post.source === "facebook" ? "facebook" : "instagram"} ↗
           </a>
         ) : null}
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -294,47 +383,22 @@ function formatPostDate(iso: string): string {
   }
 }
 
-const GRADE_STYLE: Record<PerformanceGrade, { bg: string; text: string; ring: string; label: string }> = {
-  A: { bg: "bg-emerald-500", text: "text-white", ring: "ring-emerald-400", label: "מנצח" },
-  B: { bg: "bg-sky-500", text: "text-white", ring: "ring-sky-400", label: "טוב" },
-  C: { bg: "bg-amber-500", text: "text-white", ring: "ring-amber-400", label: "בינוני" },
-  D: { bg: "bg-red-600", text: "text-white", ring: "ring-red-500", label: "חלש" },
-  learning: { bg: "bg-slate-400", text: "text-white", ring: "ring-slate-400", label: "לומד" },
-};
-
-function PerformanceBadge({
-  grade,
-  score,
-}: {
-  grade: PerformanceGrade;
-  score: number;
-}) {
-  const s = GRADE_STYLE[grade];
-  const display = grade === "learning" ? "…" : grade;
-  return (
-    <div className={`flex flex-col items-center gap-0.5 rounded-md ${s.bg} px-2 py-1 ${s.text} shadow`}>
-      <span className="text-base font-bold leading-none">{display}</span>
-      {grade !== "learning" ? (
-        <span className="text-[9px] font-mono opacity-90">{score > 0 ? `+${score}` : score}</span>
-      ) : null}
-    </div>
-  );
-}
-
-function MetricChips({ perf }: { perf: NonNullable<LiveMetaCreative["performance"]> }) {
+function MetricLine({ perf }: { perf: NonNullable<LiveMetaCreative["performance"]> }) {
   const m = perf.metrics;
-  const chips: string[] = [];
-  if (m.impressions != null && m.impressions > 0) chips.push(`${m.impressions.toLocaleString()} impr`);
-  if (m.ctr != null) chips.push(`CTR ${m.ctr.toFixed(2)}%`);
-  if (m.hook_rate != null) chips.push(`Hook ${m.hook_rate.toFixed(0)}%`);
-  if (m.frequency != null) chips.push(`Freq ${m.frequency.toFixed(1)}`);
-  if (m.spend != null && m.spend > 0) chips.push(`₪${m.spend.toFixed(0)}`);
-  if (m.conversions != null && m.conversions > 0) chips.push(`${m.conversions} conv`);
-  if (chips.length === 0) return null;
+  const parts: string[] = [];
+  if (m.ctr != null) parts.push(`CTR ${m.ctr.toFixed(2)}%`);
+  if (m.hook_rate != null) parts.push(`Hook ${m.hook_rate.toFixed(0)}%`);
+  if (m.spend != null && m.spend > 0) parts.push(`₪${m.spend.toFixed(0)}`);
+  if (m.impressions != null && m.impressions > 0)
+    parts.push(`${(m.impressions / 1000).toFixed(1)}k impr`);
+  if (parts.length === 0) return null;
   return (
-    <div className="flex flex-wrap gap-1 rounded bg-muted/40 px-2 py-1 text-[10px] font-mono text-muted-foreground">
-      {chips.map((c) => (
-        <span key={c}>{c}</span>
+    <div className="mono-ltr flex flex-wrap items-baseline gap-x-3 font-mono text-[10.5px] tabular-nums text-muted-foreground">
+      {parts.map((p, i) => (
+        <span key={p}>
+          {i > 0 ? <span className="text-border me-3">·</span> : null}
+          {p}
+        </span>
       ))}
     </div>
   );
@@ -354,7 +418,13 @@ const NO_DATA_PERFORMANCE = {
   },
 };
 
-function LiveMetaCreativeTile({ creative }: { creative: LiveMetaCreative }) {
+function LiveMetaCreativeTile({
+  creative,
+  index,
+}: {
+  creative: LiveMetaCreative;
+  index: number;
+}) {
   const [playing, setPlaying] = useState(false);
 
   const rawThumb = creative.thumbnail_url ?? creative.image_url;
@@ -365,121 +435,87 @@ function LiveMetaCreativeTile({ creative }: { creative: LiveMetaCreative }) {
   const canPlay = isVideo && !!creative.video_source_url;
   const fromGallery = !!creative.galleryAsset;
   const perf = creative.performance ?? NO_DATA_PERFORMANCE;
-  const ringColor = GRADE_STYLE[perf.grade].ring;
+  const displayName = creative.name
+    ? extractDisplayName(creative.name)
+    : "ללא שם";
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2 px-1 text-[10px]">
-        <span
-          className="truncate font-semibold text-muted-foreground"
-          title={`${creative.campaign_name} · #${creative.campaign_id}`}
-        >
-          {creative.campaign_name}
-        </span>
-        <span className="shrink-0 font-mono text-muted-foreground/70">
-          #{creative.campaign_id.slice(-6)}
-        </span>
-        {creative.campaign_status && creative.campaign_status !== "ACTIVE" ? (
-          <span className="shrink-0 rounded bg-amber-100 px-1 py-0.5 text-[9px] text-amber-900">
-            {creative.campaign_status}
+    <article className="group flex flex-col gap-3">
+      <ContactFrame>
+        {playing && canPlay ? (
+          <video
+            src={creative.video_source_url ?? undefined}
+            poster={thumb ?? undefined}
+            controls
+            autoPlay
+            playsInline
+            className="h-full w-full bg-muted object-cover"
+          />
+        ) : thumb ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={thumb}
+              alt={creative.name ?? `creative ${creative.creative_id}`}
+              className="h-full w-full object-cover"
+              referrerPolicy="no-referrer"
+              loading="lazy"
+            />
+            {canPlay ? (
+              <button
+                type="button"
+                onClick={() => setPlaying(true)}
+                aria-label="הפעל וידאו"
+                className="absolute inset-0 cursor-pointer bg-black/0 transition-colors hover:bg-black/15"
+              />
+            ) : null}
+          </>
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-muted text-[11px] text-muted-foreground">
+            {isVideo ? "▶ וידאו" : "אין תצוגה מקדימה"}
+          </div>
+        )}
+
+        <div className="absolute end-2 top-2">
+          <Scoreplate grade={perf.grade} />
+        </div>
+        {fromGallery ? (
+          <span className="absolute start-2 top-2 rounded-sm border border-white/15 bg-black/55 px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.16em] text-white backdrop-blur-sm">
+            from gallery
           </span>
         ) : null}
-      </div>
-
-      <div
-        className={`group relative overflow-hidden rounded-xl bg-muted shadow-sm ring-2 ${ringColor} transition-shadow hover:shadow-md`}
-      >
-        <div className="relative aspect-square w-full">
-          {playing && canPlay ? (
-            <video
-              src={creative.video_source_url ?? undefined}
-              poster={thumb ?? undefined}
-              controls
-              autoPlay
-              playsInline
-              className="h-full w-full bg-slate-900 object-cover"
-            />
-          ) : thumb ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={thumb}
-                alt={creative.name ?? `creative ${creative.creative_id}`}
-                className="h-full w-full object-cover"
-                referrerPolicy="no-referrer"
-                loading="lazy"
-              />
-              {canPlay ? (
-                <button
-                  type="button"
-                  onClick={() => setPlaying(true)}
-                  aria-label="הפעל וידאו"
-                  className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors hover:bg-black/20"
-                >
-                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition-transform group-hover:scale-110">
-                    <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current ms-1" aria-hidden>
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </span>
-                </button>
-              ) : null}
-            </>
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-slate-900 text-xs text-slate-300">
-              {isVideo ? "▶ וידאו" : "אין תצוגה מקדימה"}
-            </div>
-          )}
-
-          <div className="absolute start-2 top-2">
-            <PerformanceBadge grade={perf.grade} score={perf.score} />
-          </div>
-          <span className="absolute end-2 top-2 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-            Meta
+        {isVideo && !playing ? (
+          <span className="absolute bottom-2 start-2 rounded-sm border border-white/15 bg-black/65 px-1.5 py-[2px] font-mono text-[9.5px] uppercase tracking-[0.16em] text-white">
+            video
           </span>
-          {isVideo && !playing ? (
-            <span className="absolute bottom-2 start-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] text-white">
-              ▶ וידאו
-            </span>
-          ) : null}
-          {fromGallery ? (
-            <span className="absolute bottom-2 end-2 rounded bg-purple-600 px-1.5 py-0.5 text-[10px] font-semibold text-white">
-              מהגלרייה
-            </span>
-          ) : null}
-        </div>
-      </div>
-      <div className="flex flex-col gap-1.5 px-1">
-        <div className="flex items-baseline justify-between gap-2">
-          <h4
-            className="truncate text-sm font-medium text-foreground"
-            title={creative.name ?? creative.creative_id}
-          >
-            {creative.name ?? "ללא שם"}
-          </h4>
-          <span className="shrink-0 text-[10px] text-muted-foreground">
-            {GRADE_STYLE[perf.grade].label}
+        ) : null}
+      </ContactFrame>
+
+      <div className="flex flex-col gap-1.5 px-0.5">
+        <div className="flex items-baseline gap-2 text-muted-foreground">
+          <FrameIndex index={index} />
+          <span className="truncate font-mono text-[10px] uppercase tracking-[0.14em]">
+            {creative.campaign_name}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-          <span className="font-mono">#{creative.creative_id.slice(-9)}</span>
+        <h4
+          className="truncate text-[13px] font-medium text-foreground"
+          dir="auto"
+          title={creative.name ?? creative.creative_id}
+        >
+          {displayName}
+        </h4>
+        <MetricLine perf={perf} />
+        <div className="flex items-center gap-2 font-mono text-[9.5px] uppercase tracking-[0.16em] text-muted-foreground">
+          <span className="mono-ltr">#{creative.creative_id.slice(-9)}</span>
           {creative.ad_status !== "ACTIVE" ? (
-            <span className="rounded bg-amber-100 px-1 py-0.5 text-amber-900">
+            <span className="rounded-sm border border-warning/25 bg-warning/10 px-1.5 py-[1px] text-warning">
               {creative.ad_status}
             </span>
           ) : null}
         </div>
-        <MetricChips perf={perf} />
-        {perf.reasons.length > 0 ? (
-          <ul className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
-            {perf.reasons.slice(0, 2).map((r, i) => (
-              <li key={i} className="truncate" title={r}>
-                · {r}
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -489,8 +525,15 @@ interface PrioritySectionProps {
   search: string;
 }
 
-export function PrioritySection({ assets, usage, search }: PrioritySectionProps) {
-  const items = useMemo(() => buildPriorityQueue(assets, usage), [assets, usage]);
+export function PrioritySection({
+  assets,
+  usage,
+  search,
+}: PrioritySectionProps) {
+  const items = useMemo(
+    () => buildPriorityQueue(assets, usage),
+    [assets, usage],
+  );
   const q = search.trim().toLowerCase();
   const filtered = useMemo(() => {
     if (!q) return items;
@@ -512,20 +555,24 @@ export function PrioritySection({ assets, usage, search }: PrioritySectionProps)
   if (filtered.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-5">
       <SectionHeader
+        numeral="III."
+        kicker="Chapter III — Up Next"
         title="הבא בתור"
-        subtitle="נכסי גלריה שעוד לא רצו במודעה — ממוינים לפי score שקוף"
+        subtitle="נכסי גלריה שעוד לא רצו במודעה — ממוינים לפי score שקוף."
         count={filtered.length}
+        unit="candidates"
       />
-      <TileGrid>
-        {filtered.slice(0, 12).map((item) =>
+      <ContactSheet>
+        {filtered.slice(0, 12).map((item, i) =>
           item.asset ? (
             <AssetTile
               key={item.id}
               asset={item.asset}
               ads={[]}
               usage={usage}
+              index={i + 1}
               showCampaignChip={false}
               footer={
                 <PromoteFooter
@@ -537,7 +584,7 @@ export function PrioritySection({ assets, usage, search }: PrioritySectionProps)
             />
           ) : null,
         )}
-      </TileGrid>
+      </ContactSheet>
     </section>
   );
 }
@@ -551,7 +598,9 @@ function PromoteFooter({
   score: number;
   reasons: string[];
 }) {
-  const [state, setState] = useState<"idle" | "pending" | "success" | "error">("idle");
+  const [state, setState] = useState<"idle" | "pending" | "success" | "error">(
+    "idle",
+  );
   const [errMsg, setErrMsg] = useState<string | null>(null);
 
   async function onPromote() {
@@ -580,25 +629,28 @@ function PromoteFooter({
   }
 
   return (
-    <div className="flex flex-col gap-1.5 rounded-md border border-amber-200/60 bg-amber-50/50 p-2 dark:border-amber-900/40 dark:bg-amber-950/20">
+    <div className="flex flex-col gap-1.5 border-t border-border/60 pt-2">
       <div className="flex items-center justify-between gap-2">
-        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-900 dark:text-amber-300">
+        <span className="inline-flex items-baseline gap-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-brand-400">
           <Sparkles className="h-3 w-3" />
-          Score {score}
+          score{" "}
+          <span className="mono-ltr text-[12px] tabular-nums text-foreground">
+            {score}
+          </span>
         </span>
         {state === "success" ? (
           <Link
             href="/approvals"
-            className="text-[10px] font-medium text-emerald-700 hover:underline"
+            className="font-mono text-[10px] uppercase tracking-[0.18em] text-success hover:underline"
           >
-            ✓ נשלח לאישור — פתח את התור
+            ✓ נשלח · פתח תור
           </Link>
         ) : (
           <Button
             type="button"
             size="sm"
             variant="outline"
-            className="h-6 px-2 text-[10px]"
+            className="h-6 px-2 text-[10.5px]"
             disabled={state === "pending"}
             onClick={onPromote}
           >
@@ -607,12 +659,12 @@ function PromoteFooter({
         )}
       </div>
       {state === "error" && errMsg ? (
-        <p className="text-[10px] text-red-600" dir="auto" title={errMsg}>
+        <p className="text-[10.5px] text-destructive" dir="auto" title={errMsg}>
           שגיאה: {errMsg}
         </p>
       ) : null}
       {reasons.length > 0 ? (
-        <ul className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+        <ul className="flex flex-col gap-0.5 text-[10.5px] leading-snug text-muted-foreground">
           {reasons.slice(0, 3).map((r, i) => (
             <li key={i} className="truncate" title={r}>
               · {r}
@@ -691,26 +743,37 @@ export function ArchiveSection({
   }, [filtered, sort, usage]);
 
   return (
-    <section className="flex flex-col gap-4">
+    <section className="flex flex-col gap-5">
       <SectionHeader
+        numeral="IV."
+        kicker="Chapter IV — Archive"
         title="הארכיון"
-        subtitle="כל הנכסים — חיים, טיוטות וכבויים"
+        subtitle="כל הנכסים — חיים, טיוטות וכבויים. ממוינים לפי הציר שבחרת."
         count={filtered.length}
+        unit="frames"
         right={<SortPicker value={sort} onChange={setSort} />}
       />
       {sorted.length === 0 ? (
         assets.length === 0 ? (
-          <EmptyState text="עוד לא הועלו נכסים. לחץ על + העלה למעלה." />
+          <EmptyState text="עוד לא הועלו נכסים. לחץ על העלה למעלה." />
         ) : (
           <EmptyState text="אין נכסים שתואמים את החיפוש/הפילטר." />
         )
       ) : (
-        <TileGrid>
-          {sorted.map((a) => {
+        <ContactSheet>
+          {sorted.map((a, i) => {
             const ads = a.meta_creative_id ? usage[a.meta_creative_id] ?? [] : [];
-            return <AssetTile key={a.id} asset={a} ads={ads} usage={usage} />;
+            return (
+              <AssetTile
+                key={a.id}
+                asset={a}
+                ads={ads}
+                usage={usage}
+                index={i + 1}
+              />
+            );
           })}
-        </TileGrid>
+        </ContactSheet>
       )}
     </section>
   );
@@ -730,26 +793,34 @@ function SortPicker({
     { value: "most_used", label: "הכי בשימוש" },
   ];
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as ArchiveSort)}
-      className="h-9 rounded-md border border-input bg-background px-3 text-xs"
-      aria-label="מיון"
-    >
-      {options.map((o) => (
-        <option key={o.value} value={o.value}>
-          {o.label}
-        </option>
-      ))}
-    </select>
+    <label className="flex items-baseline gap-2">
+      <span className="font-mono text-[9.5px] uppercase tracking-[0.18em] text-muted-foreground">
+        sort
+      </span>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value as ArchiveSort)}
+        className="h-7 rounded-sm border-0 border-b border-border bg-transparent px-1 text-[12px] text-foreground transition-colors hover:border-foreground/40 focus:border-brand-400 focus:outline-none"
+        aria-label="מיון"
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
-function TileGrid({ children }: { children: React.ReactNode }) {
-  // Looser auto-fill grid per Claude Design — tiles are ~220px wide so the
-  // hero card breathes and individual tiles are scannable from arm's length.
+/**
+ * Contact-sheet grid — five-up at desktop. Wider gutters than a standard
+ * card grid so each frame breathes and the eye reads it as a sequence,
+ * not a wall of thumbnails.
+ */
+function ContactSheet({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-x-5 gap-y-7">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-x-6 gap-y-10">
       {children}
     </div>
   );
@@ -757,10 +828,23 @@ function TileGrid({ children }: { children: React.ReactNode }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-border/60 px-4 py-12 text-center text-sm text-muted-foreground">
-      {text}
+    <div className="flex flex-col items-center gap-3 rounded-sm border border-dashed border-border/60 px-6 py-14 text-center">
+      <span aria-hidden className="font-editorial text-[28px] italic text-muted-foreground/60">
+        —
+      </span>
+      <p className="max-w-[44ch] text-[13px] leading-relaxed text-muted-foreground">
+        {text}
+      </p>
     </div>
   );
+}
+
+// Creative names from the agent often have a date-stamp + hex ID suffix.
+function extractDisplayName(raw: string): string {
+  return raw
+    .replace(/[\s\-_·]*\d{4}-\d{2}-\d{2}[\s\-_·]*[0-9a-f]{16,}\s*$/i, "")
+    .replace(/[\s\-_·]*[0-9a-f]{20,}\s*$/i, "")
+    .trim() || raw;
 }
 
 export type { OrganicPost };
