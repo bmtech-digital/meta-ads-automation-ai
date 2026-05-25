@@ -113,6 +113,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # myoung34/github-runner image doesn't ship kubectl — install it
+      # fresh on each run. Cluster auth is implicit via the in-cluster
+      # ServiceAccount (gh-runner-campaigner) — kubectl auto-discovers it
+      # via /var/run/secrets/kubernetes.io/serviceaccount.
+      - uses: azure/setup-kubectl@v4
+
       - name: Apply migrations (idempotent)
         # Tolerates "already exists" / "duplicate" so re-runs don't fail.
         # Any other error aborts the deploy. Migrations are checked out from
