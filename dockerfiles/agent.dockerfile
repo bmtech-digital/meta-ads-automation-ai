@@ -1,8 +1,10 @@
 # syntax=docker/dockerfile:1.6
 #
 # Campaigner agent image — Python 3.11 + Node 20 + Claude Code CLI.
-# Used by k8s CronJobs (daily observe-propose, executor every 15min, weekly creative).
-# Each CronJob overrides `command:` to invoke a runner script under runners/.
+# Image: ghcr.io/roihala/campaigner-agent
+# Used by k8s CronJobs on Hetzner k3s (daily observe-propose, executor every
+# 15min, weekly creative, etc.). Each CronJob overrides `command:` to invoke
+# a runner script under runners/.
 
 FROM python:3.11-slim
 

@@ -47,7 +47,7 @@ When Claude's cwd matches a folder below, that folder's `CLAUDE.md` loads **in a
 | [`tests/`](tests/CLAUDE.md)                           | Two test layers (golden, contract), how to run, what's intentionally not tested |
 | [`tests/golden/`](tests/golden/README.md)             | Golden-scenario format and adding cases                                         |
 | [`dockerfiles/`](dockerfiles/CLAUDE.md)               | Three images, when to rebuild which, build-context rule                         |
-| [`kubefiles/`](kubefiles/CLAUDE.md)                   | Cluster of record, manifest catalog, deploy via Makefile                        |
+| [`kubefiles/README.md`](kubefiles/README.md)          | Pointer to the canonical Hetzner k3s manifests (this repo no longer ships its own — production manifests live in the operator's Hetzner infra repo) |
 | [`web/`](web/CLAUDE.md)                               | Next.js conventions, dual-mode adapters, Hebrew RTL, run + test                 |
 | [`web/src/app/`](web/src/app/CLAUDE.md)               | App Router route map, auth-gate via middleware                                  |
 | [`web/src/components/`](web/src/components/CLAUDE.md) | Primitives vs feature components, RTL conventions                               |
@@ -79,11 +79,11 @@ All decisions are logged to Supabase `agent_decisions` — replaces LangSmith/La
 ## Architecture (MVP — Claude Code Native)
 
 ```
-cron (Cloud Scheduler)
+cron (Kubernetes CronJob, Hetzner k3s)
   → runners/*.sh → claude -p "..."
   → Claude reads CAMPAIGNER.md + prompts/*.md
   → Claude invokes Python CLI tools via Bash
-  → Python tools talk to Meta (facebook-business) + Supabase
+  → Python tools talk to Meta (facebook-business) + Postgres
   → Decisions logged; proposals queued for human approval
 ```
 
@@ -130,21 +130,23 @@ cron (Cloud Scheduler)
 - **Supabase** (Postgres + Auth + Storage) — DB + HITL queue
 - **Vertex AI Imagen** (`google-genai`) — image generation
 - **Meta Marketing API** (`facebook-business`) — Meta integration
-- **Cloud Run Jobs + Cloud Scheduler** — cron runtime
+- **Hetzner k3s CronJobs** — cron runtime (production); `docker compose` for local
 
 **Estimated MVP cost:** ~$25/month/business (Claude ~$23, Imagen ~$1.60).
 
 ## Setup & Configuration
 
-### GCP Authentication
+### Vertex AI Imagen credentials (local development only)
 
-Imagen uses GCP credentials (not API keys):
+Vertex AI Imagen is the one remaining GCP-side dependency — it's a managed API the agent calls, not a deployment target. For local development, the SDK uses Application Default Credentials:
 
 ```bash
 gcloud auth application-default login
 ```
 
-The GCP project defaults to `bemtech-478413`.
+In production on Hetzner k3s, the agent CronJobs mount a dedicated GCP service account key via the `gcp-vertexai-credentials` Kubernetes Secret (provisioned by the operator from the Hetzner infra repo). No `gcloud` is needed at runtime — only the JSON key file mounted at `/var/secrets/gcp/credentials.json`.
+
+The GCP project is `bemtech-478413` (kept solely for billing the Vertex AI calls).
 
 ### Environment Variables (`.env`)
 

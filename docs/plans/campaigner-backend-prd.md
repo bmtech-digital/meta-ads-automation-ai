@@ -384,6 +384,8 @@ Daily cron tool writes Anthropic + Imagen spend to `agent_decisions.outputs` for
 
 ## 4. Technical Specifications
 
+> **Updated 2026-05-25** — production now runs on Hetzner k3s as a single multi-tenant cluster, not Cloud Run Jobs + Cloud Scheduler. Backend flows are k8s `CronJob` resources, not Cloud Run Jobs; secrets are SOPS-encrypted YAMLs in the operator's Hetzner infra repo, not Google Secret Manager. Everything below is historical context. For the current shape see [`../ARCHITECTURE.md`](../ARCHITECTURE.md) and for deployment see [`../CI_CD.md`](../CI_CD.md).
+
 ### Architecture Overview
 
 See spec §9 for the full diagram. Condensed flow:

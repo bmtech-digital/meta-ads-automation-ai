@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Generate cronjob manifests and prompt-load matrices from config/flows.yaml.
+"""Generate spec-table fragments from config/flows.yaml.
 
 `config/flows.yaml` is the single source of truth for the campaigner flow
-registry. This script regenerates the artifacts derived from it:
+registry. This script regenerates the doc fragments derived from it:
 
-    - kubefiles/agent_cronjob_<cronjob_name>.yaml  (one per deployed cron flow)
     - The "Which flow am I running?" routing table in campaigner/CAMPAIGNER.md
     - The "Before every flow — Load context" matrix in CAMPAIGNER.md
     - The flow index table in docs/ARCHITECTURE.md
+
+Note: CronJob YAML generation was retired with the GKE deployment. Production
+CronJob manifests now live in the operator's Hetzner infra repo at
+~/projects/bemtech/setup/hetzner/manifests/campaigner/ — see kubefiles/README.md.
 
 Run modes:
 
@@ -32,7 +35,6 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 FLOWS_YAML = REPO_ROOT / "config" / "flows.yaml"
-KUBEFILES_DIR = REPO_ROOT / "kubefiles"
 CAMPAIGNER_MD = REPO_ROOT / "campaigner" / "CAMPAIGNER.md"
 ARCHITECTURE_MD = REPO_ROOT / "docs" / "ARCHITECTURE.md"
 
@@ -245,18 +247,8 @@ def replace_between_sentinels(text: str, sentinel: str, new_body: str) -> str:
 
 def planned_outputs() -> dict[Path, str]:
     """Return {path: content} for every file the generator owns."""
-    defaults, prompts, flows = load_registry()
+    defaults, prompts, flows = load_registry()  # noqa: F841 — `defaults` still consumed by render_cronjob if ever re-enabled
     outputs: dict[Path, str] = {}
-
-    # CronJob manifests — one per deployed cron flow. The filename uses the
-    # cronjob_name (with hyphens replaced by underscores) to match the
-    # existing convention: `agent-daily-observe` -> `agent_cronjob_daily_observe.yaml`.
-    for f in flows:
-        if not f.deployed or f.schedule is None:
-            continue
-        filename = f"agent_cronjob_{f.cronjob_name.replace('-', '_')}.yaml"
-        path = KUBEFILES_DIR / filename
-        outputs[path] = render_cronjob(f, defaults)
 
     # CAMPAIGNER.md — routing table + prompt-load matrix.
     campaigner_text = CAMPAIGNER_MD.read_text()
@@ -276,17 +268,6 @@ def planned_outputs() -> dict[Path, str]:
     return outputs
 
 
-def find_orphan_cronjobs(expected: set[Path]) -> list[Path]:
-    """Cronjob YAMLs that exist on disk but are not produced by the generator.
-
-    Anything matching `kubefiles/agent_cronjob_*.yaml` is owned by this
-    generator. A file that doesn't correspond to a flow in flows.yaml is
-    an orphan — usually a rename or a deleted flow.
-    """
-    on_disk = set(KUBEFILES_DIR.glob("agent_cronjob_*.yaml"))
-    return sorted(on_disk - expected)
-
-
 def write_mode() -> int:
     outputs = planned_outputs()
     changed: list[Path] = []
@@ -297,17 +278,10 @@ def write_mode() -> int:
             path.write_text(content)
             changed.append(path)
 
-    cronjob_paths = {p for p in outputs if p.parent == KUBEFILES_DIR}
-    orphans = find_orphan_cronjobs(cronjob_paths)
-    for path in orphans:
-        path.unlink()
-        changed.append(path)
-
     if changed:
-        print(f"Wrote/removed {len(changed)} file(s):")
+        print(f"Wrote {len(changed)} file(s):")
         for p in changed:
-            marker = "(removed orphan)" if p in orphans else ""
-            print(f"  {p.relative_to(REPO_ROOT)} {marker}".rstrip())
+            print(f"  {p.relative_to(REPO_ROOT)}")
     else:
         print("Already up to date.")
     return 0
@@ -330,19 +304,11 @@ def check_mode() -> int:
             )
             drift.append((path, diff))
 
-    cronjob_paths = {p for p in outputs if p.parent == KUBEFILES_DIR}
-    orphans = find_orphan_cronjobs(cronjob_paths)
-
-    if drift or orphans:
-        if drift:
-            print("DRIFT — generated files are out of sync with config/flows.yaml:")
-            for path, diff in drift:
-                print(f"\n--- {path.relative_to(REPO_ROOT)} ---")
-                print(diff)
-        if orphans:
-            print("\nORPHAN cronjob manifests (no matching entry in flows.yaml):")
-            for p in orphans:
-                print(f"  {p.relative_to(REPO_ROOT)}")
+    if drift:
+        print("DRIFT — generated files are out of sync with config/flows.yaml:")
+        for path, diff in drift:
+            print(f"\n--- {path.relative_to(REPO_ROOT)} ---")
+            print(diff)
         print(
             "\nRun `make generate` to regenerate, then commit the result.\n"
             "If the change is intentional, edit config/flows.yaml first — "

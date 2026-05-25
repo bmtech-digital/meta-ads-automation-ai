@@ -163,7 +163,7 @@ def handle_webhook():
 
 @app.route("/health", methods=["GET"])
 def health():
-    """Health check for Cloud Run."""
+    """Health check for the k8s liveness/readiness probe."""
     return jsonify({"status": "ok"}), 200
 
 

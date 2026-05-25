@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 #
 # Campaigner webhook (Flask + gunicorn). Build context: ./webhook
-# Image: us-central1-docker.pkg.dev/bemtech-478413/generic-agent-repo/campaigner-webhook
+# Image: ghcr.io/roihala/campaigner-webhook
 
 FROM python:3.12-slim
 

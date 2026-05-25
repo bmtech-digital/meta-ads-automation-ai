@@ -263,6 +263,8 @@ If the operator hits a rationale they can't act on from the UI alone, they file 
 
 ## 4. Technical Specifications
 
+> **Updated 2026-05-25** — production now runs on Hetzner k3s, not GKE. The architecture diagram and tables below describe the original GCP-targeted design; everything below is historical context. For the current shape see [`../ARCHITECTURE.md`](../ARCHITECTURE.md) and for deployment see [`../CI_CD.md`](../CI_CD.md).
+
 ### Architecture Overview
 
 ```

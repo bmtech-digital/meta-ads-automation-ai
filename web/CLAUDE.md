@@ -4,7 +4,7 @@
 
 ## What this folder is
 
-The Next.js 15 + Tailwind + shadcn/ui dashboard. RTL Hebrew-first. Built into the `campaigner-web` Docker image via [`../dockerfiles/web.dockerfile`](../dockerfiles/web.dockerfile) and deployed via [`../kubefiles/web_deployment.yaml`](../kubefiles/web_deployment.yaml).
+The Next.js 15 + Tailwind + shadcn/ui dashboard. RTL Hebrew-first. Built into the `ghcr.io/roihala/campaigner-web` Docker image via [`../dockerfiles/web.dockerfile`](../dockerfiles/web.dockerfile) and deployed to Hetzner k3s by CI ([`../docs/CI_CD.md`](../docs/CI_CD.md)); the Deployment/Service/Ingress manifests live in the operator's Hetzner infra repo — see [`../kubefiles/README.md`](../kubefiles/README.md).
 
 | | |
 |---|---|
@@ -68,7 +68,7 @@ E2E lives in [`e2e/`](e2e/). Unit tests are colocated as `<file>.test.ts` next t
 2. **Server components by default.** Add `"use client"` only when the component genuinely needs state, effects, or browser APIs. Components without `"use client"` can fetch directly from `src/lib/db/`.
 3. **Assistant + Geist + Geist Mono as the three brand fonts.** All loaded once in `layout.tsx` via `next/font`. Assistant = Hebrew display/UI, Geist = Latin sans, Geist Mono = numbers/IDs/code. Don't import other fonts ad-hoc. (Heebo was the previous brand font — no longer in use; see [`../docs/DESIGN.md`](../docs/DESIGN.md) Typography.)
 4. **No CSS files outside `globals.css`.** Tailwind for everything. Custom CSS goes into `globals.css` with a comment explaining why a utility class wasn't enough.
-5. **Image uploads** go to `web/uploads/` in dev (gitignored) or to the gallery GCS bucket in prod. The same dual-mode pattern applies — see [`src/lib/storage.ts`](src/lib/storage.ts).
+5. **Image uploads** go to `web/uploads/` in dev (gitignored) or to object storage in prod (currently still the GCS gallery bucket; eventual move to Hetzner Object Storage tracked separately). The same dual-mode pattern applies — see [`src/lib/storage.ts`](src/lib/storage.ts).
 6. **API routes are thin.** [`src/app/api/`](src/app/api/) handlers should validate with Zod, call into `src/lib/db/`, and return JSON. Business logic doesn't belong in route handlers.
 7. **No direct Meta *write* calls from the web.** Meta writes (publish post, create/update campaign) stay the agent's territory and only fire after an approved `approvals` row. Meta *reads* — OAuth bootstrap, asset discovery, capability readiness — are allowed from web routes under [`src/app/api/meta/`](src/app/api/meta/) via the capability layer at [`src/lib/meta-capabilities.ts`](src/lib/meta-capabilities.ts). Updated by [`decisions-log.md §1.12`](../docs/plans/decisions-log.md) — see [`meta-integration-readiness.md`](../docs/plans/meta-integration-readiness.md) for the dual-path token model.
 
@@ -87,5 +87,6 @@ E2E lives in [`e2e/`](e2e/). Unit tests are colocated as `<file>.test.ts` next t
 | Backend PRD (the data this UI reads) | [`../docs/plans/campaigner-backend-prd.md`](../docs/plans/campaigner-backend-prd.md) |
 | Why dual-mode adapters | [`../docs/plans/decisions-log.md`](../docs/plans/decisions-log.md) §1.4 |
 | Meta integration plan (OAuth, capability layer, App Review) | [`../docs/plans/meta-integration-readiness.md`](../docs/plans/meta-integration-readiness.md) + [`decisions-log.md §1.12`](../docs/plans/decisions-log.md) |
-| The deployment manifest | [`../kubefiles/web_deployment.yaml`](../kubefiles/web_deployment.yaml) |
+| The deployment manifest | Operator's Hetzner infra repo (`setup/hetzner/manifests/campaigner/02-web.yaml`); see [`../kubefiles/README.md`](../kubefiles/README.md) |
+| CI/CD flow (build + roll on push to main) | [`../docs/CI_CD.md`](../docs/CI_CD.md) |
 | Setup + Docker commands | [`README.md`](README.md) |
