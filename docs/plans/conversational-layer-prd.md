@@ -5,6 +5,8 @@
 > **Source brief:** "Campaigner V2 — Focused Delta Spec" + operator notes (2026-05-27)
 > **Family:** companion to [campaigner-backend-prd.md](campaigner-backend-prd.md) · [campaigner-frontend-prd.md](campaigner-frontend-prd.md) · [campaigner-migration-prd.md](campaigner-migration-prd.md)
 > **Must obey:** [campaigner-spec.md](campaigner-spec.md) · [../CAMPAIGN_EVALUATION.md](../CAMPAIGN_EVALUATION.md) · [../CAMPAIGN_BUILDING_RECOMMENDATIONS.md](../CAMPAIGN_BUILDING_RECOMMENDATIONS.md)
+>
+> 📂 **Split for review/approval (31.5.2026):** this document is broken into focused, per-domain files under [`conversational-layer/`](conversational-layer/README.md) so work can be scoped, approved, and divided. This file is the full source of truth and stays intact.
 
 ---
 
